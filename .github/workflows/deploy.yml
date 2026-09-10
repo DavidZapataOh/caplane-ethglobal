@@ -1,0 +1,56 @@
+name: deploy
+
+# Platform auto-deploy is off, so production is reached only from here. Several gates in this
+# repository are proved by pushing a deliberately failing commit; with auto-deploy those land
+# on a URL anyone can open.
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+    branches: [main]
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: "${{ github.event.workflow_run.head_sha }}" }
+
+      # `workflow_run.conclusion` is the whole workflow's, and two of its jobs must not block a
+      # release: `credentialed` goes red when a third party has a bad minute, and
+      # `data-sources` reports a missing secret on every push. Gating on the workflow would
+      # mean never promoting. So the five hermetic jobs are checked by name.
+      - name: Require the five hermetic jobs to have passed
+        env:
+          GH_TOKEN: "${{ github.token }}"
+          RUN_ID: "${{ github.event.workflow_run.id }}"
+        run: |
+          jobs=$(gh api "repos/${{ github.repository }}/actions/runs/$RUN_ID/jobs" --paginate \
+                 --jq '.jobs[] | "\(.name)=\(.conclusion)"')
+          echo "$jobs"
+          failed=0
+          for name in hygiene contracts libraries web workflow; do
+            conclusion=$(printf '%s\n' "$jobs" | grep -E "^$name=" | cut -d= -f2 | head -1)
+            if [ "$conclusion" != "success" ]; then
+              echo "::error::$name did not pass (${conclusion:-missing})"
+              failed=1
+            fi
+          done
+          exit $failed
+
+      - uses: oven-sh/setup-bun@v2
+        with: { bun-version: 1.2.21 }
+
+      - name: Promote both surfaces
+        env:
+          VERCEL_TOKEN: "${{ secrets.VERCEL_TOKEN }}"
+          VERCEL_ORG_ID: "${{ secrets.VERCEL_ORG_ID }}"
+        run: |
+          for project in web site; do
+            (
+              cd "$project"
+              npx --yes vercel pull --yes --environment=production --token "$VERCEL_TOKEN"
+              npx --yes vercel build --prod --token "$VERCEL_TOKEN"
+              npx --yes vercel deploy --prebuilt --prod --token "$VERCEL_TOKEN"
+            )
+          done

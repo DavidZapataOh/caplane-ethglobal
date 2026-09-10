@@ -363,6 +363,27 @@ export const brandInvariants = (s: Snapshot): Finding[] => {
   return findings;
 };
 
+
+/**
+ * The public registry has to answer "is this claim already taken" by reading the chain, and it
+ * has to keep answering when the backend is switched off. One project serves both the app and
+ * the registry, so they share one environment: an API URL the app needs is present in the
+ * registry's deployment whether or not anyone intended it. The guarantee therefore has to be a
+ * property of the code path.
+ */
+const REGISTRY_ROUTE = /(^|\/)web\/app\/(\[[^\]]+\]\/)?registry\//;
+const BACKEND_REFERENCE = /api\.caplane\.xyz|NEXT_PUBLIC_API_URL|CAPLANE_API_URL/;
+
+export const registryReadsChainOnly = (s: Snapshot): Finding[] =>
+  s.files
+    .filter(isScannable)
+    .filter((f) => REGISTRY_ROUTE.test(f.path) && BACKEND_REFERENCE.test(f.content))
+    .map((f) => ({
+      rule: "registry-reads-chain-only",
+      where: f.path,
+      detail: "the public registry must read the chain, never the backend — it has to survive the backend being switched off",
+    }));
+
 export const ALL_RULES = [
   noMockDependencies,
   noMockCallSites,
@@ -377,4 +398,5 @@ export const ALL_RULES = [
   frozenArtifactsAreIdentical,
   secretNamesAreRegistered,
   brandInvariants,
+  registryReadsChainOnly,
 ];

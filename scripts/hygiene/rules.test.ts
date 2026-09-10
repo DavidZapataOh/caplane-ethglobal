@@ -2,6 +2,7 @@ import { test, expect } from "bun:test";
 import type { Snapshot } from "./scan";
 import {
   brandInvariants,
+  registryReadsChainOnly,
   noMockDependencies,
   noMockCallSites,
   noLoopbackUrls,
@@ -217,7 +218,7 @@ test("flags a workflow directory still named my-workflow", () => {
 });
 
 test("every rule is registered in ALL_RULES", () => {
-  expect(ALL_RULES).toHaveLength(13);
+  expect(ALL_RULES).toHaveLength(14);
 });
 
 test("does not flag the rule engine's own definitions and fixtures", () => {
@@ -358,4 +359,32 @@ test("flags the seal hex used as a text colour", () => {
 test("accepts the seal hex as a fill", () => {
   const s = snap({ files: [{ path: "web/app/x.css", content: ".seal{background:#A03328}" }] });
   expect(brandInvariants(s)).toEqual([]);
+});
+
+// One Vercel project serves both the app and the registry, so they share one variable set:
+// an API URL the app needs is automatically present in the registry's deployment. The
+// guarantee has to live in the code path, not in a variable.
+
+test("the registry surface never references the api host", () => {
+  const s = snap({
+    files: [{ path: "web/app/[mode]/registry/page.tsx", content: 'fetch("https://api.caplane.xyz/liens")' }],
+  });
+  const found = registryReadsChainOnly(s);
+  expect(found).toHaveLength(1);
+  expect(found[0]!.detail).toContain("must read the chain");
+});
+
+// Without this the rule would be too broad: the app surface may use the backend freely.
+test("the app surface may reference the api host", () => {
+  const s = snap({
+    files: [{ path: "web/app/[mode]/app/page.tsx", content: 'fetch("https://api.caplane.xyz/x")' }],
+  });
+  expect(registryReadsChainOnly(s)).toEqual([]);
+});
+
+test("the rule follows the registry wherever its route lives", () => {
+  const s = snap({
+    files: [{ path: "web/app/registry/lookup.ts", content: "const base = process.env.NEXT_PUBLIC_API_URL" }],
+  });
+  expect(registryReadsChainOnly(s)).toHaveLength(1);
 });

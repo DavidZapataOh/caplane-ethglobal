@@ -2,7 +2,17 @@
   "name": "@caplane/harness",
   "private": true,
   "type": "module",
-  "engines": { "node": "22" },
-  "scripts": { "typecheck": "tsc --noEmit", "test": "node --test" },
-  "devDependencies": { "typescript": "5.9.3" }
+  "engines": {
+    "node": "22"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --test",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/loop.js"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "@types/node": "22.19.1"
+  }
 }

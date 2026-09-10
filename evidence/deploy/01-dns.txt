@@ -1,0 +1,18 @@
+DNS preflight, 2026-09-10. Run before touching any record.
+
+=== CAA on the apex ===
+$ dig -t CAA +noall +ans caplane.xyz
+(no output above = no CAA record, so no issuer is excluded)
+
+=== leftover ACME challenge from a previous provider ===
+$ dig -t TXT _acme-challenge.caplane.xyz +short
+(no output above = nothing to remove)
+
+=== current state of the seven names ===
+caplane.xyz              
+www.caplane.xyz          
+app.caplane.xyz          
+registry.caplane.xyz     
+docs.caplane.xyz         
+api.caplane.xyz          
+mcp.caplane.xyz          
