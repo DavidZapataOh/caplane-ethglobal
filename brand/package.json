@@ -2,7 +2,16 @@
   "name": "@caplane/brand",
   "version": "0.0.0",
   "private": true,
-  "main": "index.ts",
-  "scripts": { "typecheck": "tsc --noEmit" },
-  "devDependencies": { "typescript": "5.9.3" }
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./icon": "./Icon.tsx",
+    "./icon-names": "./icon-names.js",
+    "./tokens.css": "./tokens.css",
+    "./sprite.svg": "./sprite.svg"
+  },
+  "files": ["index.js", "Icon.tsx", "icon-names.js", "contrast.js", "tokens.css", "sprite.svg"],
+  "scripts": { "typecheck": "tsc --noEmit", "test": "node --test" },
+  "peerDependencies": { "react": ">=19" },
+  "devDependencies": { "react": "19.2.0", "@types/react": "19.2.2", "typescript": "5.9.3" }
 }

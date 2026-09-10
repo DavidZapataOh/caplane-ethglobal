@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Caplane icon system v1.0 -->
+<!-- Symbol ids are English: CONVENTIONS.md requires English identifiers inside caplane/ -->
+<!-- viewBox 24 - stroke 1.5 - fill none - linecap butt - linejoin miter - currentColor -->
+<!-- Presentation attributes, never a <style> block: Firefox and WebKit do not apply -->
+<!-- a referenced document's stylesheet to shadow-cloned <use> content. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+<!-- A · estados del registro -->
+<symbol id="i-encumbered" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="butt" stroke-linejoin="miter"><g><path d="M5 3h9l5 5v13H5z"/><path d="M14 3v5h5"/><path d="M8 12h8v6H8z"/><path d="M8 15h8"/></g></symbol>
+<symbol id="i-unencumbered" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="butt" stroke-linejoin="miter"><g><path d="M5 3h9l5 5v13H5z"/><path d="M14 3v5h5"/></g></symbol>
+<symbol id="i-verified" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="butt" stroke-linejoin="miter"><g><path d="M4 4h16v16H4z"/><path d="M8 12l3 3 5-6"/></g></symbol>
+<symbol id="i-expired" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="butt" stroke-linejoin="miter"><g><path d="M4 4h16v16H4z"/><path d="M12 8v4l3 2"/><path d="M4 4l16 16"/></g></symbol>
+<symbol id="i-released" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="butt" stroke-linejoin="miter"><g><path d="M5 3h9l5 5v13H5z"/><path d="M14 3v5h5"/><path d="M12 19v-8"/><path d="M9 14l3-3 3 3"/></g></symbol>
+<symbol id="i-rejected" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="butt" stroke-linejoin="miter"><g><path d="M4 4h16v16H4z"/><path d="M8.5 8.5l7 7"/><path d="M15.5 8.5l-7 7"/></g></symbol>
+<!-- B · el derecho -->
+<symbol id="i-invoice" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="butt" stroke-linejoin="miter"><g><path d="M5 3h9l5 5v13H5z"/><path d="M14 3v5h5"/><path d="M8 12h8"/><path d="M8 15h8"/><path d="M8 18h4"/></g></symbol>
+<symbol id="i-debtor" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="butt" stroke-linejoin="miter"><g><path d="M4 21V6l8-3 8 3v15"/><path d="M8 9h3v3H8z"/><path d="M13 9h3v3h-3z"/><path d="M10 21v-4h4v4"/></g></symbol>
+<symbol id="i-issuer" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="butt" stroke-linejoin="miter"><g><path d="M3 21V7h10v14"/><path d="M13 12h8v9"/><path d="M6 11h4"/><path d="M6 15h4"/><path d="M16 16h2"/></g></symbol>
+<symbol id="i-amount" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="butt" stroke-linejoin="miter"><g><path d="M4 4h16v16H4z"/><path d="M15 9H9v3h6v3H9"/><path d="M12 7v10"/></g></symbol>
+<symbol id="i-due-date" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="butt" stroke-linejoin="miter"><g><path d="M4 6h16v15H4z"/><path d="M4 10h16"/><path d="M8 3v4"/><path d="M16 3v4"/><path d="M8 14h3v3H8z"/></g></symbol>
+<symbol id="i-commitment" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="butt" stroke-linejoin="miter"><g><path d="M4 4h16v16H4z"/><path d="M10 8v8"/><path d="M14 8v8"/><path d="M8 10h8"/><path d="M8 14h8"/></g></symbol>
+<!-- C · criptografía -->
+<symbol id="i-enclave" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="butt" stroke-linejoin="miter"><g><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5"/><path d="M12 12v9"/></g></symbol>
+<symbol id="i-attestation" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="butt" stroke-linejoin="miter"><g><path d="M12 3l7 3v6l-7 9-7-9V6z"/><path d="M9 11l2.5 2.5L16 9"/></g></symbol>
+<symbol id="i-secret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="butt" stroke-linejoin="miter"><g><path d="M4 6h8v8H4z"/><path d="M12 10h8"/><path d="M17 10v4"/><path d="M20 10v3"/></g></symbol>
+<symbol id="i-signature" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="butt" stroke-linejoin="miter"><g><path d="M4 4h16v16H4z"/><path d="M7 16l2-5 2 5 2-7 2 7 2-4"/></g></symbol>
+<symbol id="i-hash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="butt" stroke-linejoin="miter"><g><path d="M4 4h6v6H4z"/><path d="M14 4h6v6h-6z"/><path d="M4 14h6v6H4z"/><path d="M14 14h6v6h-6z"/></g></symbol>
+<symbol id="i-encrypted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="butt" stroke-linejoin="miter"><g><path d="M5 11h14v10H5z"/><path d="M8 11V6h8v5"/><path d="M12 15v3"/></g></symbol>
+<symbol id="i-k-of-n" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="butt" stroke-linejoin="miter"><g><path d="M3 5h5v5H3z"/><path d="M9.5 5h5v5h-5z"/><path d="M16 5h5v5h-5z"/><path d="M3 14h5v5H3z"/><path d="M9.5 14h5v5h-5z"/><path d="M16 14h5v5h-5z"/><path d="M4.2 7.2l1 1 1.6-2"/><path d="M17.2 16.2l1 1 1.6-2"/></g></symbol>
+<!-- D · capital -->
+<symbol id="i-pool" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="butt" stroke-linejoin="miter"><g><path d="M4 5h16v15H4z"/><path d="M4 12h16"/><path d="M4 16h16"/></g></symbol>
+<symbol id="i-escrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="butt" stroke-linejoin="miter"><g><path d="M4 4h16v16H4z"/><path d="M9 13h6v5H9z"/><path d="M10.5 13v-2h3v2"/></g></symbol>
+<symbol id="i-disbursement" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="butt" stroke-linejoin="miter"><g><path d="M3 4h10v16H3z"/><path d="M9 12h11"/><path d="M16 8l4 4-4 4"/></g></symbol>
+<symbol id="i-repayment" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="butt" stroke-linejoin="miter"><g><path d="M11 4h10v16H11z"/><path d="M15 12H4"/><path d="M8 8l-4 4 4 4"/></g></symbol>
+<symbol id="i-tranches" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="butt" stroke-linejoin="miter"><g><path d="M4 5h16v5H4z"/><path d="M4 14h16v5H4z"/><path d="M7 7.5h4"/><path d="M7 16.5h7"/></g></symbol>
+<symbol id="i-usdc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="butt" stroke-linejoin="miter"><g><path d="M4 4h16v16H4z"/><path d="M8 8h8"/><path d="M8 16h8"/><path d="M12 8v8"/><path d="M8 12h8"/></g></symbol>
+<!-- E · organización -->
+<symbol id="i-organization" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="butt" stroke-linejoin="miter"><g><path d="M3 21V4h18v17"/><path d="M7 8h3v3H7z"/><path d="M14 8h3v3h-3z"/><path d="M7 14h3v3H7z"/><path d="M14 14h3v3h-3z"/></g></symbol>
+<symbol id="i-signer" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="butt" stroke-linejoin="miter"><g><path d="M9 3h6v6H9z"/><path d="M4 21v-3l4-3h8l4 3v3"/></g></symbol>
+<symbol id="i-quorum" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="butt" stroke-linejoin="miter"><g><path d="M3 4h10v10H3z"/><path d="M10 10h11v11H10z"/><path d="M13 16l2 2 3.5-4"/></g></symbol>
+<symbol id="i-policy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="butt" stroke-linejoin="miter"><g><path d="M5 3h9l5 5v13H5z"/><path d="M14 3v5h5"/><path d="M8 12l1.5 1.5L12 11"/><path d="M8 17l3 3"/><path d="M11 17l-3 3"/></g></symbol>
+<symbol id="i-limit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="butt" stroke-linejoin="miter"><g><path d="M3 4h18"/><path d="M3 21h18"/><path d="M8 8v10"/><path d="M12 6v12"/><path d="M16 11v7"/></g></symbol>
+<symbol id="i-wallet" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="butt" stroke-linejoin="miter"><g><path d="M3 6h18v14H3z"/><path d="M3 10h18"/><path d="M15 13h4v4h-4z"/></g></symbol>
+<!-- F · sistema -->
+<symbol id="i-block" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="butt" stroke-linejoin="miter"><g><path d="M3 8h7v8H3z"/><path d="M14 8h7v8h-7z"/><path d="M10 12h4"/></g></symbol>
+<symbol id="i-contract" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="butt" stroke-linejoin="miter"><g><path d="M5 3h9l5 5v13H5z"/><path d="M14 3v5h5"/><path d="M10 12l-2 3 2 3"/><path d="M14 12l2 3-2 3"/></g></symbol>
+<symbol id="i-lookup" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="butt" stroke-linejoin="miter"><g><path d="M3 3h13v13H3z"/><path d="M16 16l5 5"/></g></symbol>
+<symbol id="i-sdk" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="butt" stroke-linejoin="miter"><g><path d="M8 5l-5 7 5 7"/><path d="M16 5l5 7-5 7"/><path d="M13.5 6l-3 12"/></g></symbol>
+<symbol id="i-agent" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="butt" stroke-linejoin="miter"><g><path d="M6 10h12v10H6z"/><path d="M12 10V6"/><path d="M9 3h6v3H9z"/><path d="M10 15h4"/></g></symbol>
+
+<!-- G · cromo de interfaz -->
+<!-- The 36 above are domain nouns. These four are interface chrome, added under the same six
+     rules. Reusing a domain icon for chrome is forbidden: `rejected` means the registry status
+     rejected, and lending it to a network error would break the semantic discipline that the
+     rest of the set exists to keep. Everything else stays text, per rule 06. -->
+<symbol id="i-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="butt" stroke-linejoin="miter"><g><path d="M9 9h12v12H9z"/><path d="M15 9V3H3v12h6"/></g></symbol>
+<symbol id="i-loading" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="butt" stroke-linejoin="miter"><g><path d="M9 3h6"/><path d="M21 9v6"/><path d="M15 21H9"/><path d="M3 15V9"/></g></symbol>
+<symbol id="i-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="butt" stroke-linejoin="miter"><g><path d="M12 3l9 9-9 9-9-9z"/><path d="M12 8v5"/><path d="M12 16v1.5"/></g></symbol>
+<symbol id="i-external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="butt" stroke-linejoin="miter"><g><path d="M13 5H4v15h15v-9"/><path d="M11 13L20 4"/><path d="M14 4h6v6"/></g></symbol>
+</defs>
+</svg>

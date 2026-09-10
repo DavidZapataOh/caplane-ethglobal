@@ -1,26 +1,33 @@
 @import "tailwindcss";
+@import "@caplane/brand/tokens.css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* The real directory, not the package name: Tailwind does not resolve a package specifier
+   here, and without this it silently skips the linked package — green build, unstyled
+   components, no warning. */
+@source "../../brand";
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-ground: var(--cp-ground);
+  --color-surface: var(--cp-surface);
+  --color-surface-2: var(--cp-surface-2);
+  --color-border: var(--cp-border);
+  --color-border-strong: var(--cp-border-strong);
+  --color-text: var(--cp-text);
+  --color-text-2: var(--cp-text-2);
+  --color-text-3: var(--cp-text-3);
+  --color-seal: var(--cp-seal);
+  --color-seal-text: var(--cp-seal-text);
+  --color-on-seal: var(--cp-on-seal);
+  --color-verified: var(--cp-verified);
+  --color-verified-text: var(--cp-verified-text);
+  --font-display: var(--cp-font-display);
+  --font-prose: var(--cp-font-prose);
+  --font-data: var(--cp-font-data);
+  --radius-none: 0;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--cp-ground);
+  color: var(--cp-text);
+  font-family: var(--cp-font-prose), ui-sans-serif, system-ui, sans-serif;
 }

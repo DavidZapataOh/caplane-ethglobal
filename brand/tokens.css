@@ -1,0 +1,37 @@
+/* Dark is the default mode: the landing, the app and the dashboard.
+   Paper is the mode of the public registry and the docs — a register is read the way a
+   document is read, so the inversion follows the metaphor instead of offering a theme. */
+
+:root {
+  --cp-ground: #0D0C0B;
+  --cp-surface: #131211;
+  --cp-surface-2: #1B1917;
+  --cp-border: #211F1D;
+  --cp-border-strong: #39352F;
+  --cp-text: #E6E3DF;
+  --cp-text-2: #A39C93;
+  --cp-text-3: #8B857C;
+  --cp-seal: #A03328;
+  --cp-seal-text: #C9564A;
+  --cp-on-seal: #F2EFEA;
+  --cp-verified: #6E7F63;
+  --cp-verified-text: #8FA383;
+  --cp-radius: 0;
+  --cp-shadow: none;
+}
+
+:root[data-mode="paper"] {
+  --cp-ground: #E6E3DF;
+  --cp-surface: #F2EFEA;
+  --cp-surface-2: #DBD7D1;
+  --cp-border: #CFCAC2;
+  --cp-border-strong: #A9A29A;
+  --cp-text: #0D0C0B;
+  --cp-text-2: #5C564E;
+  --cp-text-3: #6A645E;
+  --cp-seal: #A03328;
+  --cp-seal-text: #A03328;
+  --cp-on-seal: #F2EFEA;
+  --cp-verified: #4E5D46;
+  --cp-verified-text: #4E5D46;
+}

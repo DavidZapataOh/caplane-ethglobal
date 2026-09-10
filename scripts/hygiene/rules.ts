@@ -333,6 +333,36 @@ export const secretNamesAreRegistered = (s: Snapshot): Finding[] => {
   return findings;
 };
 
+
+/**
+ * The mechanical half of the brand's checklist. Zero radius and no shadow are the two rules
+ * that make the rest legible, and a rounded stroke gives the icon set away next to a square
+ * card. The seal is the subtle one: the same hex is correct as a fill and fails contrast as
+ * text on dark, which is why two tokens exist for it.
+ */
+export const brandInvariants = (s: Snapshot): Finding[] => {
+  const findings: Finding[] = [];
+  const flag = (where: string, detail: string) =>
+    findings.push({ rule: "brand-invariants", where, detail });
+
+  for (const f of s.files.filter(isScannable)) {
+    for (const [, value] of f.content.matchAll(/border-radius:\s*([^;}"']+)/gi)) {
+      if (!/^0[a-z%]*$/i.test(value!.trim())) flag(f.path, `border-radius: ${value!.trim()} — the brand is zero radius`);
+    }
+    for (const [, value] of f.content.matchAll(/box-shadow:\s*([^;}"']+)/gi)) {
+      if (!/^none$/i.test(value!.trim())) flag(f.path, `box-shadow: ${value!.trim()} — the brand uses hairlines, never shadows`);
+    }
+    for (const [, property] of f.content.matchAll(/stroke-line(cap|join)\s*[:=]\s*"?round/gi)) {
+      flag(f.path, `stroke-line${property} round — the set is butt and miter`);
+    }
+    // The seal as a text colour only. As a fill it is correct, which is the whole distinction.
+    for (const [match] of f.content.matchAll(/(?:^|[^-\w])color:\s*#A03328/gi)) {
+      flag(f.path, `${match.trim()} — use --cp-seal-text; the fill hex fails contrast as text on dark`);
+    }
+  }
+  return findings;
+};
+
 export const ALL_RULES = [
   noMockDependencies,
   noMockCallSites,
@@ -346,4 +376,5 @@ export const ALL_RULES = [
   noTemplateScaffolding,
   frozenArtifactsAreIdentical,
   secretNamesAreRegistered,
+  brandInvariants,
 ];

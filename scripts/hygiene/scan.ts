@@ -15,7 +15,10 @@ export type Snapshot = {
   dependencies: Dependency[];
 };
 
-const TEXT = /\.(ts|tsx|js|jsx|mjs|cjs|sol|json|ya?ml|toml|sh|md)$|(^|\/)\.env(\.|$)/;
+// css and svg are here because rules target them: the brand invariants live in stylesheets
+// and the icon spec lives in the sprite. Without them those rules pass their own fixtures and
+// see nothing in the repository.
+const TEXT = /\.(ts|tsx|js|jsx|mjs|cjs|sol|json|ya?ml|toml|sh|md|css|svg)$|(^|\/)\.env(\.|$)/;
 
 const git = async (root: string, args: string[]) =>
   (await run("git", args, { cwd: root, maxBuffer: 64 * 1024 * 1024 })).stdout;
@@ -26,7 +29,15 @@ export async function scan(root: string): Promise<Snapshot> {
   const files: SourceFile[] = [];
   for (const path of tracked) {
     if (!TEXT.test(path)) continue;
-    files.push({ path, content: await readFile(join(root, path), "utf8") });
+    // A tracked file can be absent from the working tree — deleted but not yet staged. The
+    // gate should report on what is there, not crash on what is not.
+    let content: string;
+    try {
+      content = await readFile(join(root, path), "utf8");
+    } catch {
+      continue;
+    }
+    files.push({ path, content });
   }
 
   const commitMessages = (await git(root, ["log", "--format=%B", "--all"]))

@@ -1,6 +1,7 @@
 import { test, expect } from "bun:test";
 import type { Snapshot } from "./scan";
 import {
+  brandInvariants,
   noMockDependencies,
   noMockCallSites,
   noLoopbackUrls,
@@ -216,7 +217,7 @@ test("flags a workflow directory still named my-workflow", () => {
 });
 
 test("every rule is registered in ALL_RULES", () => {
-  expect(ALL_RULES).toHaveLength(12);
+  expect(ALL_RULES).toHaveLength(13);
 });
 
 test("does not flag the rule engine's own definitions and fixtures", () => {
@@ -320,4 +321,41 @@ test("accepts non-overlapping secret id and env var names", () => {
     ],
   });
   expect(secretNamesAreRegistered(s)).toEqual([]);
+});
+
+// Five of the brand's eight checks are mechanical. A document saying "check there is no
+// border radius before publishing" is an intention; a rule that fails the push is a guarantee.
+
+test("flags a non-zero border radius", () => {
+  const s = snap({ files: [{ path: "web/app/x.css", content: ".card{border-radius:4px}" }] });
+  expect(brandInvariants(s)).toHaveLength(1);
+});
+
+test("accepts an explicit zero radius", () => {
+  const s = snap({ files: [{ path: "web/app/x.css", content: ".card{border-radius:0}" }] });
+  expect(brandInvariants(s)).toEqual([]);
+});
+
+test("flags a box shadow", () => {
+  const s = snap({ files: [{ path: "web/app/x.css", content: ".card{box-shadow:0 1px 2px #000}" }] });
+  expect(brandInvariants(s)).toHaveLength(1);
+});
+
+test("flags a round stroke linecap in any svg", () => {
+  const s = snap({ files: [{ path: "brand/sprite.svg", content: 'stroke-linecap="round"' }] });
+  expect(brandInvariants(s)).toHaveLength(1);
+});
+
+// The pair that matters: the seal hex is forbidden as text and correct as a fill.
+
+test("flags the seal hex used as a text colour", () => {
+  const s = snap({ files: [{ path: "web/app/x.css", content: ".tag{color:#A03328}" }] });
+  const found = brandInvariants(s);
+  expect(found).toHaveLength(1);
+  expect(found[0]!.detail).toContain("--cp-seal-text");
+});
+
+test("accepts the seal hex as a fill", () => {
+  const s = snap({ files: [{ path: "web/app/x.css", content: ".seal{background:#A03328}" }] });
+  expect(brandInvariants(s)).toEqual([]);
 });

@@ -89,6 +89,11 @@ jobs:
         working-directory: ${{ matrix.dir }}
       - run: npm run typecheck
         working-directory: ${{ matrix.dir }}
+      # Conditional on purpose: a bare `npm test` across the matrix would fire the bun suites
+      # in claim and sdk inside a job with no bun installed — red for an unrelated reason.
+      - if: matrix.dir == 'brand'
+        run: npm test
+        working-directory: ${{ matrix.dir }}
 
   web:
     runs-on: ubuntu-latest
