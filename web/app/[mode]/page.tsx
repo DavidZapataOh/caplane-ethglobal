@@ -1,4 +1,4 @@
-import { Icon } from '@caplane/brand/icon'
+import { Icon } from '../../components/icon'
 
 export default function Page() {
   return (

@@ -8,17 +8,11 @@
     "exactOptionalPropertyTypes": true,
     "noEmit": true,
     "skipLibCheck": true,
-    "jsx": "react-jsx",
     "allowJs": true,
-    "checkJs": false,
-    "lib": [
-      "ES2022",
-      "DOM"
-    ]
+    "checkJs": false
   },
   "include": [
     "**/*.ts",
-    "**/*.tsx",
     "**/*.js"
   ],
   "exclude": [
