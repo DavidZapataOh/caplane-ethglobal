@@ -16,3 +16,33 @@ registry.caplane.xyz
 docs.caplane.xyz         
 api.caplane.xyz          
 mcp.caplane.xyz          
+
+=== after provisioning, 2026-09-10T20:15Z ===
+caplane.xyz            http=308 tls=0  
+www.caplane.xyz        http=200 tls=0  data-mode="dark"
+app.caplane.xyz        http=200 tls=0  data-mode="dark"
+registry.caplane.xyz   not provisioned
+docs.caplane.xyz       not provisioned
+api.caplane.xyz        not provisioned
+mcp.caplane.xyz        not provisioned
+
+tls=0 means the certificate verified. The apex currently 308s to www; the canonical
+name is the apex, so that redirect belongs the other way round.
+
+=== all five Vercel names live, 2026-09-10T20:29Z ===
+  caplane.xyz            http=200 tls=0  data-mode="dark"
+  www.caplane.xyz        http=308 tls=0  
+  app.caplane.xyz        http=200 tls=0  data-mode="dark"
+  registry.caplane.xyz   http=200 tls=0  data-mode="paper"
+  docs.caplane.xyz       http=200 tls=0  data-mode="paper"
+
+tls=0 on every one: the certificate verified. www now redirects to the apex, which is the
+canonical name — the one the README, the video and a judge's address bar will carry.
+
+The mode inversion is live and was verified beyond the attribute: the stylesheet served from
+registry.caplane.xyz carries #E6E3DF, #6A645E, #A03328 and #4E5D46, and #4E5D46 exists only
+in the paper block. The contrast fix made this morning reached production — #6E6862, the
+value that failed 4.5:1 against the paper ground, appears nowhere in the served CSS.
+
+Still to provision: api.caplane.xyz and mcp.caplane.xyz, both from Railway, each needing a
+CNAME and a TXT. Without the TXT the name resolves and answers 404.
