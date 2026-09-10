@@ -1,0 +1,14 @@
+{
+  "name": "caplane-data-sources",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "probe": "bun run probe.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test"
+  },
+  "devDependencies": {
+    "@types/bun": "1.3.10",
+    "typescript": "5.9.3"
+  }
+}

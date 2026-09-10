@@ -3,6 +3,12 @@ name: ci
 on:
   push:
   pull_request:
+  # Live third-party calls are metered. Running them on every push would let a Saturday of
+  # pushes exhaust a sandbox quota and turn every other gate red for a reason we do not
+  # control, so they run on a schedule and on demand instead.
+  schedule:
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
 
 jobs:
   hygiene:
@@ -116,6 +122,40 @@ jobs:
       # Hermetic: simulate and deploy need a login session and do not run in CI.
       # The vendored ABI copy in this directory is guarded by the hygiene job, which is the
       # only job that sees every tracked file regardless of package.
+
+  data-sources:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with: { bun-version: 1.2.21 }
+      - run: bun install --frozen-lockfile
+        working-directory: scripts/data-sources
+      - run: bun run typecheck
+        working-directory: scripts/data-sources
+      - run: bun test
+        working-directory: scripts/data-sources
+      # Presence costs nothing and catches the real failure: nobody set the secret. It runs on
+      # every push. Only the calls below are held back.
+      - name: Assert every required secret is present
+        env:
+          LEDGER_APP_ID: ${{ secrets.LEDGER_APP_ID }}
+          LEDGER_APP_PASSPHRASE: ${{ secrets.LEDGER_APP_PASSPHRASE }}
+          WATCHLIST_SUBSCRIPTION: ${{ secrets.WATCHLIST_SUBSCRIPTION }}
+          NOTIFY_TRANSPORT_KEY: ${{ secrets.NOTIFY_TRANSPORT_KEY }}
+        run: |
+          missing=0
+          for name in LEDGER_APP_ID LEDGER_APP_PASSPHRASE WATCHLIST_SUBSCRIPTION NOTIFY_TRANSPORT_KEY; do
+            if [ -z "${!name}" ]; then echo "::error::missing required secret: $name"; missing=1; fi
+          done
+          exit $missing
+      - name: Providers still answer with the record we expect
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        env:
+          LEDGER_APP_ID: ${{ secrets.LEDGER_APP_ID }}
+          LEDGER_APP_PASSPHRASE: ${{ secrets.LEDGER_APP_PASSPHRASE }}
+          WATCHLIST_SUBSCRIPTION: ${{ secrets.WATCHLIST_SUBSCRIPTION }}
+        run: bun run scripts/data-sources/probe.ts
 
   credentialed:
     runs-on: ubuntu-latest

@@ -1,0 +1,66 @@
+Day-0 preflight, run 2026-09-10. Everything here needs no credential, so it is what can be
+established before any account exists.
+
+--- the screening endpoint is live and refuses anonymous callers -------------
+
+$ curl 'https://data.trade.gov/consolidated_screening_list/v1/search?name=putin&size=3'
+{ "statusCode": 401, "message": "Access denied due to missing subscription key. Make sure to
+  include subscription key when making requests to an API." }
+http=401 bytes=152
+
+$ curl -H 'subscription-key: 00000000000000000000000000000000' <same url>
+{ "statusCode": 401, "message": "Access denied due to invalid subscription key. Make sure to
+  provide a valid key for an active subscription." }
+http=401 bytes=143
+
+Two distinct messages: a missing key and an invalid key are told apart, so a failing probe
+says which of the two it is. Note this refutes a common assumption — the endpoint does NOT
+answer anonymous callers with an empty 200. It refuses them outright.
+
+The reason to still test that a query discriminates is different, and it survives: with a
+VALID key, a name on no list also returns 200. So a 200 alone never proves the key can find
+a hit. Both arms have to be exercised.
+
+--- the legacy host has an expired certificate -------------------------------
+
+$ curl https://api.trade.gov/static/consolidated_screening_list/documentation.html
+curl: (60) SSL certificate problem: certificate has expired
+
+api.trade.gov is the retired host. data.trade.gov is the live one and is the only host any
+code here talks to. Recorded because an enclave has no way to click through a TLS warning:
+pointing at the wrong host would fail closed with an opaque error.
+
+--- the list is also published as a static download, unauthenticated ---------
+
+$ curl https://data.trade.gov/downloadable_consolidated_screening_list/v1/consolidated.json
+http=200 bytes=33752788
+
+This is where the record shape below was read from, rather than guessed:
+
+  {"results": [{"addresses": [...], "alt_names": [...], "entity_number": "15268",
+    "id": "15268", "ids": [...], "name": "BANK OF KUNLUN CO LTD", "programs": ["561-Related"],
+    "remarks": "...", "source": "Capta List (CAP) - Treasury Department",
+    "source_information_url": "...", "source_list_url": "...", "type": "Entity"}, ...]}
+
+33 MB is far past the enclave's 100 KB response cap, which is why the search endpoint — and
+therefore a subscription key — is the only usable path from inside the enclave.
+
+--- accounting field types, read from the published schema -------------------
+
+The accounting OpenAPI schema gives the Invoice object as:
+
+  AmountDue:   type: number, format: double, readOnly: true
+  AmountPaid:  type: number, format: double, readOnly: true
+  Status:      type: string, enum: DRAFT SUBMITTED DELETED AUTHORISED PAID VOIDED
+  DueDate:     type: string (YYYY-MM-DD)
+  InvoiceID:   type: string, format: uuid
+
+The object declares no `required` properties, so every field is optional on the wire. Money
+fields are JSON numbers, not quoted strings. `parse.ts` is typed from this, not from a guess.
+
+--- what still needs a credential --------------------------------------------
+
+- that the client_credentials grant returns NO refresh_token  (01-xero.txt)
+- the canonical invoice, seeded and read back as unpaid       (02-invoice-corpus.json)
+- that a screening query discriminates hit from clean         (03-screening.txt)
+- that a real email reaches a real inbox                      (04-email.txt)

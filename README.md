@@ -28,7 +28,13 @@ Pinned so a clean machine reproduces this build:
 | `sdk/` | `@caplane/sdk` |
 | `web/` · `site/` | Next.js surfaces |
 | `services/` | api, mcp, adversarial harness |
+| `scripts/` | Repository gates and live dependency probes |
 | `evidence/` | Reproducible execution artifacts |
+
+## Attribution
+
+This product uses the International Trade Administration's Data API but is not endorsed or
+certified.
 
 ## License
 

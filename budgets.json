@@ -9,6 +9,11 @@
     "reportPayloadBytes": 5120,
     "logTriggerEventBytes": 5120
   },
+  "data": {
+    "accounting": { "callsPerExecution": 2, "accessTokenSeconds": null, "invoiceResponseBytes": null },
+    "screening": { "callsPerExecution": 1, "responseBytesAtSizeThree": null },
+    "httpCallPlan": { "stageOne": 4, "stageTwo": 2, "reserve": 1 }
+  },
   "contracts": { "gasSnapshotPath": ".gas-snapshot", "maxGasDeltaPercent": null },
   "web": { "firstLoadJsBytes": null, "lcpMs": null, "clsScore": null },
   "site": { "firstLoadJsBytes": null, "lcpMs": null, "clsScore": null },
