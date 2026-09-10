@@ -1,0 +1,38 @@
+{
+  "_comment": [
+    "Two denials, because no single one has both properties worth having.",
+    "The first is evaluated inside the enclave and leaves only an HTTP 400.",
+    "The second is evaluated at the API layer and leaves a persisted action record.",
+    "Neither is described as the other. Raw headers for the first are in 04-denial.http."
+  ],
+  "enclaveEvaluated": {
+    "method": "eth_signTransaction",
+    "why": "For methods Privy also broadcasts, simulation runs before policy evaluation, so an unfunded wallet fails with insufficient_funds and the artifact shows the wrong control.",
+    "control": { "to": "the wallet's own address", "result": "signed, 228 characters" },
+    "denied": {
+      "to": "0x000000000000000000000000000000000000dEaD",
+      "status": 400,
+      "error": { "error": "RPC request denied due to policy violation", "code": "policy_violation" }
+    }
+  },
+  "apiLayerEvaluated": {
+    "method": "transfer",
+    "why": "Transfer limits need transaction simulation, which runs outside the enclave; the trade is that this path leaves a fetchable record.",
+    "chain": "not the registry's chain — transfers accept a fixed set of named chains and Arc is not among them, so the chain here is incidental to the policy engine being shown",
+    "denied": {
+      "status": 400,
+      "error": { "error": "RPC request denied due to policy violation", "code": "policy_violation" }
+    }
+  },
+  "attribution": {
+    "problem": "The response names no rule, deliberately, so a caller cannot enumerate a denylist by probing.",
+    "answer": "The control run. Same wallet, same policy, same execution, same wire: one recipient signs and one does not.",
+    "notConflated": "The denial wallet carries no quorum owner. A quorum-owned wallet refuses with insufficient_correct_authorization_signatures — a real block, by a different control. An artifact that conflates two controls proves neither."
+  },
+  "policyShape": {
+    "denyRule": { "field_source": "ethereum_transaction", "field": "to", "operator": "eq" },
+    "allowRule": "an explicit allow for the control recipient",
+    "whyNotAllowEverythingElse": "An empty condition list is rejected with invalid_policy_format, and the operator set has no negation — eq, in, contains, starts_with, lt, lte, gt, gte, in_condition_set. 'Allow everything else' cannot be expressed.",
+    "whyNotInConditionSet": "If a condition set is deleted, every condition referencing it evaluates false: the denylist stops blocking silently while allow rules keep passing traffic."
+  }
+}

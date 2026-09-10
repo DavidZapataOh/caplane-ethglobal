@@ -1,0 +1,44 @@
+Signing on Arc, executed 2026-09-10. The static evidence said this would work; it half did,
+and the half that failed is the finding.
+
+--- broadcasting is gated per app and per chain --------------------------------
+
+$ wallets().ethereum().sendTransaction(walletId, { caip2: 'eip155:5042002', ... })
+  401 {"error":"App is not authorized to transact on chain eip155:5042002"}
+
+The type system permits any chain — `Caip2` is a bare `string` with no whitelist — and that is
+what the desk research saw. It is not the whole gate. Authorisation to broadcast is a
+per-application setting, and the type gives no hint of it. This is the difference between
+evidence that is strong and evidence that is executed.
+
+--- signing is not gated, and that is what the architecture needs --------------
+
+$ wallets().ethereum().signTransaction(walletId, { params: { transaction: { chain_id: 5042002, ... } } })
+  -> signed_transaction, broadcast by us over the chain's own RPC
+
+  hash        0x62582fc59e7c533e39fa20795810b9d5e1a9dd73bacd08065c1d94efa7bbd03e
+  explorer    https://testnet.arcscan.app/tx/0x62582fc5...
+  status      0x1
+  from        0xb404f14dbf46dec0ec6cb86b0407b3704a835cb8   (the Privy wallet)
+  blockNumber 61438153
+  gasUsed     21000
+  effectiveGasPrice  21 gwei
+
+`signTransaction` takes no `caip2` — it is chain-agnostic by construction, and the chain id
+travels inside the transaction. So the signer works on 5042002 and we broadcast ourselves.
+
+That was written into the plan as a fallback to exercise "in case it is ever needed". It was
+needed on the first run. Exercising the fallback before depending on it is the whole reason
+there was one to fall back to.
+
+--- the base-fee floor is real -------------------------------------------------
+
+Effective gas price came back at 21 gwei against a 20 gwei floor. Fee fields are `snake_case`
+(`max_fee_per_gas`, `gas_limit`); camelCase does not compile, and had it slipped through as an
+untyped object the transaction would have gone out underpriced and been dropped with no error
+and no receipt — which reads exactly like "Privy cannot sign on Arc".
+
+--- funding ------------------------------------------------------------------
+
+A fresh wallet holds nothing and gas on Arc is paid in the native asset, so the wallet was
+funded from the deployer before either path could run. Returned afterwards.

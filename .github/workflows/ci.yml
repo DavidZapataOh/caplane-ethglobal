@@ -135,6 +135,12 @@ jobs:
         working-directory: scripts/data-sources
       - run: bun test
         working-directory: scripts/data-sources
+      - run: bun install --frozen-lockfile
+        working-directory: scripts/privy
+      - run: bun run typecheck
+        working-directory: scripts/privy
+      - run: bun test
+        working-directory: scripts/privy
       # Presence costs nothing and catches the real failure: nobody set the secret. It runs on
       # every push. Only the calls below are held back.
       - name: Assert every required secret is present
@@ -143,9 +149,12 @@ jobs:
           LEDGER_APP_PASSPHRASE: ${{ secrets.LEDGER_APP_PASSPHRASE }}
           WATCHLIST_SUBSCRIPTION: ${{ secrets.WATCHLIST_SUBSCRIPTION }}
           NOTIFY_TRANSPORT_KEY: ${{ secrets.NOTIFY_TRANSPORT_KEY }}
+          NEXT_PUBLIC_PRIVY_PUBLIC_APP: ${{ secrets.NEXT_PUBLIC_PRIVY_PUBLIC_APP }}
+          PRIVY_SERVER_CREDENTIAL: ${{ secrets.PRIVY_SERVER_CREDENTIAL }}
         run: |
           missing=0
-          for name in LEDGER_APP_ID LEDGER_APP_PASSPHRASE WATCHLIST_SUBSCRIPTION NOTIFY_TRANSPORT_KEY; do
+          for name in LEDGER_APP_ID LEDGER_APP_PASSPHRASE WATCHLIST_SUBSCRIPTION NOTIFY_TRANSPORT_KEY \
+                      NEXT_PUBLIC_PRIVY_PUBLIC_APP PRIVY_SERVER_CREDENTIAL; do
             if [ -z "${!name}" ]; then echo "::error::missing required secret: $name"; missing=1; fi
           done
           exit $missing
@@ -156,6 +165,14 @@ jobs:
           LEDGER_APP_PASSPHRASE: ${{ secrets.LEDGER_APP_PASSPHRASE }}
           WATCHLIST_SUBSCRIPTION: ${{ secrets.WATCHLIST_SUBSCRIPTION }}
         run: bun run scripts/data-sources/probe.ts
+      # `--teardown` is not optional. A live run creates durable state, so without it every
+      # scheduled run would leave an orphan wallet and policy behind in the dashboard.
+      - name: Privy still denies what it should
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        env:
+          NEXT_PUBLIC_PRIVY_PUBLIC_APP: ${{ secrets.NEXT_PUBLIC_PRIVY_PUBLIC_APP }}
+          PRIVY_SERVER_CREDENTIAL: ${{ secrets.PRIVY_SERVER_CREDENTIAL }}
+        run: bun run scripts/privy/deny.ts --teardown
 
   credentialed:
     runs-on: ubuntu-latest

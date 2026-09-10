@@ -1,0 +1,54 @@
+Day-0 verification against the published SDK, 2026-09-10. No credential needed for any of it:
+these are claims about the API's shape, and the package is the authority on them.
+
+--- the claim nobody had checked -----------------------------------------------
+
+Organization wallets were an unsourced row in our own notes. The package settles it:
+
+  OrganizationCreateParams {
+    default_key_quorum_id: KeyQuorumID;   // required
+    display_name: string;                 // required
+  }
+
+Both required. An organization cannot exist without a key quorum, so a quorum is not an
+optional extra to reach later — it is a structural precondition of the feature. The design
+that depends on "an attempt blocked for want of quorum" is reachable as written.
+
+--- the chain question is open at the type level -------------------------------
+
+  export type Caip2 = string;
+
+No whitelist, no enum. 5042002 appears nowhere in the package. So the types permit Arc and
+only an executed transaction can decide; that is what 01-arc-signature.txt is for.
+
+--- transaction fields are snake_case, and getting it wrong fails silently ------
+
+  UnsignedStandardEthereumTransaction {
+    chain_id, max_fee_per_gas, max_priority_fee_per_gas, gas_limit, nonce, to, value, type
+  }
+
+camelCase does not compile:
+
+  error TS2561: Object literal may only specify known properties, but 'maxFeePerGas' does not
+  exist in type 'UnsignedStandardEthereumTransaction'. Did you mean to write 'max_fee_per_gas'?
+
+Recorded because of what would have happened without the compiler: dropped fee fields put the
+transaction under Arc's base-fee floor, where it is discarded with no error and no receipt.
+That failure reads exactly like "Privy cannot sign on Arc" — the wrong conclusion entirely.
+
+--- error shapes, so the interface never claims the wrong block ----------------
+
+  class APIError { readonly status; readonly error; }
+
+`policy_violation`, `insufficient_funds` and `insufficient_correct_authorization_signatures`
+are all 400s from three different controls. `isPolicyViolation` matches only the first, and
+two of its three tests exist solely to keep the other two out.
+
+--- teardown is possible for everything that matters --------------------------
+
+  organizations: create get list update delete
+  policies:      create createRule delete deleteRule update updateRule
+  keyQuorums:    create get update delete
+  wallets:       create update ethereum transfer archive list  (no delete: archive instead)
+
+A wallet is archived rather than deleted, which is the one piece of state that survives a run.

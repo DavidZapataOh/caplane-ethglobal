@@ -1,0 +1,52 @@
+The quorum-organization-wallet sequence, executed 2026-09-10.
+
+$ keyQuorums().create({ public_keys: [<two P-256 keys>], authorization_threshold: 2 })
+  key quorum:   u9mzeyaf0ghas7jz0bjrwny2   threshold 2 of 2
+
+$ organizations().create({ display_name, default_key_quorum_id })
+  organization: cmtvur1po002l0bkz4la9inj0
+
+$ wallets().create({ chain_type: 'ethereum', entity: { id, type: 'organization' } })
+  wallet:       xvbzbd371wjvc0z2a8uwi5gt   0x1356D53e083b52523DC200d7f59b702ED33bdD68
+
+$ wallets().list({ entity_id: <organization> })
+  xvbzbd371wjvc0z2a8uwi5gt   0x1356D53e083b52523DC200d7f59b702ED33bdD68
+
+The order is not a preference. `default_key_quorum_id` is a required field on organization
+creation, so the organization cannot exist before the quorum does. A quorum is a precondition
+of the feature, not an extra to reach later.
+
+Omitting `owner` leaves the organization's default quorum as the wallet's owner: the wallet
+answers to a set of signers rather than to one loose key.
+
+Members are P-256 authorization keys generated in-process and never written to disk. That is
+why creation and teardown run in one process — persisting an organization quorum's private
+keys so a later script could tear it down would be a worse outcome than leaving state behind.
+
+Names are throwaway and distinct from anything production would use, for the same reason the
+disposable workflow was: a judge opening the dashboard should not find a production-sounding
+organization created by a test.
+
+--- teardown, and the one thing that cannot be torn down ---------------------
+
+  organizations: 0        (the throwaway organization is deleted)
+  policies:      deleted
+  wallets:       archived, except one
+
+The exception is the organization's own wallet. It is owned by the key quorum, so modifying it
+requires a `privy-authorization-signature` from that quorum — and those private keys existed
+only inside the process that created them. Attempting it from a later process returns:
+
+  Missing `privy-authorization-signature` header or no signatures provided
+
+This is the in-process teardown rule proving itself the hard way: this run deliberately skipped
+`--teardown` in order to capture the listing above, and that decision is what stranded the
+wallet. Wallets cannot be deleted in any case — the operation is `archive` — so one archived
+wallet belonging to a deleted organization is the residue, and it is the smallest one available.
+
+Two API details worth carrying forward:
+
+  - A policy cannot be deleted while attached. Detach first with `wallets().update(id,
+    { policy_ids: [] })`, or the delete is refused with "Policy has associated wallets".
+  - The SDK's `archive` helper sends no request body and the endpoint rejects that with
+    "Expected application/json request body". Archiving goes over REST with an empty object.

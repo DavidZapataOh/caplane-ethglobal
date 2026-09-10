@@ -1,0 +1,23 @@
+Raw denial, captured 2026-09-10. Cookies, CDN and cache headers stripped; nothing else.
+
+$ curl -i -X POST https://api.privy.io/v1/wallets/diefzzkn3f5ltrcoqh1319ij/rpc \
+    -u <app id>:<app secret> -H 'privy-app-id: <app id>' \
+    -d '{"method":"eth_signTransaction","chain_type":"ethereum",
+         "params":{"transaction":{"to":"0x000000000000000000000000000000000000dEaD",
+                                  "value":"0x0","chain_id":5042002,...}}}'
+
+HTTP/2 400 
+date: Thu, 10 Sep 2026 18:21:40 GMT
+content-type: application/json; charset=utf-8
+content-length: 80
+cache-control: public, max-age=0, must-revalidate
+referrer-policy: strict-origin-when-cross-origin
+strict-transport-security: max-age=63072000
+x-content-type-options: nosniff
+x-frame-options: DENY
+
+{"error":"RPC request denied due to policy violation","code":"policy_violation"}
+
+The response does not name the rule that fired. That is deliberate on Privy's side: a
+caller must not be able to enumerate a denylist by probing it. Attribution comes from the
+control run in 03-denial.json instead — same wallet, same policy, same execution.
