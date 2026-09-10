@@ -1,0 +1,46 @@
+Debtor-confirmation transport, verified live 2026-09-10. The key never appears here.
+
+--- the send ------------------------------------------------------------------
+
+$ POST https://api.resend.com/emails
+  Authorization: Bearer <static key, 36 chars>
+  from:    Caplane <noreply@caplane.xyz>
+  to:      one real inbox belonging to the team (address withheld: personal data)
+  subject: Caplane day-0 delivery check
+
+  http 200
+  id: a40cc07d-494c-40c0-9f8a-48aa86343f22
+
+--- and the part a status code cannot tell you --------------------------------
+
+DELIVERED: confirmed by the recipient, who found the message. That confirmation is separate
+from the 200 on purpose. A 200 means the provider accepted the message for sending; it says
+nothing about whether it reached anyone.
+
+PLACEMENT: it landed in the spam folder, not the inbox. Recorded because it is the honest
+result and because it matters to the layer that depends on this transport: a debtor who never
+sees the message never confirms.
+
+--- authentication is complete, so placement is reputation, not configuration --
+
+  resend._domainkey.caplane.xyz   DKIM key published
+  send.caplane.xyz                SPF for the return-path the provider actually uses
+  _dmarc.caplane.xyz              v=DMARC1; p=none;
+
+Nothing is missing. The domain simply has no sending history: this was the first message it
+had ever sent, plain text, no links, to a major consumer provider. No DNS record fixes that.
+
+What is being done about it: the recipients that matter are known to us, so they mark the
+first message as legitimate and reply to it, which is the strongest positive signal available.
+What cannot be done in the time available is cold deliverability to arbitrary third parties.
+That is a limitation of the demonstration, not of the mechanism, and it is declared as one.
+
+--- the credential is send-only -----------------------------------------------
+
+$ GET https://api.resend.com/emails/<id>
+  401 {"name":"restricted_api_key","message":"This API key is restricted to only send emails"}
+
+Deliberate. This credential is destined for the vault and therefore for the enclave, and an
+enclave that could read a mail history is a larger enclave than the one being argued for. The
+cost is that delivery state cannot be read back programmatically, which is why the delivery
+line above is a human confirmation.

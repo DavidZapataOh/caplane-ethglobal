@@ -1,0 +1,70 @@
+Accounting credential, verified live 2026-09-10. Nothing here is a value: only key names,
+lengths, granted scopes and sizes.
+
+--- the finding the architecture rests on -------------------------------------
+
+$ POST https://identity.xero.com/connect/token
+  grant_type=client_credentials&scope=accounting.invoices.read
+
+  response keys: ["access_token", "expires_in", "scope", "token_type"]
+  has refresh_token: false
+  scope granted:    accounting.invoices.read
+  expires_in:       1800
+  token_type:       Bearer
+  access_token:     989 chars
+
+No refresh token is issued. That absence is what makes the whole design possible: the enclave
+reads the vault and cannot write back, so a credential that rotated on use would strand the
+workflow after its first execution. It is measured here, not assumed.
+
+--- least privilege is enforced at token time, not just at consent ------------
+
+The connection holds the write scope, but a token minted with only the read scope carries only
+the read scope. Verified by asking for each one separately:
+
+  accounting.invoices          -> granted, scope=accounting.invoices
+  accounting.contacts.read     -> granted, scope=accounting.contacts.read
+  accounting.transactions      -> DENIED,  invalid_scope
+
+The token that lives inside the enclave is minted with `accounting.invoices.read` and cannot
+alter the ledger, even though the credential in the vault could mint a writing one. The vault
+credential's ceiling is the set of scopes selected on the app, which is why only three were
+selected: read contacts, and read and create invoices.
+
+--- the published schema and the console disagree, and the console wins -------
+
+`accounting.transactions` is what the published OpenAPI declares for /Invoices. The custom
+connections console does not offer it, and the identity service rejects it as `invalid_scope`.
+The granular scopes (`accounting.invoices`, `accounting.invoices.read`) are the live ones.
+Recorded because the spec is the more authoritative-looking source and it is the stale one.
+
+--- the connection ------------------------------------------------------------
+
+$ GET https://api.xero.com/connections
+  tenantId:   e1218a28-7437-47ec-bfb5-252092825083
+  tenantName: Demo Company (AU)
+  tenantType: ORGANISATION
+
+A custom connection reaches exactly one organisation, which is why the tenant id can be read
+once and treated as fixed.
+
+--- the canonical claim, read back through an authenticated call --------------
+
+$ GET https://api.xero.com/api.xro/2.0/Invoices/72476883-0c78-4099-9bde-59530764d1b1
+
+  InvoiceNumber:  ORC1043          (assigned by the provider, not chosen by us)
+  Status:         AUTHORISED
+  AmountDue:      275000.00        JSON number, not a quoted string
+  AmountPaid:     0.00
+  CurrencyCode:   AUD
+  DueDate:        2026-12-31
+  Contact:        Bayside Club, tax number "11 000 111 000"
+
+  isUnpaid(invoice) -> true
+  response size     -> 4684 bytes, against the enclave's 102400 cap
+
+The bar is that last pair, not a 200. An empty result is also a 200; a specific invoice coming
+back AUTHORISED with a balance outstanding is not.
+
+The amount carries tax: the line is 250000.00 and the claim is 275000.00. What is owed is what
+the claim is worth, so the corpus records the gross figure.

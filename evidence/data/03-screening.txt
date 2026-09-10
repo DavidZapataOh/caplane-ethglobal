@@ -1,0 +1,53 @@
+Screening list, verified live 2026-09-10. The key never appears here; it travels as a static
+`subscription-key` header and nothing about it is printed.
+
+--- both arms, because one proves nothing ------------------------------------
+
+An anonymous caller gets 401, not an empty 200 (see 00-endpoint-preflight.txt). But with a
+VALID key a clean name also returns 200, so a single successful query cannot tell "the key
+works" from "the query always matches". Both arms are required.
+
+=== a listed name must hit ===
+$ GET .../search?name=kunlun&size=3     -> 200, 9322 bytes
+  total:  3
+  sources: 2
+  first:  KUNLUN SHIPPING COMPANY LIMITED
+  source: Specially Designated Nationals (SDN) - Treasury Department
+
+=== a name on no list must not hit ===
+$ GET .../search?name=zzqxwvunlikelyname&size=3   -> 200, 54 bytes
+  total: 0
+  page:  0
+
+--- the envelope, and the field that decides ---------------------------------
+
+Top-level keys: ["results", "sources", "total"]. There is no `sources_used`.
+
+`total` is how many matches exist; `results` is only the page `size` let through. They
+diverge on any common name, which is why the hit test reads `total` and never the array:
+
+  name                 total   page   bytes
+  kunlun                   3      3    9322
+  smith                    8      3    4167
+  ali                    400      3    7210
+  mohammed               196      3    6959
+  ivanov                  18      3    6660
+
+Reading the page would call a counterparty clean whenever the match fell outside it — a false
+negative, the unsafe direction for a sanctions check. The first implementation here did read
+the array; the test that exposed it asserts a hit on { total: 400, results: [] }.
+
+--- the endpoint rate-limits, and gathering this evidence tripped it ---------
+
+Collecting the table above with three calls per row returned 429 partway through, and a 429
+body is 83 bytes, which silently looked like a plausible measurement. Regathered with one call
+per query and three seconds between them; every row above is a single 200.
+
+Two consequences, both already in the design. The enclave spends one call per execution, well
+clear of the limit. And live calls stay out of the per-push CI job: a burst of Saturday pushes
+would rate-limit this endpoint and turn unrelated gates red.
+
+--- size against the enclave's cap -------------------------------------------
+
+Largest observed at size=3: 9322 bytes, against a 102400 cap. Budget set to 16384: headroom
+over what was measured, an order of magnitude under the platform limit.

@@ -12,9 +12,11 @@ export const isUnpaid = (invoice: Invoice): boolean =>
 export const invoiceIdOf = (body: { Invoices?: Array<{ InvoiceID?: string }> }): string | undefined =>
   body.Invoices?.[0]?.InvoiceID
 
+/** The screening envelope, as returned: a match count, the lists consulted, and one page. */
+export type ScreeningResponse = { total?: number; sources?: unknown[]; results?: unknown[] }
+
 /**
- * `size` caps how many matches the page carries, so a non-empty result set is a hit
- * whatever the upstream match count is.
+ * Reads the match count, never the page. `size` caps `results`, so a query with more matches
+ * than the page holds would read clean off the array — a false negative, the unsafe direction.
  */
-export const hasSanctionsHit = (response: { results?: unknown[] }): boolean =>
-  (response.results?.length ?? 0) > 0
+export const hasSanctionsHit = (response: ScreeningResponse): boolean => (response.total ?? 0) > 0

@@ -10,8 +10,8 @@
     "logTriggerEventBytes": 5120
   },
   "data": {
-    "accounting": { "callsPerExecution": 2, "accessTokenSeconds": null, "invoiceResponseBytes": null },
-    "screening": { "callsPerExecution": 1, "responseBytesAtSizeThree": null },
+    "accounting": { "callsPerExecution": 2, "accessTokenSeconds": 1800, "invoiceResponseBytes": 10240 },
+    "screening": { "callsPerExecution": 1, "responseBytesAtSizeThree": 16384 },
     "httpCallPlan": { "stageOne": 4, "stageTwo": 2, "reserve": 1 }
   },
   "contracts": { "gasSnapshotPath": ".gas-snapshot", "maxGasDeltaPercent": null },

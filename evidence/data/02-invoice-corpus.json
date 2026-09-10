@@ -1,0 +1,37 @@
+{
+  "_comment": [
+    "The canonical claim is a real invoice in a real accounting system, read back through an",
+    "authenticated call. Variants are the SAME claim rewritten the way a second lender would",
+    "receive it, so k-of-N matching has something to measure; the last entry is a different",
+    "claim and must NOT match, which is what keeps the threshold from being tuned to accept",
+    "everything. Every canonical value below was returned by the provider, none was invented.",
+    "The tax id carries its separators as the source system stores them, so the reformatting",
+    "runs in the direction the real data dictates: canonical has spaces, the variant strips them."
+  ],
+  "canonical": {
+    "invoiceId": "72476883-0c78-4099-9bde-59530764d1b1",
+    "invoiceNumber": "ORC1043",
+    "debtorName": "Bayside Club",
+    "debtorTaxId": "11 000 111 000",
+    "amountMinor": "27500000",
+    "currency": "AUD",
+    "dueDate": "2026-12-31",
+    "country": "AU"
+  },
+  "variants": [
+    { "label": "invoice number with a separator", "invoiceNumber": "ORC-1043" },
+    { "label": "invoice number without its prefix", "invoiceNumber": "1043" },
+    { "label": "tax id without separators", "debtorTaxId": "11000111000" },
+    { "label": "amount written with a decimal separator", "amountMinor": "275000.00" },
+    { "label": "due date in day-first format", "dueDate": "31/12/2026" },
+    { "label": "lowercase country", "country": "au" },
+    { "label": "a different claim entirely", "invoiceNumber": "ORC1044", "expectNoMatch": true }
+  ],
+  "measured": {
+    "readResponseBytes": 4684,
+    "accessTokenSeconds": 1800,
+    "amountIncludesTax": true,
+    "lineNetAmount": "250000.00",
+    "taxAmount": "25000.00"
+  }
+}

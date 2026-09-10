@@ -51,7 +51,9 @@ const tokenResponse = await fetch('https://identity.xero.com/connect/token', {
 		Authorization: `Basic ${btoa(`${ledgerId}:${ledgerPassphrase}`)}`,
 		'Content-Type': 'application/x-www-form-urlencoded',
 	},
-	body: 'grant_type=client_credentials&scope=accounting.transactions.read',
+	// Read-only on purpose. The connection itself also holds the write scope, used once to seed
+	// the corpus; the token this probe and the enclave hold cannot alter the ledger.
+	body: 'grant_type=client_credentials&scope=accounting.invoices.read',
 })
 const token = (await tokenResponse.json()) as Record<string, unknown>
 
@@ -103,15 +105,29 @@ const screen = async (name: string) => {
 		{ headers: { 'subscription-key': watchlist } },
 	)
 	const body = await response.text()
-	return { hit: hasSanctionsHit(JSON.parse(body)), bytes: body.length, status: response.status }
+	return {
+		answered: response.ok,
+		hit: hasSanctionsHit(JSON.parse(body)),
+		bytes: body.length,
+		status: response.status,
+	}
 }
 
 const listed = await screen('kunlun')
 const clean = await screen('zzqxwvunlikelyname')
 
-check('a listed name hits', listed.hit, `http ${listed.status}`)
-check('a clean name does not hit', !clean.hit, `http ${clean.status}`)
-withinBudget('screening response fits', listed.bytes, budgets.data.screening.responseBytesAtSizeThree)
+// Both arms must assert the request was answered. Without it a rejected key reads as "no hit"
+// and the clean-name arm passes for the wrong reason, which is the same trap as trusting a 200.
+check('a listed name hits', listed.answered && listed.hit, `http ${listed.status}`)
+check('a clean name does not hit', clean.answered && !clean.hit, `http ${clean.status}`)
+check(
+	'screening size is measurable',
+	listed.answered,
+	listed.answered ? `${listed.bytes} bytes` : 'not answered, size means nothing',
+)
+if (listed.answered) {
+	withinBudget('screening response fits', listed.bytes, budgets.data.screening.responseBytesAtSizeThree)
+}
 
 if (failures.length > 0) {
 	console.error(`\n${failures.length} check(s) failed: ${failures.join(', ')}`)

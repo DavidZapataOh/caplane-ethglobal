@@ -30,22 +30,31 @@ test('reads the invoice id out of a response envelope', () => {
   expect(invoiceIdOf(body)).toBe('243216c5-369e-4056-ac67-05388f86dc81')
 })
 
-// The screening fixtures are verbatim rows from the published consolidated list, not invented
-// ones. `results` is the array the payload actually carries; `size` caps its length, so any
-// non-empty page is a hit regardless of how many matches exist upstream.
+// Fixtures are verbatim rows and counts from the live payload, whose envelope is
+// { results, sources, total }. `total` is how many matches exist; `results` is only the page
+// that `size` allowed through, so the two diverge on any query with more matches than size.
 
 test('a listed entity is a hit', () => {
   expect(
     hasSanctionsHit({
-      results: [{ name: 'BANK OF KUNLUN CO LTD', source: 'Capta List (CAP) - Treasury Department' }],
+      total: 3,
+      results: [
+        { name: 'KUNLUN SHIPPING COMPANY LIMITED', source: 'Specially Designated Nationals (SDN) - Treasury Department' },
+      ],
     }),
   ).toBe(true)
 })
 
 test('a name on no list is not a hit', () => {
-  expect(hasSanctionsHit({ results: [] })).toBe(false)
+  expect(hasSanctionsHit({ total: 0, results: [] })).toBe(false)
 })
 
-test('a response carrying no result set is not a hit', () => {
+test('a response carrying no count is not a hit', () => {
   expect(hasSanctionsHit({})).toBe(false)
+})
+
+// Reading the page instead of the count fails in the unsafe direction: a sanctioned
+// counterparty would read clean whenever the page happens not to carry the match.
+test('a match the page does not carry is still a hit', () => {
+  expect(hasSanctionsHit({ total: 400, results: [] })).toBe(true)
 })
