@@ -1,0 +1,10 @@
+{
+  "name": "caplane-hygiene",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "bun run check.ts",
+    "test": "bun test"
+  },
+  "devDependencies": { "typescript": "5.9.3" }
+}

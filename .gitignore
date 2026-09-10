@@ -1,0 +1,13 @@
+node_modules/
+dist/
+out/
+.next/
+cache/
+broadcast/
+contracts/lib/
+.env
+.env.*
+!.env.example
+secrets.yaml
+.DS_Store
+*.log

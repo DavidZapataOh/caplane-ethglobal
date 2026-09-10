@@ -1,0 +1,139 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  hygiene:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: oven-sh/setup-bun@v2
+        with: { bun-version: 1.2.21 }
+      - run: bun install --frozen-lockfile
+        working-directory: scripts/hygiene
+      - run: bun test
+        working-directory: scripts/hygiene
+      - run: bun run scripts/hygiene/check.ts
+
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # NEVER foundry-rs/foundry-toolchain here. Circle's own README: it installs upstream
+      # Foundry, "which has no Arc support and will run your tests against Ethereum rules
+      # while reporting them as passing." Pin the Arc fork by checksum instead.
+      - name: Install arc-foundry, pinned and checksum-verified
+        run: |
+          V=v0.8.0-1
+          A=arc-foundry-$V-x86_64-unknown-linux-gnu.tar.gz
+          curl -sSLO https://github.com/circlefin/arc-foundry/releases/download/$V/$A
+          curl -sSLO https://github.com/circlefin/arc-foundry/releases/download/$V/$A.sha256
+          sha256sum -c $A.sha256
+          tar -xzf $A && mkdir -p "$HOME/.local/bin"
+          mv forge "$HOME/.local/bin/arc-forge"
+          mv cast  "$HOME/.local/bin/arc-cast"
+          mv anvil "$HOME/.local/bin/arc-anvil"
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+      - name: Confirm Arc semantics are the ones in effect
+        working-directory: contracts
+        run: arc-forge config --json | grep -E '"network"|"arc_hardfork"'
+      - run: arc-forge fmt --check
+        working-directory: contracts
+      - run: arc-forge lint
+        working-directory: contracts
+      - run: arc-forge test -vvv
+        working-directory: contracts
+        env: { FOUNDRY_PROFILE: ci }
+      # `forge test` exits 0 when it finds no tests at all, so a green job proves nothing
+      # on its own. Assert the suite actually ran.
+      - name: Assert the contract suite is not empty
+        working-directory: contracts
+        run: |
+          n=$(arc-forge test --json | node -e "
+            let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{
+              const s=JSON.parse(d);
+              console.log(Object.values(s).reduce((a,x)=>a+Object.keys(x.test_results||{}).length,0));
+            })")
+          echo "contract tests executed: $n"
+          [ "$n" -gt 0 ] || { echo "::error::forge ran zero tests and still exited 0"; exit 1; }
+
+  libraries:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        dir: [claim, sdk, brand, services/api, services/mcp, services/harness]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ${{ matrix.dir }}/package-lock.json
+      - run: npm ci
+        working-directory: ${{ matrix.dir }}
+      - run: npm run typecheck
+        working-directory: ${{ matrix.dir }}
+
+  web:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        dir: [web, site]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ${{ matrix.dir }}/package-lock.json
+      - run: npm ci
+        working-directory: ${{ matrix.dir }}
+      - run: npm run lint
+        working-directory: ${{ matrix.dir }}
+      - run: npm run build
+        working-directory: ${{ matrix.dir }}
+
+  credentialed:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assert every required secret is present
+        env:
+          ARC_TESTNET_RPC_URL: ${{ secrets.ARC_TESTNET_RPC_URL }}
+        run: |
+          missing=0
+          for name in ARC_TESTNET_RPC_URL; do
+            if [ -z "${!name}" ]; then echo "::error::missing required secret: $name"; missing=1; fi
+          done
+          exit $missing
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      # Suites that need live credentials are added by the plans that own each data source.
+      # No step may wrap itself in `if [ -n "$SECRET" ]` — a silent skip is a false green.
+      - run: echo "no credentialed suites registered yet"
+
+  clean-clone:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone fresh with no caches
+        run: git clone --depth 1 "https://github.com/${{ github.repository }}" fresh
+      - uses: oven-sh/setup-bun@v2
+        with: { bun-version: 1.2.21 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Install arc-foundry, pinned and checksum-verified
+        run: |
+          V=v0.8.0-1
+          A=arc-foundry-$V-x86_64-unknown-linux-gnu.tar.gz
+          curl -sSLO https://github.com/circlefin/arc-foundry/releases/download/$V/$A
+          curl -sSLO https://github.com/circlefin/arc-foundry/releases/download/$V/$A.sha256
+          sha256sum -c $A.sha256
+          tar -xzf $A && mkdir -p "$HOME/.local/bin" && mv forge "$HOME/.local/bin/arc-forge"
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+      - run: arc-forge build
+        working-directory: fresh/contracts
+      - run: bun install --frozen-lockfile && bun test
+        working-directory: fresh/scripts/hygiene

@@ -1,0 +1,10 @@
+{
+  "name": "@caplane/sdk",
+  "version": "0.0.0",
+  "type": "module",
+  "main": "index.ts",
+  "license": "MIT",
+  "scripts": { "typecheck": "tsc --noEmit", "test": "bun test" },
+  "dependencies": { "viem": "2.34.0" },
+  "devDependencies": { "typescript": "5.9.3" }
+}
