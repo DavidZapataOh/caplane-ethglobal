@@ -1,4 +1,8 @@
 [profile.default]
+# arc-foundry only applies Arc semantics when the network is selected explicitly, and no tool
+# prints which EVM rules are in effect. Declared on the default profile so every other profile
+# inherits it: upstream Foundry would run these tests against Ethereum rules and report a pass.
+network = "arc"
 src = "src"
 out = "out"
 libs = ["lib"]

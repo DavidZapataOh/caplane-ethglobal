@@ -1,0 +1,12 @@
+=== rpc.testnet.arc.io (documented) ===
+chainId:  {"jsonrpc":"2.0","id":1,"result":"0x4cef52"}
+client:   {"jsonrpc":"2.0","id":1,"result":"arc/v1"}
+block:    {"jsonrpc":"2.0","id":1,"result":"0x3a8398a"}
+gasPrice: {"jsonrpc":"2.0","id":1,"result":"0x4f0cf8100"}
+batch:    [{"jsonrpc":"2.0","id":1,"result":"0x4cef52"},{"jsonrpc":"2.0","id":2,"result":"0x3a8398b"},{"jsonrpc":"2.0","id":3,"result":"0x4f0cf8100"}]
+=== rpc.testnet.arc.network (undocumented, parity check) ===
+chainId:  {"jsonrpc":"2.0","id":1,"result":"0x4cef52"}
+client:   {"jsonrpc":"2.0","id":1,"result":"arc/v1"}
+block:    {"jsonrpc":"2.0","id":1,"result":"0x3a8398e"}
+gasPrice: {"jsonrpc":"2.0","id":1,"result":"0x4f0cf8100"}
+batch:    [{"jsonrpc":"2.0","id":1,"result":"0x4cef52"},{"jsonrpc":"2.0","id":2,"result":"0x3a8398f"},{"jsonrpc":"2.0","id":3,"result":"0x4f0cf8100"}]

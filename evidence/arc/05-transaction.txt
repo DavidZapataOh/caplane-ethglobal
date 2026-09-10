@@ -1,0 +1,9 @@
+tx: 0x958f9ffe2730fb9101c5dd061610aca338e9babd352bbf817c3efef6406bb19c
+explorer: https://testnet.arcscan.app/tx/0x958f9ffe2730fb9101c5dd061610aca338e9babd352bbf817c3efef6406bb19c
+
+status: 0x1 | gasUsed: 48722 | effectiveGasPrice: 21.0 gwei
+
+=== EIP-7708 dual emit: one movement, two logs ===
+  emitter 0xfffffffffffffffffffffffffffffffffffffffe → 1000000000000000 (18 dec) = 0.001000 USDC
+  emitter 0x3600000000000000000000000000000000000000 → 1000 (6 dec) = 0.001000 USDC
+  ratio = 1000000000000 — indexing both addresses would double-count

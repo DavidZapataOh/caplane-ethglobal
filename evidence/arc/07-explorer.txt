@@ -1,0 +1,33 @@
+=== verifier config ===
+  rust verifier enabled: true
+  solc versions available: 1657
+  v0.8.28 present: [
+  'v0.8.28+commit.7893614a',
+  'v0.8.28-nightly.2024.10.7+commit.0e02c469',
+  'v0.8.28-nightly.2024.10.2+commit.256e9528',
+  'v0.8.28-nightly.2024.10.1+commit.4ab3e361',
+  'v0.8.28-nightly.2024.9.30+commit.a8a679d1',
+  'v0.8.28-nightly.2024.9.27+commit.4ba39cbe',
+  'v0.8.28-nightly.2024.9.26+commit.f369cdd0',
+  'v0.8.28-nightly.2024.9.25+commit.3ee5f2df',
+  'v0.8.28-nightly.2024.9.24+commit.bd733546',
+  'v0.8.28-nightly.2024.9.23+commit.60cea4d7',
+  'v0.8.28-nightly.2024.9.20+commit.33b67f0a',
+  'v0.8.28-nightly.2024.9.19+commit.7d331510',
+  'v0.8.28-nightly.2024.9.18+commit.ba4d7684',
+  'v0.8.28-nightly.2024.9.17+commit.154fc1df',
+  'v0.8.28-nightly.2024.9.16+commit.322d6561',
+  'v0.8.28-nightly.2024.9.11+commit.4049f51e',
+  'v0.8.28-nightly.2024.9.10+commit.6ef580cd',
+  'v0.8.28-nightly.2024.9.9+commit.62909dec',
+  'v0.8.28-nightly.2024.9.4+commit.09e9aa65'
+]
+=== anonymous contract read (no auth header) ===
+  name: FiatTokenProxy | is_verified: true | compiler: v0.6.12+commit.27d51765
+
+Verification command for 02/08:
+  arc-forge verify-contract $ADDRESS src/Contract.sol:Contract \
+    --chain-id 5042002 \
+    --verifier blockscout \
+    --verifier-url https://testnet.arcscan.app/api/
+No API key required. Manual fallback: https://testnet.arcscan.app/contract-verification

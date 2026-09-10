@@ -1,0 +1,8 @@
+forge Version: 1.7.1-dev
+Commit SHA: f567f940c9187c64f1ac65364280e5381a542c77
+Build Timestamp: 2026-09-08T15:23:25.464595000Z (1788881005)
+Build Profile: release
+--- effective semantics ---
+  solc: 0.8.28 | evm_version: cancun | optimizer: true
+--- sha256 of the installed release ---
+  9aa45d4d3e12d94e9145be8feddfdd0d9eb419dec940823a4a03a55519b3dc2a (verified at install)

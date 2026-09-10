@@ -1,0 +1,7 @@
+=== USDC dual view, measured on our own funded address ===
+  native  (18 dec): 20000000000000000000
+  erc20   (6 dec):  20000000
+  ratio native/erc20 = 1000000000000n
+  floor(native/1e12) = 20000000n  (must equal erc20)
+
+  The ERC-20 view TRUNCATES: a balanceOf of 0 does not imply a native balance of 0.

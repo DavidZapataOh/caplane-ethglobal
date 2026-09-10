@@ -1,0 +1,18 @@
+=== Fee-floor behaviour, settled empirically 2026-09-10 ===
+
+Circle's own docs contradict each other:
+  gas-and-fees.md     : lists 'transaction underpriced' as a returned RPC error
+  evm-differences.md  : 'silently dropped by the mempool. They produce no error receipt
+                         and never appear in a block.'
+
+Measured with a funded key, 1 gwei against a 20 gwei floor:
+  eth_sendRawTransaction  -> ACCEPTED, returned 0x2f040d99...6368ba29
+  receipt after 122 blocks-> null
+  getTransactionByHash    -> null (gone from the mempool entirely)
+
+VERDICT: evm-differences.md is right. The RPC accepts it, nothing is mined,
+and the transaction vanishes. A deploy script that does not pin maxFeePerGas
+above 20 gwei fails with no diagnostic whatsoever.
+
+Nonce is not consumed: 1 (unchanged).
+Material for the sponsor feedback document.
