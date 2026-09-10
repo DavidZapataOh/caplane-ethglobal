@@ -1,4 +1,5 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "git": { "deploymentEnabled": { "main": false } }
+  "git": { "deploymentEnabled": { "main": false } },
+  "installCommand": "npm ci --prefix ../brand --no-audit --no-fund && npm ci"
 }
