@@ -43,6 +43,7 @@ jobs:
           mv cast  "$HOME/.local/bin/arc-cast"
           mv anvil "$HOME/.local/bin/arc-anvil"
           echo "$HOME/.local/bin" >> $GITHUB_PATH
+      - run: ./scripts/contracts/install-deps.sh
       # The `network` key always exists; only its VALUE says whether Arc rules apply.
       # Grepping for the key name passes vacuously while tests run under Ethereum rules.
       - name: Confirm Arc semantics are the ones in effect
@@ -203,6 +204,7 @@ jobs:
           sha256sum -c $A.sha256
           tar -xzf $A && mkdir -p "$HOME/.local/bin" && mv forge "$HOME/.local/bin/arc-forge"
           echo "$HOME/.local/bin" >> $GITHUB_PATH
+      - run: ./scripts/contracts/install-deps.sh
       - name: Endpoint liveness
         env: { ARC_TESTNET_RPC_URL: "${{ secrets.ARC_TESTNET_RPC_URL }}" }
         run: ./scripts/chain/liveness.sh
@@ -229,7 +231,14 @@ jobs:
           sha256sum -c $A.sha256
           tar -xzf $A && mkdir -p "$HOME/.local/bin" && mv forge "$HOME/.local/bin/arc-forge"
           echo "$HOME/.local/bin" >> $GITHUB_PATH
+      - run: ./scripts/contracts/install-deps.sh
+        working-directory: fresh
       - run: arc-forge build
         working-directory: fresh/contracts
       - run: bun install --frozen-lockfile && bun test
         working-directory: fresh/scripts/hygiene
+      # The web build is here because a warm machine cannot reproduce it: the linked brand
+      # package resolves its own dependencies only if someone has installed them, and on a
+      # developer's laptop someone always has.
+      - run: npm ci && npm run build
+        working-directory: fresh/web
