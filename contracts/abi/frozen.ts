@@ -62,6 +62,11 @@ export const ENVELOPE = {
 export const CHAIN = {
   arcTestnet: {
     chainId: 5042002,
+    /**
+     * BigInt is mandatory, not stylistic. 3034092155422581607 exceeds Number.MAX_SAFE_INTEGER,
+     * so JSON.parse silently rounds it to 3034092155422582000 — verified against the CLI's own
+     * `supported-chains --output json`. Handling it as a Number corrupts the identifier.
+     */
     chainSelector: 3034092155422581607n,
     forwarder: '0x76c9cf548b4179F8901cda1f8623568b58215E62',
     usdc: '0x3600000000000000000000000000000000000000',

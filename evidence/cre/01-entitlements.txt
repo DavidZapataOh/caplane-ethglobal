@@ -1,0 +1,37 @@
+=== CRE entitlements, recorded 2026-09-10T06:44:24Z ===
+(email redacted: this file ships in a public repository)
+
+Initializing...
+Fetching account details...
+
+Account Details
+╭─────────────────────────────────────────╮
+│ Email:             <redacted>  │
+│ Organization ID:   org_bpfrIMiRcRbMXkqW │
+│ Organization Name: Glemo                │
+│ Deploy Access:     Enabled              │
+╰─────────────────────────────────────────╯
+
+
+--- registries available to this organization ---
+
+Private (Chainlink-hosted)
+  ID:   private
+  Type: off-chain
+
+Targeting a registry
+  Set `deployment-registry` in your workflow.yaml to one of the IDs above:
+
+  <target-name>:
+    user-workflow:
+      deployment-registry: "onchain:ethereum-mainnet"
+
+--- arc-testnet enabled for this tenant? ---
+  total chains: 57
+   {"chainName":"arc-testnet","chainSelector":3034092155422582000,"address":"0x76c9cf548b4179F8901cda1f8623568b58215E62","mockAddress":"0x6E9EE680ef59ef64Aa8C7371279c27E496b5eDc1"}
+
+--- precision hazard, measured ---
+  arc-testnet chainSelector = 3034092155422581607
+  Number.MAX_SAFE_INTEGER   =       9007199254740991
+  After JSON.parse          = 3034092155422582000  (corrupted)
+  The CLI's own --output json is affected. frozen.ts declares it as BigInt for this reason.

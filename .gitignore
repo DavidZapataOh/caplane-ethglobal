@@ -8,6 +8,14 @@ contracts/lib/
 .env
 .env.*
 !.env.example
-secrets.yaml
 .DS_Store
 *.log
+
+# CRE build artifacts. `cre workflow simulate` leaves a ~800 KB bundle of the whole SDK
+# in the workflow directory; it is generated, never source.
+.cre_build_tmp.js
+*.wasm
+
+# secrets.yaml is deliberately NOT ignored: it maps secret ids to env var names and holds
+# no values. workflow.yaml references it, so a clean clone cannot simulate without it.
+# The values live in .env, which is ignored above.

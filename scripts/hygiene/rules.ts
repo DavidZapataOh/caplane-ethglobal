@@ -288,6 +288,51 @@ export const frozenArtifactsAreIdentical = (s: Snapshot): Finding[] => {
     });
 };
 
+const GET_SECRET_ID = /getSecrets?\(\s*\[?\s*\{\s*id:\s*["']([A-Z0-9_]+)["']/g;
+const SECRETS_YAML_ENTRY = /^\s{2,}([A-Z0-9_]+):\s*$\n\s+-\s*([A-Z0-9_]+)\s*$/gm;
+
+/**
+ * One registry of secret names across four surfaces — local .env, GitHub Actions, the CRE Vault
+ * and the platform env vars. Inconsistent names across files is rubric violation 10.
+ * The substring ban is not style: the CLI fails to resolve overlapping id/env-var pairs.
+ */
+export const secretNamesAreRegistered = (s: Snapshot): Finding[] => {
+  const envExample = s.files.find((f) => f.path.endsWith(".env.example"))?.content ?? "";
+  const registered = new Set(
+    envExample
+      .split("\n")
+      .map((l) => l.split("=")[0]!.trim())
+      .filter(Boolean),
+  );
+
+  const findings: Finding[] = [];
+
+  for (const f of s.files.filter(isFirstPartySource)) {
+    for (const [, id] of f.content.matchAll(GET_SECRET_ID)) {
+      if (!registered.has(id!)) {
+        findings.push({
+          rule: "secret-names-registered",
+          where: f.path,
+          detail: `${id} is not a key in .env.example`,
+        });
+      }
+    }
+  }
+
+  const secretsYaml = s.files.find((f) => f.path.endsWith("secrets.yaml"))?.content ?? "";
+  for (const [, id, envVar] of secretsYaml.matchAll(SECRETS_YAML_ENTRY)) {
+    if (envVar!.includes(id!) || id!.includes(envVar!)) {
+      findings.push({
+        rule: "secret-names-registered",
+        where: "secrets.yaml",
+        detail: `${envVar} is a substring of ${id}; the CLI fails to resolve overlapping names`,
+      });
+    }
+  }
+
+  return findings;
+};
+
 export const ALL_RULES = [
   noMockDependencies,
   noMockCallSites,
@@ -300,4 +345,5 @@ export const ALL_RULES = [
   noCommittedCredentials,
   noTemplateScaffolding,
   frozenArtifactsAreIdentical,
+  secretNamesAreRegistered,
 ];

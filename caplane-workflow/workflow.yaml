@@ -1,0 +1,24 @@
+# ==========================================================================
+# CRE WORKFLOW SETTINGS FILE
+# ==========================================================================
+staging-settings:
+  user-workflow:
+    workflow-name: "caplane-vault-check-staging"
+    deployment-registry: "private"
+  workflow-artifacts:
+    workflow-path: "./main.ts"
+    config-path: "./config.staging.json"
+    secrets-path: "../secrets.yaml"
+
+# ==========================================================================
+production-settings:
+  user-workflow:
+    # Throwaway name on purpose. The registry pins workflowName and the owner is shared by
+    # every workflow in the organization, so a test workflow registered under the production
+    # name could write to the real registry. 03/09 renames it before any contract exists.
+    workflow-name: "caplane-vault-check"
+    deployment-registry: "private"
+  workflow-artifacts:
+    workflow-path: "./main.ts"
+    config-path: "./config.production.json"
+    secrets-path: "../secrets.yaml"

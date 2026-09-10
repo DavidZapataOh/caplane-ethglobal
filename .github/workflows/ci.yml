@@ -103,6 +103,20 @@ jobs:
       - run: npm run build
         working-directory: ${{ matrix.dir }}
 
+  workflow:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with: { bun-version: 1.2.21 }
+      - run: bun install --frozen-lockfile
+        working-directory: caplane-workflow
+      - run: bun run typecheck
+        working-directory: caplane-workflow
+      # Hermetic: simulate and deploy need a login session and do not run in CI.
+      # The vendored ABI copy in this directory is guarded by the hygiene job, which is the
+      # only job that sees every tracked file regardless of package.
+
   credentialed:
     runs-on: ubuntu-latest
     steps:

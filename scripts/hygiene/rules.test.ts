@@ -12,6 +12,7 @@ import {
   noCommittedCredentials,
   noTemplateScaffolding,
   frozenArtifactsAreIdentical,
+  secretNamesAreRegistered,
   ALL_RULES,
 } from "./rules";
 
@@ -215,7 +216,7 @@ test("flags a workflow directory still named my-workflow", () => {
 });
 
 test("every rule is registered in ALL_RULES", () => {
-  expect(ALL_RULES).toHaveLength(11);
+  expect(ALL_RULES).toHaveLength(12);
 });
 
 test("does not flag the rule engine's own definitions and fixtures", () => {
@@ -268,4 +269,55 @@ test("flags a copy whose canonical source is missing", () => {
   const found = frozenArtifactsAreIdentical(s);
   expect(found).toHaveLength(1);
   expect(found[0].detail).toContain("no canonical");
+});
+
+test("flags a secret id that is not registered in .env.example", () => {
+  const s = snap({
+    files: [
+      { path: ".env.example", content: "ARC_TESTNET_RPC_URL=\n" },
+      {
+        path: "caplane-workflow/workflow.ts",
+        content: 'runtime.getSecrets([{ id: "GHOST_KEY" }])',
+      },
+    ],
+  });
+  const found = secretNamesAreRegistered(s);
+  expect(found).toHaveLength(1);
+  expect(found[0].detail).toContain("GHOST_KEY");
+});
+
+test("accepts a secret id that is registered", () => {
+  const s = snap({
+    files: [
+      { path: ".env.example", content: "VAULT_ROUNDTRIP_PROBE=\n" },
+      {
+        path: "caplane-workflow/workflow.ts",
+        content: 'runtime.getSecrets([{ id: "VAULT_ROUNDTRIP_PROBE" }])',
+      },
+    ],
+  });
+  expect(secretNamesAreRegistered(s)).toEqual([]);
+});
+
+test("flags an env var name that collides with its secret id", () => {
+  const s = snap({
+    files: [
+      { path: "secrets.yaml", content: "secretsNames:\n  API_TOKEN:\n    - SECRET_API_TOKEN\n" },
+    ],
+  });
+  const found = secretNamesAreRegistered(s);
+  expect(found).toHaveLength(1);
+  expect(found[0].detail).toContain("substring");
+});
+
+test("accepts non-overlapping secret id and env var names", () => {
+  const s = snap({
+    files: [
+      {
+        path: "secrets.yaml",
+        content: "secretsNames:\n  VAULT_ROUNDTRIP_PROBE:\n    - CAPLANE_VAULT_PROBE_VALUE\n",
+      },
+    ],
+  });
+  expect(secretNamesAreRegistered(s)).toEqual([]);
 });
