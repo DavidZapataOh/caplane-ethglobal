@@ -11,10 +11,13 @@ contracts/lib/
 .DS_Store
 *.log
 
-# CRE build artifacts. `cre workflow simulate` leaves a ~800 KB bundle of the whole SDK
-# in the workflow directory; it is generated, never source.
+# CRE build artifacts, all generated in the workflow directory and never source.
+# `simulate` leaves a ~800 KB bundle of the whole SDK; `deploy` leaves the compressed
+# binary it uploads, ~1.1 MB. `*.wasm` does not cover the latter — the extension is
+# `.wasm.br.b64`, so it needs its own pattern.
 .cre_build_tmp.js
 *.wasm
+*.wasm.br.b64
 
 # secrets.yaml is deliberately NOT ignored: it maps secret ids to env var names and holds
 # no values. workflow.yaml references it, so a clean clone cannot simulate without it.

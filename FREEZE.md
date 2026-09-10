@@ -88,8 +88,8 @@ With no id to pin, the graph has no cycle:
 1. `CaplaneInbox` and `CaplaneRegistry(forwarder, workflowOwner, workflowName)` — every
    constructor argument is known offline, so these can go in either order
 2. Workflow config, carrying both addresses
-3. `cre workflow deploy --deployment-registry private`
-4. `cre workflow activate` — deploys land paused
+3. `cre workflow deploy --deployment-registry private` — on the private registry the deploy lands
+   `Active` and the first cron tick fires without a separate `activate`
 
 Never rename the workflow after step 1: the name is immutable in the contract.
 

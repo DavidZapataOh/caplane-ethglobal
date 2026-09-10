@@ -1,0 +1,66 @@
+Vault-to-enclave round trip, measured by ablation.
+=================================================
+
+The handler holds no `runtime.log`, so `cre execution logs` returns `No logs found`, and the
+report only materialises when an on-chain receiver consumes it. The verdict is therefore not
+readable from outside the enclave — which is the property being built, not a gap in the evidence.
+
+So the proof is not the verdict. It is that the execution has two distinguishable shapes
+depending on whether the Vault holds the secret. Same binary, same config, same schedule.
+
+  secret present -> SUCCESS,  trigger -> http-actions.SendRequest -> consensus.Report
+  secret absent  -> FAILURE,  trigger, and nothing after it
+
+The HTTP call is never attempted when the secret is missing: `getSecrets(...).result()` aborts
+the handler first. That is what makes the green meaningful. A green with no counterfactual would
+only show that nothing crashed.
+
+
+--- ARM A: secret present ---------------------------------------------------
+
+$ cre execution list caplane-vault-check
+3. dede78210e99ecbc92d873e11be6a06f7035c212b38bb0e9a0d8d8544c84f3b9
+     Status:    SUCCESS
+     Started:   2026-09-10 15:00:01 UTC
+     Finished:  2026-09-10 15:00:11 UTC (10s)
+
+$ cre execution events dede78210e99ecbc92d873e11be6a06f7035c212b38bb0e9a0d8d8544c84f3b9
+1. trigger                        success   15:00:00
+2. http-actions@1.0.0-alpha       success   15:00:11   SendRequest
+3. consensus@1.0.0-alpha          success   15:00:10   Report
+
+$ cre execution logs dede78210e99ecbc92d873e11be6a06f7035c212b38bb0e9a0d8d8544c84f3b9
+! No logs found
+
+
+--- the secret is deleted from the Vault, 15:05:0xZ --------------------------
+
+$ cre secrets list --target production-settings --secrets-auth=browser --non-interactive --yes
+  No secrets found
+
+
+--- ARM B: secret absent, twice ---------------------------------------------
+
+$ cre execution list caplane-vault-check
+1. 4fffd929e254ead42cef573c461a25beae714d767c3baa994ca7d5a11c622f5a
+     Status:    FAILURE
+     Started:   2026-09-10 15:10:02 UTC   (five minutes after the deletion: no timing ambiguity)
+2. 94ae12bdba0e62d89b03addb07838bac03f688375e324f481c9c0e431769fe36
+     Status:    FAILURE
+     Started:   2026-09-10 15:05:02 UTC
+
+$ cre execution events 4fffd929e254ead42cef573c461a25beae714d767c3baa994ca7d5a11c622f5a
+1. trigger                        success   15:10:00
+(no further events)
+
+
+--- what this does and does not establish ------------------------------------
+
+Established: the Vault DON releases a secret into an attested enclave running under
+`handlerInTee` on Nitro in us-west-2, and the workflow cannot proceed without it.
+
+Not established: that the credential is valid upstream. `http-actions` reports `success` for the
+transport, not for the status code, so a 401 and a 200 produce identical observable output. Proving
+credential validity needs a real credential AND an on-chain receiver to read the verdict out of the
+report; both arrive later. Keeping the probe credential disposable is deliberate: a shared failure
+between "Vault broken" and "credential bad" would be unattributable.

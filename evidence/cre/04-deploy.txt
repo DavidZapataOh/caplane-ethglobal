@@ -1,0 +1,16 @@
+$ cre workflow deploy caplane-workflow --target production-settings --non-interactive --yes
+  Registering workflow in private registry (workflowID: 006818407cb18ada74aa7cad0880ff10bc88cc93b8ad69c14204e5feb4bee17e)...
+✓ Workflow registered in private registry
+
+Details:
+     Registry:         private
+     DON Family:       zone-a
+     Workflow Name:    caplane-vault-check
+     Workflow ID:      006818407cb18ada74aa7cad0880ff10bc88cc93b8ad69c14204e5feb4bee17e
+     Status:           Active
+     Binary URL:       https://storage.cre.chain.link/artifacts/006818407cb18ada74aa7cad0880ff10bc88cc93b8ad69c14204e5feb4bee17e/binary.wasm
+     Config URL:       https://storage.cre.chain.link/artifacts/006818407cb18ada74aa7cad0880ff10bc88cc93b8ad69c14204e5feb4bee17e/config
+     Owner:            d5557a1d0806323cad77bc4049ccaca0eadaaf06
+
+# No gas quote, no linked wallet, no funding step: the private registry is off-chain.
+# Deploy landed ACTIVE directly, so no separate `activate` was needed.
