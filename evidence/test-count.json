@@ -1,6 +1,6 @@
 {
-  "contractTests": 1,
-  "unitTests": 37,
-  "total": 38,
+  "contractTests": 10,
+  "unitTests": 41,
+  "total": 51,
   "commit": "uncommitted"
 }

@@ -246,6 +246,48 @@ export const noTemplateScaffolding = (s: Snapshot): Finding[] => [
   ),
 ];
 
+const FROZEN_ARTIFACTS = ["index.ts", "frozen.ts"];
+const CANONICAL_DIR = "contracts/abi/";
+
+/**
+ * With no workspace linkage every consumer holds a copy of the frozen interface. A stale copy
+ * in the workflow fails OPEN: an obsolete selector makes the node return empty bytes, which
+ * decodes to false, and the registry answers "not encumbered" while a double pledge is written.
+ */
+export const frozenArtifactsAreIdentical = (s: Snapshot): Finding[] => {
+  const canonical = new Map<string, string>();
+  for (const f of s.files) {
+    if (!f.path.startsWith(CANONICAL_DIR)) continue;
+    const name = f.path.slice(CANONICAL_DIR.length);
+    if (FROZEN_ARTIFACTS.includes(name)) canonical.set(name, f.content);
+  }
+
+  return s.files
+    .filter((f) => !f.path.startsWith(CANONICAL_DIR) && /(^|\/)abi\//.test(f.path))
+    .filter((f) => FROZEN_ARTIFACTS.includes(f.path.split("/").pop()!))
+    .flatMap((f) => {
+      const name = f.path.split("/").pop()!;
+      const source = canonical.get(name);
+      if (source === undefined) {
+        return [
+          {
+            rule: "frozen-artifact-drift",
+            where: f.path,
+            detail: `no canonical ${CANONICAL_DIR}${name}`,
+          },
+        ];
+      }
+      if (source === f.content) return [];
+      return [
+        {
+          rule: "frozen-artifact-drift",
+          where: f.path,
+          detail: `differs from ${CANONICAL_DIR}${name}`,
+        },
+      ];
+    });
+};
+
 export const ALL_RULES = [
   noMockDependencies,
   noMockCallSites,
@@ -257,4 +299,5 @@ export const ALL_RULES = [
   onlyApprovedTeeConstraint,
   noCommittedCredentials,
   noTemplateScaffolding,
+  frozenArtifactsAreIdentical,
 ];

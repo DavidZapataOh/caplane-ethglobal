@@ -64,7 +64,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        dir: [claim, sdk, brand, services/api, services/mcp, services/harness]
+        dir: [contracts/abi, claim, sdk, brand, services/api, services/mcp, services/harness]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

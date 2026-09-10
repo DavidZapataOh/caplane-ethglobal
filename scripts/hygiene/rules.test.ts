@@ -11,6 +11,7 @@ import {
   onlyApprovedTeeConstraint,
   noCommittedCredentials,
   noTemplateScaffolding,
+  frozenArtifactsAreIdentical,
   ALL_RULES,
 } from "./rules";
 
@@ -214,7 +215,7 @@ test("flags a workflow directory still named my-workflow", () => {
 });
 
 test("every rule is registered in ALL_RULES", () => {
-  expect(ALL_RULES).toHaveLength(10);
+  expect(ALL_RULES).toHaveLength(11);
 });
 
 test("does not flag the rule engine's own definitions and fixtures", () => {
@@ -232,4 +233,39 @@ test("does not flag the rule engine's own definitions and fixtures", () => {
 test("still scans the rest of scripts/ — the exclusion stays narrow", () => {
   const s = snap({ files: [{ path: "scripts/test-count/count.ts", content: "vi.mock('./x')" }] });
   expect(noMockCallSites(s)).toHaveLength(1);
+});
+
+test("accepts a vendored copy identical to the canonical artifact", () => {
+  const body = "export const registryAbi = [] as const satisfies Abi\n";
+  const s = snap({
+    files: [
+      { path: "contracts/abi/index.ts", content: body },
+      { path: "caplane-workflow/abi/index.ts", content: body },
+    ],
+  });
+  expect(frozenArtifactsAreIdentical(s)).toEqual([]);
+});
+
+test("flags a vendored copy that drifted from the canonical artifact", () => {
+  const s = snap({
+    files: [
+      { path: "contracts/abi/index.ts", content: "export const registryAbi = [1] as const\n" },
+      { path: "caplane-workflow/abi/index.ts", content: "export const registryAbi = [] as const\n" },
+    ],
+  });
+  const found = frozenArtifactsAreIdentical(s);
+  expect(found).toHaveLength(1);
+  expect(found[0].where).toBe("caplane-workflow/abi/index.ts");
+});
+
+test("accepts a repository with no vendored copies yet", () => {
+  const s = snap({ files: [{ path: "contracts/abi/index.ts", content: "x" }] });
+  expect(frozenArtifactsAreIdentical(s)).toEqual([]);
+});
+
+test("flags a copy whose canonical source is missing", () => {
+  const s = snap({ files: [{ path: "sdk/src/abi/frozen.ts", content: "x" }] });
+  const found = frozenArtifactsAreIdentical(s);
+  expect(found).toHaveLength(1);
+  expect(found[0].detail).toContain("no canonical");
 });

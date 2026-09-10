@@ -1,0 +1,8 @@
+No files changed, compilation skipped
+
+Ran 2 tests for test/FrozenInterface.t.sol:FrozenInterfaceTest
+[PASS] test_ReportCodec_DecodesTheGoldenVector() (gas: 4114)
+[PASS] test_ReportCodec_GoldenVectorFitsTheReportBudget() (gas: 1510)
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 10.97ms (6.32ms CPU time)
+
+Ran 1 test suite in 22.82ms (10.97ms CPU time): 2 tests passed, 0 failed, 0 skipped (2 total tests)
