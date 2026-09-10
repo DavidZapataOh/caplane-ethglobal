@@ -1,0 +1,35 @@
+Three services, verified 2026-09-10. Two answer on a domain; the third deliberately does not.
+
+--- the two that serve ---------------------------------------------------------
+
+$ curl https://api.caplane.xyz/health   ->  200  tls=0  "ok"
+$ curl https://api.caplane.xyz/other    ->  404         "not found"
+$ curl https://mcp.caplane.xyz/health   ->  200  tls=0  "ok"
+$ curl https://mcp.caplane.xyz/other    ->  404         "not found"
+
+The 404 is the check that discriminates. A 200 on /health alone would also be returned by a
+platform placeholder page; a 404 carrying "not found" is the responder in this repository.
+
+Each name needed two DNS records, a CNAME and a TXT. Without the TXT the name resolves and
+answers 404 — a failure that reads like success at the DNS layer.
+
+--- the one that does not ------------------------------------------------------
+
+The harness has no domain, no port and no healthcheck, and that shape is the point: it is a
+worker, not a service. Confirmed running with its log emitting one line per iteration, sixty
+seconds apart.
+
+Sixty seconds apart is the measurement that matters, not the fact that it runs. Billing is per
+vCPU-minute, so a loop that never yields pins a core and costs roughly ten times the rest of
+the deployment put together — and the hard spend limit is destructive, taking down the public
+surfaces with it. The interval is `HARNESS_INTERVAL_MS`; if the faucet cannot keep the signer
+funded at this rate, raise it rather than topping up more often.
+
+Its restart policy is ALWAYS rather than the default ON_FAILURE with ten retries: a transient
+RPC failure in hour 300 would otherwise end the experiment in silence, leaving the dashboard
+showing the last good state. Serverless is off for the same reason — nothing would wake it.
+
+--- what is not here -----------------------------------------------------------
+
+No accounting or screening credential is set on any of these services. They are enclave
+credentials; a copy on a platform would hand a server of ours the ability to read the invoice.

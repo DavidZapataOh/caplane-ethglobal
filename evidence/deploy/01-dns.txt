@@ -46,3 +46,15 @@ value that failed 4.5:1 against the paper ground, appears nowhere in the served 
 
 Still to provision: api.caplane.xyz and mcp.caplane.xyz, both from Railway, each needing a
 CNAME and a TXT. Without the TXT the name resolves and answers 404.
+
+=== all seven names, 2026-09-10T22:31Z ===
+  caplane.xyz/           http=200 tls=0           data-mode="dark"
+  www.caplane.xyz/       http=308 tls=0           
+  app.caplane.xyz/       http=200 tls=0           data-mode="dark"
+  registry.caplane.xyz/  http=200 tls=0           data-mode="paper"
+  docs.caplane.xyz/      http=200 tls=0           data-mode="paper"
+  api.caplane.xyz/health http=200 tls=0           
+  mcp.caplane.xyz/health http=200 tls=0           
+
+The two service names answer 'ok' on /health and 404 on anything else, which is the
+shape of the responder in this repository rather than a platform placeholder page.
