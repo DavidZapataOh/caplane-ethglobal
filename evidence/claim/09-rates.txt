@@ -1,0 +1,92 @@
+Measured against a real ledger, 2026-09-10.
+
+--- what the two numbers are, and are not -------------------------------------
+
+The false-match rate rests on receivables this project did not create — the accounting sandbox
+ships them, with update dates going back to 2008. The two populations were separated by asking
+the provider which invoices this application created, not by a heuristic over dates or names.
+Voided, deleted and draft invoices are excluded: a voided number can be reissued, and a draft
+may carry no number at all, so both would produce artifacts of the query rather than of the
+matcher.
+
+The false-non-match figure is NOT a rate, and is not published as one. A pair that must match
+is the same invoice as a second lender would transcribe it, and there is no second lender. Six
+renderings were exercised; five are ours, each with a documented reason. Exactly one was
+produced by the ledger rather than by us — the same invoice carries a net line of 250,000.00
+and 275,000.00 owed — and all six survive the threshold.
+
+--- false match, all three thresholds in the margin ---------------------------
+
+independent claims: 43
+identified by name: 41
+
+k=4  247 of 903 pairs   point 27.353%   95% upper 29.901%
+        ORC1005 ~ ORC1003  agreed on 4
+        ORC1005 ~ ORC1006  agreed on 4
+        ORC1005 ~ ORC1019  agreed on 4
+        ORC1005 ~ ORC1018  agreed on 4
+        ORC1005 ~ ORC1017  agreed on 4
+        ORC1005 ~ ORC1016  agreed on 4
+        … and 241 more
+k=5   47 of 903 pairs   point 5.205%   95% upper 6.589%
+        ORC1005 ~ ORC1045  agreed on 5
+        ORC1003 ~ ORC1016  agreed on 5
+        ORC1003 ~ ORC1020  agreed on 5
+        ORC1003 ~ ORC1010  agreed on 5
+        ORC1003 ~ ORC1008  agreed on 6
+        ORC1003 ~ ORC1009  agreed on 5
+        … and 41 more
+k=6    1 of 903 pairs   point 0.111%   95% upper 0.524%
+        ORC1003 ~ ORC1008  agreed on 6
+
+--- the one false match, opened rather than counted ---------------------------
+
+At the chosen threshold there is exactly one, and it is not a defect in the matcher:
+
+  ORC1003   Hamilton Smith Pty   550.00 AUD   due 2026-06-19
+  ORC1008   Hamilton Smith Pty   550.00 AUD   due 2026-06-19
+
+Two real invoices to one debtor, identical in amount and due date, differing only in their
+number. They agree on six of seven because they genuinely are near-identical claims. This is
+also the shape of the near-collision squatting attack: an adversary constructing a claim to
+collide with someone else's would build exactly this. It is closed by debtor confirmation and
+by the atomic binding of a lien to its disbursement, not by the threshold.
+
+--- what the ledger's shape does to this --------------------------------------
+
+Three of the seven components are constant here: one currency, one country, one issuer. Every
+pair starts at three of seven before anything about the debt is compared. That is not a flaw in
+the measurement, it is the measurement: a single-ledger deployment has four discriminating
+components, and this is what four buys.
+
+The amount bucket is nearly a fourth constant. Real amounts run from 105.60 to 7,150.00 and
+occupy seven doubling buckets, with 19 of 43 claims in one of them. A uniform generator would
+have hidden that; real data did not.
+
+Almost every debtor is identified by name rather than by a tax number — the ledger carries a
+tax number for one contact out of eighty-three. A name discriminates worse than a tax number,
+so these figures are pessimistic against a deployment where debtors are identified fiscally.
+That is the correct direction to be wrong in.
+
+--- what the projection said, and what the measurement said -------------------
+
+Before any of this ran, grouping the ledger's invoices by debtor, bucket and due date projected
+one false match at the chosen threshold and sixty-nine one step down. The measurement gives one
+and forty-seven. The first was right; the second was not, because the projection grouped by
+contact and by raw amount while the measurement groups by canonical components with the name
+fallback and the status filter. The measurement is what stands.
+
+--- honest limits ---------------------------------------------------------------
+
+Every figure above is an interval, not a point. A single false match in nine hundred pairs
+reads as 0.11%, and the honest bound on it is roughly five times that. Zero matches would not
+have meant zero either — it would have meant under a third of a percent.
+
+More invoices would not sharpen this. Rows from one generator correlate with one another, so
+ten thousand synthetic invoices do not buy ten thousand independent negatives. The invoices
+this ledger shipped with are the ceiling of what the sandbox can honestly supply.
+
+A commercial requirement quoted in the literature — at most ten false matches, a one percent
+false-non-match rate — is recorded as precedent for the METHOD: fix targets from practice and
+calibrate against a corpus. It is not used to judge these figures. Its "ten false matches"
+carries no denominator, and it describes a biometric system over databases a billion rows deep.

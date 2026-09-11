@@ -27,7 +27,15 @@ export type ComponentName = (typeof COMPONENT_ORDER)[number]
  */
 export const LEDGER_CONSTANT = ['currency', 'issuerTaxId', 'country'] as const
 
-/** Raw, as submitted. Every field is a string: this is what arrives over the wire. */
+/**
+ * Raw, as submitted. Every field is a string: this is what arrives over the wire.
+ *
+ * `debtorTaxId` is the debtor's identity: a tax number when the ledger carries one, the
+ * canonical debtor name otherwise — which is the case for eighty-two of this ledger's
+ * eighty-three contacts. The field keeps its name deliberately. It enters no preimage, so
+ * renaming would change nothing that is hashed, and would break test literals across four
+ * plans' worth of artifacts.
+ */
 export type ClaimInput = {
   debtorTaxId: string
   invoiceNumber: string

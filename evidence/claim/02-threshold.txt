@@ -41,3 +41,30 @@ The rate, and how few samples it rests on, belong to the measurement plan.
 7/7  collision as required  due date in day-first format
 7/7  collision as required  lowercase country
 3/7  clear     as required  a second real invoice: different debtor, number, amount bucket and due date
+
+--- measured, see 09-rates.txt ---
+
+independent claims: 43
+identified by name: 41
+
+k=4  247 of 903 pairs   point 27.353%   95% upper 29.901%
+        ORC1005 ~ ORC1003  agreed on 4
+        ORC1005 ~ ORC1006  agreed on 4
+        ORC1005 ~ ORC1019  agreed on 4
+        ORC1005 ~ ORC1018  agreed on 4
+        ORC1005 ~ ORC1017  agreed on 4
+        ORC1005 ~ ORC1016  agreed on 4
+        … and 241 more
+k=5   47 of 903 pairs   point 5.205%   95% upper 6.589%
+        ORC1005 ~ ORC1045  agreed on 5
+        ORC1003 ~ ORC1016  agreed on 5
+        ORC1003 ~ ORC1020  agreed on 5
+        ORC1003 ~ ORC1010  agreed on 5
+        ORC1003 ~ ORC1008  agreed on 6
+        ORC1003 ~ ORC1009  agreed on 5
+        … and 41 more
+k=6    1 of 903 pairs   point 0.111%   95% upper 0.524%
+        ORC1003 ~ ORC1008  agreed on 6
+
+The threshold above was chosen from the cost of the squatting attack, before any
+rate existed. Whether the measurement supports it is the table, not this sentence.
