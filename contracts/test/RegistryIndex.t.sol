@@ -197,13 +197,15 @@ contract RegistryIndexTest is RegistryFixture {
   }
 
   /// @dev Pinned near the measured value, not at the ceiling: an assertion at 4,800,000 would
-  ///      pass through a tenfold regression.
+  ///      pass through a tenfold regression. The bound is the receipt figure, so it binds under
+  ///      `--isolate`, where this reads 458,261; the default run measures 428,571 because
+  ///      execution gas charges no intrinsic cost and no calldata.
   function test_OnReport_StaysNearItsMeasuredCost() public {
     uint256 before = gasleft();
     _record(LIEN_A, 250_000_000, 150, EXPIRES);
     uint256 spent = before - gasleft();
     emit log_named_uint("onReport Record", spent);
-    assertLt(spent, 450_000, "record cost regressed");
+    assertLt(spent, 470_000, "record cost regressed");
     assertLt(spent, 4_800_000, "past the transaction budget");
   }
 }

@@ -15,8 +15,9 @@
     "httpCallPlan": { "stageOne": 4, "stageTwo": 2, "reserve": 1 }
   },
   "contracts": {
-    "gasSnapshotPath": ".gas-snapshot",
-    "maxGasDeltaPercent": null,
+    "gasSnapshotPath": "contracts/.gas-snapshot",
+    "gasSnapshotForkPath": "contracts/.gas-snapshot.fork",
+    "maxGasDeltaPercent": 2,
     "receiptMeasured": {
       "CaplaneInbox.submit": { "envelopeBytes": 275, "gas": 54144, "evidence": "evidence/contracts/01-inbox.txt" }
     }

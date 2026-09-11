@@ -205,4 +205,17 @@ contract RegistryTest is RegistryFixture {
     vm.expectRevert(abi.encodeWithSelector(ICaplaneRegistry.LienNotActive.selector, LIEN_A));
     _sendFrom(m, report);
   }
+
+  /// @dev No tool enforces this. A single isolated test was measured burning 60,822,041 gas and
+  ///      passed — 3.6x the per-transaction cap and twice Arc's block limit — so the chain's own
+  ///      ceilings only exist here. Run under `--isolate` or the figure misses the intrinsic
+  ///      charge and the calldata, about 30,000 too little on this path.
+  function test_OnReport_FitsInATransactionAndLeavesRoomInTheBlock() public {
+    uint256 before = gasleft();
+    _record(LIEN_A, 250_000_000, 150, EXPIRES);
+    uint256 spent = before - gasleft();
+
+    assertLt(spent, 16_777_216, "past the EIP-7825 per-transaction cap");
+    assertLt(spent, 30_000_000 / 4, "one report must not take a quarter of a block");
+  }
 }

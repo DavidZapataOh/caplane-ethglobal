@@ -69,12 +69,19 @@ ERC-20. Budget for the real token, never for a test double.
 
 Other paths, from the suite's own gas report:
 
-    disburse               158,851 gas
-    repay                   73,070 gas
-    writeDown               33,088 gas
+    disburse               136,936 gas     was 158,851 before an advance was packed into one word
+    repay                   75,893 gas     was 73,070; see below
+    writeDown               34,582 gas     was 33,088; same reason
     totalAssets             15,684 gas     it reads the token, which is a proxy call
 
     deployment           1,608,864 gas     6,888 bytes of runtime, 17,688 of margin
+
+An advance's principal and its funding block were two mappings on the same key and are now one
+struct in one word. Disbursement pays one cold slot instead of two and falls 13.8%. The trade is
+named rather than hidden: `repay` used to zero the principal's own slot and collect the 4,800-gas
+refund for freeing it, and now the funding block keeps the word occupied, so that refund is gone
+and repayment rises 2,823. Write-down rises 1,494 for the same reason. Net over a lien's whole
+life it is 19,092 gas cheaper if repaid and 20,421 if it defaults.
 
 --- what the demo can actually hold ---------------------------------------------
 

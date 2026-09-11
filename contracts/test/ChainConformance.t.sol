@@ -14,6 +14,14 @@ contract ChainConformanceTest is Test {
   address constant USDC = 0x3600000000000000000000000000000000000000;
   address constant FORWARDER = 0x76c9cf548b4179F8901cda1f8623568b58215E62;
 
+  /// @dev Forks here rather than relying on the caller passing --fork-url. Without it the suite
+  ///      ran against the local EVM and failed asserting `31337 != 5042002`, which reads as a
+  ///      problem with the chain and is a problem with the test. Missing credentials now fail
+  ///      saying the fork could not be instantiated.
+  function setUp() public {
+    vm.createSelectFork(vm.rpcUrl("arc_testnet"));
+  }
+
   function test_ChainId_IsArcTestnet() public view {
     assertEq(block.chainid, 5_042_002);
   }

@@ -27,13 +27,34 @@ contract CaplaneEscrow {
   ICaplaneRegistry public immutable REGISTRY;
   CaplanePool public immutable POOL;
 
-  mapping(bytes32 lienId => uint256 amount) public paidFor;
+  struct Payment {
+    uint248 paid;
+    bool settled;
+  }
+
+  /// @dev One word per lien. The running total and the settled flag were two mappings on the
+  ///      same key, which cost a second cold slot on every settlement for one bit.
+  mapping(bytes32 lienId => Payment) private _payments;
+
   /// @notice What one payer put towards one lien, so it can be handed back to them and to
   ///         nobody else if settlement becomes impossible after they paid.
   mapping(bytes32 lienId => mapping(address payer => uint256 amount)) public paidBy;
-  /// @notice The registry has no field for it, so settlement is recorded here or a later
-  ///         payment would be accepted against a lien that can no longer be settled.
-  mapping(bytes32 lienId => bool) public settled;
+
+  /// @notice Total paid towards a lien and not yet handed on.
+  function paidFor(
+    bytes32 lienId
+  ) public view returns (uint256) {
+    return _payments[lienId].paid;
+  }
+
+  /// @notice Whether a lien has been settled. The registry has no field for it, so it is
+  ///         recorded here or a later payment would be accepted against a lien that can no
+  ///         longer be settled.
+  function settled(
+    bytes32 lienId
+  ) public view returns (bool) {
+    return _payments[lienId].settled;
+  }
 
   constructor(
     IERC20 usdc,
@@ -58,12 +79,16 @@ contract CaplaneEscrow {
     uint256 amount
   ) external {
     if (amount == 0) revert NothingToPay(lienId);
-    if (settled[lienId]) revert AlreadySettled(lienId);
+    if (_payments[lienId].settled) revert AlreadySettled(lienId);
 
     uint8 status = REGISTRY.statusOf(lienId);
     if (status != 1) revert LienNotPayable(lienId, status);
 
-    paidFor[lienId] += amount;
+    // casting to 'uint248' is safe because USDC's entire supply is about 1e16 base units
+    // against a 2**248 ceiling, and this contract can only hold what was transferred into it.
+    // It is still a narrowing where there was none, which is why it is named.
+    // forge-lint: disable-next-line(unsafe-typecast)
+    _payments[lienId].paid += uint248(amount);
     paidBy[lienId][msg.sender] += amount;
     SafeERC20.safeTransferFrom(USDC, msg.sender, address(this), amount);
     emit Paid(lienId, msg.sender, amount);
@@ -74,17 +99,16 @@ contract CaplaneEscrow {
   function settle(
     bytes32 lienId
   ) external {
-    if (settled[lienId]) revert AlreadySettled(lienId);
+    if (_payments[lienId].settled) revert AlreadySettled(lienId);
 
-    uint256 paid = paidFor[lienId];
+    uint256 paid = _payments[lienId].paid;
     uint256 due = POOL.amountDue(lienId);
     if (paid < due) revert NotYetCovered(lienId, paid, due);
 
     address borrower = REGISTRY.lienOf(lienId).borrower;
     uint256 surplus = paid - due;
 
-    settled[lienId] = true;
-    paidFor[lienId] = 0;
+    _payments[lienId] = Payment({paid: 0, settled: true});
 
     SafeERC20.forceApprove(USDC, address(POOL), due);
     POOL.repay(lienId);
@@ -112,7 +136,7 @@ contract CaplaneEscrow {
     // stop the second withdrawal, since `paidFor` is zero by then and the subtraction below
     // underflows; this says why instead of panicking, and does not leave a money-safety property
     // resting on a line whose purpose is bookkeeping.
-    if (settled[lienId]) revert AlreadySettled(lienId);
+    if (_payments[lienId].settled) revert AlreadySettled(lienId);
 
     uint256 amount = paidBy[lienId][msg.sender];
     if (amount == 0) revert NothingToRefund(lienId, msg.sender);
@@ -124,7 +148,10 @@ contract CaplaneEscrow {
     }
 
     paidBy[lienId][msg.sender] = 0;
-    paidFor[lienId] -= amount;
+    // casting to 'uint248' is safe because this amount was added through `pay`, which narrowed
+    // it the same way: it cannot be wider coming out than it was going in.
+    // forge-lint: disable-next-line(unsafe-typecast)
+    _payments[lienId].paid -= uint248(amount);
 
     SafeERC20.safeTransfer(USDC, msg.sender, amount);
     emit Refunded(lienId, msg.sender, amount);

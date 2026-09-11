@@ -355,4 +355,21 @@ contract EscrowTest is RegistryFixture {
     vm.expectRevert(abi.encodeWithSelector(CaplaneEscrow.NothingToRefund.selector, lienId, DEBTOR));
     escrow.refund(lienId);
   }
+
+  /// @dev Both halves in one word, asserted where it matters: the settled flag has to live in
+  ///      the top byte of the same word that holds the running total. Checking "next slot is
+  ///      empty" after a payment alone passes against every layout, including the two separate
+  ///      mappings this replaces, because until settlement nobody has written the flag.
+  function test_Escrow_KeepsOnePaymentPerWord() public {
+    _seedPool(500e6);
+    bytes32 lienId = _activeLien(BORROWER, 250e6, 150);
+    pool.disburse(lienId);
+    _pay(DEBTOR, lienId, 300e6);
+    escrow.settle(lienId);
+
+    bytes32 slot = keccak256(abi.encode(lienId, uint256(0)));
+    uint256 word = uint256(vm.load(address(escrow), slot));
+    assertEq(word >> 248, 1, "the settled flag is not in the payment word");
+    assertEq(vm.load(address(escrow), bytes32(uint256(slot) + 1)), bytes32(0), "it spilled");
+  }
 }

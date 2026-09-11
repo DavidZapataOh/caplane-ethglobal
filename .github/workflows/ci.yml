@@ -26,6 +26,11 @@ jobs:
 
   contracts:
     runs-on: ubuntu-latest
+    # The suites that fork Arc, named once. This string has to match in three places below —
+    # the test run, the not-empty guard and the gas gate — and three copies of it drifting
+    # apart is how one of them ends up running a suite without the credentials it needs.
+    env:
+      NETWORKED: "ChainConformance|PoolTest|PoolInvariantsTest|EscrowTest"
     steps:
       - uses: actions/checkout@v4
       # NEVER foundry-rs/foundry-toolchain here. Circle's own README: it installs upstream
@@ -59,8 +64,9 @@ jobs:
         working-directory: contracts
       # ChainConformance and the suites that settle in real USDC need a fork of Arc, so they
       # belong to the credentialed tier, not here. Excluded by name: skipping them silently
-      # would let the hermetic job go green while proving nothing about any of them.
-      - run: arc-forge test -vvv --no-match-contract "ChainConformance|Pool|Escrow"
+      # would let the hermetic job go green while proving nothing about any of them. The list is
+      # written once, in the job's env, because it has to match in all four places below.
+      - run: arc-forge test -vvv --no-match-contract "$NETWORKED"
         working-directory: contracts
         env: { FOUNDRY_PROFILE: ci }
       # `forge test` exits 0 when it finds no tests at all, so a green job proves nothing
@@ -68,13 +74,24 @@ jobs:
       - name: Assert the contract suite is not empty
         working-directory: contracts
         run: |
-          n=$(arc-forge test --json --no-match-contract "ChainConformance|Pool|Escrow" | node -e "
+          n=$(arc-forge test --json --no-match-contract "$NETWORKED" | node -e "
             let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{
               const s=JSON.parse(d);
               console.log(Object.values(s).reduce((a,x)=>a+Object.keys(x.test_results||{}).length,0));
             })")
           echo "contract tests executed: $n"
           [ "$n" -gt 0 ] || { echo "::error::forge ran zero tests and still exited 0"; exit 1; }
+      # --isolate has to be on the check exactly as it was on the write: a snapshot taken one way
+      # and checked the other exits 1 against untouched code, which is the failure mode that
+      # gets a gate switched off within a week. Invariant lines stay out of the snapshot: their
+      # line is (runs, calls, reverts), and --tolerance exits 1 against one byte-identical to
+      # itself. Both verified, not assumed.
+      - name: Gas has not regressed
+        working-directory: contracts
+        env: { FOUNDRY_PROFILE: ci }
+        run: >-
+          arc-forge snapshot --isolate --check --tolerance 2 --snap .gas-snapshot
+          --no-match-contract "$NETWORKED" --no-match-test "^invariant_"
 
   libraries:
     runs-on: ubuntu-latest
@@ -263,6 +280,15 @@ jobs:
           ARC_TESTNET_RPC_URL: "${{ secrets.ARC_TESTNET_RPC_URL }}"
           ARC_FORK_BLOCK: "${{ vars.ARC_FORK_BLOCK }}"
         run: arc-forge test --match-contract "PoolTest|PoolInvariants|EscrowTest" -vvv
+      - name: Gas has not regressed on the forked suites
+        working-directory: contracts
+        env:
+          FOUNDRY_PROFILE: ci
+          ARC_TESTNET_RPC_URL: "${{ secrets.ARC_TESTNET_RPC_URL }}"
+          ARC_FORK_BLOCK: "${{ vars.ARC_FORK_BLOCK }}"
+        run: >-
+          arc-forge snapshot --isolate --check --tolerance 2 --snap .gas-snapshot.fork
+          --match-contract "PoolTest|EscrowTest"
 
   clean-clone:
     runs-on: ubuntu-latest

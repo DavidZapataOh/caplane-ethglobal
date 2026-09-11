@@ -11,7 +11,12 @@ script = "script"
 solc = "0.8.28"
 optimizer = true
 optimizer_runs = 200
-evm_version = "cancun"
+# `network = "arc"` is what prices this chain — it applies EIP-7623's calldata floor, and the
+# gas report reproduces a real receipt to the gas. This key cannot say so: the chain's baseline
+# is Osaka and the toolchain resolves `osaka` to `prague`, so no value here is exactly true.
+# `prague` is the closest one that is not false by two forks. Anyone running upstream forge
+# against this repo, without the network key, gets numbers far too small.
+evm_version = "prague"
 gas_reports = ["*"]
 
 [fmt]

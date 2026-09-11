@@ -26,9 +26,23 @@ contract CaplanePool is ERC4626 {
 
   ICaplaneRegistry public immutable REGISTRY;
 
+  struct Advance {
+    uint128 principal;
+    uint64 fundedAt;
+  }
+
   uint256 private _outstanding;
-  mapping(bytes32 lienId => uint256 blockNumber) public fundedAt;
-  mapping(bytes32 lienId => uint128 principal) private _principalOf;
+
+  /// @dev One word per advance. These were two mappings on the same key, which cost a second
+  ///      cold slot on every disbursement.
+  mapping(bytes32 lienId => Advance) private _advances;
+
+  /// @notice Block in which an advance was funded, or zero if it never was.
+  function fundedAt(
+    bytes32 lienId
+  ) public view returns (uint256) {
+    return _advances[lienId].fundedAt;
+  }
 
   constructor(
     IERC20 asset_,
@@ -51,7 +65,7 @@ contract CaplanePool is ERC4626 {
   function disburse(
     bytes32 lienId
   ) external {
-    if (fundedAt[lienId] != 0) revert AlreadyDisbursed(lienId);
+    if (_advances[lienId].fundedAt != 0) revert AlreadyDisbursed(lienId);
 
     ICaplaneRegistry.Lien memory lien = REGISTRY.lienOf(lienId);
     if (lien.status != 1) revert LienNotFundable(lienId);
@@ -59,8 +73,8 @@ contract CaplanePool is ERC4626 {
     // and it could never be settled again.
     if (lien.advanceUsdc6 == 0) revert LienNotFundable(lienId);
 
-    fundedAt[lienId] = block.number;
-    _principalOf[lienId] = lien.advanceUsdc6;
+    // uint64 of block number: at half a second a block, longer than the sun has left.
+    _advances[lienId] = Advance({principal: lien.advanceUsdc6, fundedAt: uint64(block.number)});
     _outstanding += lien.advanceUsdc6;
 
     SafeERC20.safeTransfer(IERC20(asset()), lien.borrower, lien.advanceUsdc6);
@@ -77,8 +91,8 @@ contract CaplanePool is ERC4626 {
   ///      aggregate above is not drifting from its parts.
   function principalOf(
     bytes32 lienId
-  ) external view returns (uint256) {
-    return _principalOf[lienId];
+  ) public view returns (uint256) {
+    return _advances[lienId].principal;
   }
 
   /// @dev Idle cash plus capital that is out on advances. A pure internal counter would strand
@@ -114,8 +128,8 @@ contract CaplanePool is ERC4626 {
   function repay(
     bytes32 lienId
   ) external {
-    if (fundedAt[lienId] == 0) revert NotDisbursed(lienId);
-    uint256 principal = _principalOf[lienId];
+    if (_advances[lienId].fundedAt == 0) revert NotDisbursed(lienId);
+    uint256 principal = _advances[lienId].principal;
     if (principal == 0) revert AlreadySettled(lienId);
     // Every function here obeys the registry, and this one is no exception: a released or
     // defaulted lien is not repayable.
@@ -128,7 +142,7 @@ contract CaplanePool is ERC4626 {
     // reentrant redemption would exit at an inflated price. Arc's token moves through a
     // precompile and calls no hook today, so this is latent — but the ordering is also cheaper,
     // so there is nothing to trade.
-    _principalOf[lienId] = 0;
+    _advances[lienId].principal = 0;
     _outstanding -= principal;
 
     SafeERC20.safeTransferFrom(IERC20(asset()), msg.sender, address(this), due);
@@ -141,8 +155,8 @@ contract CaplanePool is ERC4626 {
   function writeDown(
     bytes32 lienId
   ) external {
-    if (fundedAt[lienId] == 0) revert NotDisbursed(lienId);
-    uint256 principal = _principalOf[lienId];
+    if (_advances[lienId].fundedAt == 0) revert NotDisbursed(lienId);
+    uint256 principal = _advances[lienId].principal;
     if (principal == 0) revert AlreadySettled(lienId);
     // Any terminal status, not only `defaulted`. A lien released without being repaid would
     // otherwise strand its principal in `_outstanding` for ever, permanently over-reporting what
@@ -151,7 +165,7 @@ contract CaplanePool is ERC4626 {
     // principal left, so it hits `AlreadySettled` before this line.
     if (REGISTRY.statusOf(lienId) == 1) revert LienNotDefaulted(lienId);
 
-    _principalOf[lienId] = 0;
+    _advances[lienId].principal = 0;
     _outstanding -= principal;
     emit WrittenDown(lienId, principal);
   }

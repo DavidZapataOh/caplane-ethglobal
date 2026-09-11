@@ -1,0 +1,206 @@
+Gas, measured with --isolate so the figures are what a receipt would say.
+
+--- how these were taken -------------------------------------------------------
+
+`forge test` reports execution gas: no intrinsic charge, no calldata, no EIP-7623 floor. On a
+calldata-heavy path that understates by 2.8x. `--isolate` wraps each call as its own transaction
+and the numbers below include all three. Two things it does not do: `--gas-report` is unaffected
+and stays execution-only for the frames inside a test, and `view` functions are not isolated at
+all, because Solidity emits STATICCALL for them.
+
+Cold-state figures use `vm.cool()`. Without it a populated registry leaves every slot warm and
+`matchesOf` measures cheaper at a thousand liens than at forty-three, which is nonsense.
+
+The snapshot is written and checked with --isolate on both sides. Checked the other way it exits
+1 against untouched code — verified — and a gate that fails for no reason is switched off within
+a week. `--diff` is not a gate: against a snapshot whose every number had been falsified to 1 it
+still exits 0, also verified. Invariant lines stay out of both snapshots: their line is
+(runs, calls, reverts) and `--check --tolerance` exits 1 against one byte-identical to itself.
+
+--- the table ------------------------------------------------------------------
+
+test                                                                      gas
+----                                                                      ---
+FrozenInterfaceTest:test_Errors_SelectorsAreFrozen()                      631
+FrozenInterfaceTest:test_Events_Topic0IsFrozen()                          380
+FrozenInterfaceTest:test_InboxReadSurface_SelectorsAreFrozen()            354
+FrozenInterfaceTest:test_LienStruct_OccupiesExactlyThreeStorageS       301289
+FrozenInterfaceTest:test_ReadSurface_SelectorsAreFrozen()                 422
+FrozenInterfaceTest:test_ReceiverInterfaceId_IsChainlinkIReceive          274
+FrozenInterfaceTest:test_ReportCodec_DecodesTheGoldenVector()            4092
+FrozenInterfaceTest:test_ReportCodec_GoldenVectorFitsTheReportBu         1510
+FrozenInterfaceTest:test_SupportsInterface_AnswersAllThreeProbes       142978
+FrozenInterfaceTest:test_SupportsInterface_CostsLessThanTheStipe       136137
+InboxTest:test_Submit_AcceptsTheLargestEnvelopeTheBudgetAllows()      1294397
+InboxTest:test_Submit_DerivesADifferentIdForADifferentSender()         117893
+InboxTest:test_Submit_EmitsTheClaimForTheEnclave()                     141669
+InboxTest:test_Submit_KeepsBothHalvesInOneSlot()                       138734
+InboxTest:test_Submit_KeepsBothRecordsWhenTheSameClaimIsSealedAg       293084
+InboxTest:test_Submit_RefusesAnEnvelopeOverTheBudget()                1293949
+InboxTest:test_Submit_RefusesAnIdThatIsNotDerivedFromTheSender()       117192
+InboxTest:test_Submit_RefusesTheSameBytesFromTheSameSenderTwice(       172828
+InboxTest:test_Submit_RefusesToBurnSomeoneElsesId()                    164364
+InboxTest:test_Submit_ReportsTheDerivationBeforeTheDuplicate()         172688
+InboxTest:test_Submit_ReportsTheSizeBeforeTheDerivation()             1291927
+InboxTest:test_Submit_StillRecordsTheBlockAlongsideTheSubmitter(       147980
+InboxTest:test_Submit_StillRefusesADuplicateAtBlockZero()              173496
+InboxTest:test_SubmittedAt_IsZeroForSomethingNeverSubmitted()            7699
+InboxTest:test_SubmittedAt_RecordsTheBlockAndIsPubliclyReadable(       140015
+InboxTest:test_SubmitterOf_IsZeroForSomethingNeverSubmitted()            7808
+InboxTest:test_SubmitterOf_SurvivesWhereTheLogWillNot()                140034
+PlaceholderTest:test_Version_ReturnsOne()                              111371
+RegistryIndexTest:test_MatchesOf_BreaksTiesByTheLowerLienId()          924857
+RegistryIndexTest:test_MatchesOf_CostDoesNotGrowWithTheRegistry(    437114286
+RegistryIndexTest:test_MatchesOf_CostGrowsWithPostingListDensity     86323026
+RegistryIndexTest:test_MatchesOf_DoesNotIndexTheAmountBucket()         476906
+RegistryIndexTest:test_MatchesOf_FindsACandidateThroughEachIndex       585026
+RegistryIndexTest:test_MatchesOf_IsIdempotentUnderDuplicateCandi       499661
+RegistryIndexTest:test_MatchesOf_ReturnsZeroForAClaimSharingNoth       476861
+RegistryIndexTest:test_MatchesOf_ReturnsZeroForAMalformedQuery()       461180
+RegistryIndexTest:test_MatchesOf_ScoresAllSevenThoughItIndexesTh       500190
+RegistryIndexTest:test_MatchesOf_SkipsLiensThatAreNoLongerActive       562918
+RegistryIndexTest:test_OnReport_StaysNearItsMeasuredCost()             460690
+RegistryTest:test_Default_FiresOnceTheTermHasPassed()                  547623
+RegistryTest:test_Default_RefusesToFireBeforeExpiry()                  540344
+RegistryTest:test_IsEncumbered_StaysTrueAfterExpiryUntilAReportS       464796
+RegistryTest:test_OnReport_AcceptsSixtyFourByteMetadata()               82333
+RegistryTest:test_OnReport_RefusesAnUnsetReportKind()                   98683
+RegistryTest:test_OnReport_RejectsAnotherOrganisationsWorkflow()        41185
+RegistryTest:test_OnReport_RejectsAnyoneButTheForwarder()               39537
+RegistryTest:test_OnReport_RejectsOurOwnOtherWorkflow()                 41656
+RegistryTest:test_OnReport_RejectsTruncatedMetadata()                   34501
+RegistryTest:test_Record_EmitsLienRecorded()                           463237
+RegistryTest:test_Record_RefusesAReportCarryingTheWrongNumberOfC        92296
+RegistryTest:test_Record_RefusesAReportMintedForAnotherChain()          82319
+RegistryTest:test_Record_RefusesAnAlreadyActiveLien()                  537477
+RegistryTest:test_Record_RefusesTheSameReportTwice()                   509003
+RegistryTest:test_Record_WritesAnActiveLienStampedByTheChain()         478081
+RegistryTest:test_Reject_EmitsTheReasonAndLeavesTheLienUntouched       554083
+RegistryTest:test_Reject_RefusesAReasonCodeThatDoesNotFitAByte()        98645
+RegistryTest:test_Release_MovesAnActiveLienToReleased()                553189
+RegistryTest:test_Release_RefusesALienThatIsNotActive()                619899
+RegistryTest:test_SupportsInterface_AnswersAllThreeProbes()             16939
+RegistryTest:test_SupportsInterface_CostsLessThanTheStipend()            5858
+EscrowTest:test_Constructor_RefusesAPoolFromAnotherSystem()           1881767
+EscrowTest:test_Escrow_KeepsOnePaymentPerWord()                       1045736
+EscrowTest:test_Escrow_RefusesAPlainNativeSend()                        35802
+EscrowTest:test_Pay_AccumulatesAcrossSeveralPayments()                 914790
+EscrowTest:test_Pay_CreditsOnlyTheLienItWasSentFor()                  1085827
+EscrowTest:test_Pay_CreditsTheLienAndHoldsTheMoney()                   656147
+EscrowTest:test_Pay_RefusesALienThatDoesNotExist()                     102764
+EscrowTest:test_Pay_RefusesALienWithNoWayOut()                         642645
+EscrowTest:test_Pay_RefusesAnEmptyPayment()                            490397
+EscrowTest:test_Refund_IsClosedWhileSettlementIsStillPossible()        991328
+EscrowTest:test_Refund_IsRefusedAfterSettlementEvenThoughTheReco      1082295
+EscrowTest:test_Refund_OpensWhenTheBorrowerRepaidThePoolDirectly      1169901
+EscrowTest:test_Refund_PaysEachPayerOnlyTheirOwnShare()               1299366
+EscrowTest:test_Refund_RefusesSomeoneWhoNeverPaid()                    577063
+EscrowTest:test_Refund_ReturnsAPayerTheirMoneyOnceSettlementBeca      1155969
+EscrowTest:test_Settle_AcceptsTheExactAmountAndReturnsNothing()       1070740
+EscrowTest:test_Settle_ClosesTheLienToFurtherPayments()               1144536
+EscrowTest:test_Settle_EmitsTheEventTheEnclaveWillWatch()             1061110
+EscrowTest:test_Settle_IsPermissionless()                             1047675
+EscrowTest:test_Settle_LeavesNoAllowanceBehind()                      1054602
+EscrowTest:test_Settle_PaysThePoolAndReturnsTheRestToTheBusiness      1146647
+EscrowTest:test_Settle_RefusesToSettleTwice()                         1069394
+EscrowTest:test_Settle_RefusesWhileThePaymentsFallShort()             1011968
+PoolTest:test_AmountDue_IsTheAdvancePlusItsFlatFee()                   476385
+PoolTest:test_Disburse_IsPermissionless()                              784610
+PoolTest:test_Disburse_PaysTheBorrowerTheRegistrySaysAndRecordsT       822889
+PoolTest:test_Disburse_RefusesALienThatIsNotActive()                   763228
+PoolTest:test_Disburse_RefusesToPayTheSameLienTwice()                  806706
+PoolTest:test_MaxRedeem_IsCappedByIdleLiquidity()                      893745
+PoolTest:test_MaxWithdraw_IsAlsoCappedAndDoesNotRevert()               909974
+PoolTest:test_Pool_ExposesEighteenDecimalSharesOverASixDecimalAs        18348
+PoolTest:test_Pool_InvestorLifecycleStaysInBudget()                    245725
+PoolTest:test_Pool_KeepsOneAdvancePerWord()                            783198
+PoolTest:test_Pool_MakesTheInflationAttackUnprofitable()               401135
+PoolTest:test_Pool_NeverReturnsMoreThanWasDeposited()                  267499
+PoolTest:test_Pool_RefusesAPlainNativeSend()                            35871
+PoolTest:test_Pool_RoundsOnTheSideTheStandardRequires()                286491
+PoolTest:test_Repay_ClearsThePrincipalAndLeavesTheFeeBehind()          956492
+PoolTest:test_Repay_RaisesThePricePerShare()                           961351
+PoolTest:test_Repay_RefusesALienThatWasNeverDisbursed()                550969
+PoolTest:test_Repay_RefusesToBePaidTwice()                             982138
+PoolTest:test_TotalAssets_CountsIdleCashAndLiveAdvances()              826727
+PoolTest:test_Usdc_BalanceIsTheNativeBalanceScaledDown()                33975
+PoolTest:test_WriteDown_LowersThePricePerShare()                       946290
+PoolTest:test_WriteDown_RealisesTheLossOnAReleasedButUnrepaidLie       940851
+PoolTest:test_WriteDown_RealisesTheLossWhenTheRegistrySaysDefaul       944327
+PoolTest:test_WriteDown_RefusesALienThatIsStillActive()                812281
+
+--- what the numbers settle ----------------------------------------------------
+
+`matchesOf` is flat in registry size: 60,044 gas cold at 43 liens against 62,522 at 1,000, a 4%
+difference across a registry twenty-three times larger. That is the claim the three-component
+index was chosen for, and it is measured rather than argued.
+
+What is NOT flat is posting-list density. Two hundred liens sharing one debtor and one due date
+cost 5,075,156 gas cold — 17% of the node's observed call cap. Registry size is bounded by the
+design; density is bounded by nothing, and that is the honest edge of the claim.
+
+The record path spends 458,261 gas of a 4,800,000 budget: 9.5%. The read path spends 0.2% of the
+call cap in the ordinary case. Those two numbers are why most of the list below says no.
+
+--- the ceilings no tool enforces ----------------------------------------------
+
+A single test was measured burning 60,822,041 gas under --isolate and passing — 3.6 times the
+EIP-7825 per-transaction cap of 2**24 and twice Arc's block limit. Nothing in the toolchain
+refuses it. So both ceilings are asserted in Solidity, on the two heaviest paths in the system:
+the record branch at 458,261 and a maximum-size submission at the envelope cap.
+
+--- what was optimised, and what it bought -------------------------------------
+
+Two mappings keyed by the same identifier became one struct each, saving a cold slot per lien.
+Measured by receipt against the real USDC on a fork of Arc:
+
+    disburse        158,851  ->  136,936     -21,915    -13.8%
+    settle          131,753  ->  116,006     -15,747    -12.0%
+    pay             105,307  ->  103,556      -1,751
+    refund           65,260  ->   63,499      -1,761
+    repay            73,070  ->   75,893      +2,823
+    writeDown        33,088  ->   34,582      +1,494
+
+The last two rows are the trade, named rather than hidden. `repay` used to zero the principal's
+own slot and collect the 4,800-gas refund for freeing it; now the funding block keeps the word
+occupied and that refund is gone. Over a lien's whole life the packing is still 19,092 gas ahead
+if the advance is repaid and 20,421 if it defaults.
+
+Neither change touches an ABI: `fundedAt`, `principalOf`, `paidFor` and `settled` keep the
+signatures their public mappings had. Both carry a test that settles first and then reads the
+raw storage word, because the obvious version — check the next slot is empty after a payment —
+passes against every layout including the two separate mappings it replaces.
+
+--- what was NOT optimised, with the numbers -----------------------------------
+
+This list exists so nobody reopens these three days before a deadline.
+
+Truncating component commitments to sixteen bytes is the largest win available: the record path
+falls about 16.5% and the read path 11.3%, and the ABI never changes. It is refused because the
+write path uses 9.5% of its budget and the read path 0.2% of the call cap. There is no pressure
+that justifies spending 128 bits of collision margin.
+
+Decoding the report from calldata instead of memory saves at most 2,497 gas — half a percent of
+a branch that uses under a tenth of its budget — and requires hand-written offset arithmetic
+against a frozen schema. The copy itself is 331 gas.
+
+Caching the query array in memory inside the matching loop is 830 gas WORSE at every registry
+size measured. Copying each candidate's stored commitments into memory is worse still, by up to
+4.3%. Both read as optimisations and are regressions.
+
+Deduplicating candidates could save about half a million gas in a pathological case that costs
+five million, and the memory scan that would do it costs about the same. Transient storage, which
+would be cheap, reverts inside a static call.
+
+The figure that justified this elsewhere was wrong and is corrected here. Measured over two
+hundred liens reachable through two posting lists, each therefore scored twice: scoring a
+candidate cold costs 20,746 gas and the warm repeat costs 4,629. The number written down before
+was 900 warm against 18,900 cold — the cold figure was close, the warm one was wrong by a factor
+of five. The conclusion does not move, because an O(C-squared) memory scan costs more than 4,629
+a candidate long before two hundred of them.
+
+Packing the seven component commitments is impossible: they are full-width hashes.
+
+Replacing the vault's name and symbol with literals saves roughly 33,000 gas at deployment and
+frees two slots. Refused on convention: the vault is implemented the way its library documents
+it, and the largest contract here sits at 28% of the size limit. There is no size problem.

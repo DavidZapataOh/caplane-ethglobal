@@ -229,4 +229,17 @@ contract InboxTest is Test {
     vm.expectRevert(abi.encodeWithSelector(ICaplaneInbox.DuplicateSubmission.selector, id));
     inbox.submit(id, envelope);
   }
+
+  /// @dev The same two ceilings on the calldata-heaviest path in the system. At the envelope cap
+  ///      the charge is the EIP-7623 floor, so this is as close to the caps as a submission ever
+  ///      gets, and it is 1.1% of one.
+  function test_Submit_FitsInATransactionAtTheEnvelopeCap() public {
+    bytes memory largest = _envelope(MAX);
+    uint256 before = gasleft();
+    inbox.submit(_id(largest), largest);
+    uint256 spent = before - gasleft();
+
+    assertLt(spent, 16_777_216, "past the EIP-7825 per-transaction cap");
+    assertLt(spent, 30_000_000 / 4, "one submission must not take a quarter of a block");
+  }
 }

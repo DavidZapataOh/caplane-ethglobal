@@ -29,13 +29,19 @@ pulls less, a live allowance would otherwise survive.
 
 --- measured gas, receipt level -------------------------------------------------
 
-    pay                  105,307 gas     $0.0021
-    settle               131,753 gas     $0.0026
-    refund                65,260 gas     $0.0013
+    pay                  103,556 gas     $0.0021
+    settle               116,006 gas     $0.0023
+    refund                63,499 gas     $0.0013
     deployment           805,182 gas     3,436 bytes of runtime, 21,140 of margin
 
-A debtor's whole journey — one payment and the settlement — is 237,060 gas, about half a cent at
+A debtor's whole journey — one payment and the settlement — is 219,562 gas, under half a cent at
 the 20 Gwei floor. Both figures sit inside their budgets of 110,000 and 200,000.
+
+The running total and the settled flag were two mappings on the same key and are now one word:
+a settlement writes the flag into the word it already had to touch instead of buying a second
+cold slot, and falls 12.0%, 15,747 gas. The narrowing to uint248 that the packing requires
+cannot overflow — USDC's entire supply is about 1e16 base units against a 2**248 ceiling — and
+is commented where it happens rather than left to be noticed.
 
 --- money only enters where it can leave, and leaves where it cannot ------------
 

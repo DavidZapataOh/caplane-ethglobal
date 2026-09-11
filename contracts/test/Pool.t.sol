@@ -366,4 +366,20 @@ contract PoolTest is RegistryFixture {
     // 168,827 because execution gas charges no intrinsic cost and no calldata.
     assertLt(approveGas + depositGas + redeemGas, 250_000, "the investor round trip regressed");
   }
+
+  /// @dev Both halves in one word. The slot index comes from `evidence/storage/CaplanePool.txt`;
+  ///      if an unrelated state variable is added above it, this fails and the layout evidence
+  ///      is where the new number is. Asserted after a disbursement, which is the only moment
+  ///      both halves are written.
+  function test_Pool_KeepsOneAdvancePerWord() public {
+    _seedPool(500e6);
+    bytes32 lienId = _activeLien(BORROWER, 250e6, 150);
+    pool.disburse(lienId);
+
+    bytes32 slot = keccak256(abi.encode(lienId, uint256(6)));
+    uint256 word = uint256(vm.load(address(pool), slot));
+    assertEq(word & type(uint128).max, 250e6, "the principal is not in the low half");
+    assertEq((word >> 128) & type(uint64).max, block.number, "fundedAt is not beside it");
+    assertEq(vm.load(address(pool), bytes32(uint256(slot) + 1)), bytes32(0), "it spilled");
+  }
 }
