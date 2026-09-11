@@ -276,6 +276,17 @@ export const registryAbi = [
   },
   {
     "type": "error",
+    "name": "WrongComponentCount",
+    "inputs": [
+      {
+        "name": "count",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "WrongWorkflowName",
     "inputs": [
       {
@@ -361,6 +372,22 @@ export const inboxAbi = [
         "name": "length",
         "type": "uint256",
         "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "WrongSubmissionId",
+    "inputs": [
+      {
+        "name": "expected",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "given",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ]
   }

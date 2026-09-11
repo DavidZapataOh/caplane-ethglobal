@@ -29,6 +29,13 @@ contract FrozenInterfaceTest is Test {
     assertEq(
       bytes32(ICaplaneRegistry.AlreadyEncumbered.selector), bytes32(bytes4(keccak256("AlreadyEncumbered(bytes32)")))
     );
+    assertEq(
+      bytes32(ICaplaneRegistry.WrongComponentCount.selector), bytes32(bytes4(keccak256("WrongComponentCount(uint256)")))
+    );
+    assertEq(
+      bytes32(ICaplaneInbox.WrongSubmissionId.selector),
+      bytes32(bytes4(keccak256("WrongSubmissionId(bytes32,bytes32)")))
+    );
   }
 
   function test_Events_Topic0IsFrozen() public pure {

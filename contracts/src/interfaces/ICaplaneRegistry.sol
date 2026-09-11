@@ -23,6 +23,10 @@ interface ICaplaneRegistry {
   error BadMetadata(uint256 length);
   error WrongChain(uint64 chainSelector);
   error ReportReplayed(bytes32 nonce);
+  /// @param count How many component commitments the report carried.
+  /// @dev Not `BadMetadata`: the forwarder's metadata can be well-formed while the report body
+  ///      is not, and an error naming a field that did not fail is worse than no error.
+  error WrongComponentCount(uint256 count);
   error AlreadyEncumbered(bytes32 lienId);
   error LienNotActive(bytes32 lienId);
 

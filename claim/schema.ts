@@ -1,3 +1,4 @@
+import { INDEXED_POSITIONS } from '../contracts/abi/frozen'
 /**
  * The seven components of a claim, in the order their index takes inside the commitment
  * preimage. The index is hashed and the pepper that salts it never rotates, so this order
@@ -66,9 +67,6 @@ export class ClaimError extends Error {
  * index and still count toward the returned match count. They are what will separate two
  * ledgers the day there are two.
  */
-export const INDEXED_COMPONENTS = [
-  'debtorTaxId',
-  'invoiceNumber',
-  'amountBucket',
-  'dueDate',
-] as const satisfies readonly ComponentName[]
+export const INDEXED_COMPONENTS = INDEXED_POSITIONS.map(
+  (i) => COMPONENT_ORDER[i],
+) as readonly ComponentName[]

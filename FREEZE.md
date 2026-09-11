@@ -68,8 +68,26 @@ encumbered, which is the safe direction: the alternative lets a post-expiry re-p
 
 `ClaimSubmitted.ciphertext` is packed in this order: version (1 byte) · algorithm id (1 byte,
 `1` = X25519 + XChaCha20-Poly1305) · ephemeral public key (32) · nonce (24) · ciphertext.
-Maximum 4,096 bytes total, which keeps the whole event inside the 5,120-byte LogTrigger budget.
+Maximum 4,096 bytes total, which keeps the whole event inside the 5,000-byte LogTrigger budget.
+That budget is `EventSizeLimit = Size(5 * config.KByte)` and their `KByte` is 1,000, not 1,024.
+The 5,120 this file carried until now is `ChainWrite.EVM.ReportSizeLimit`, which really is 5,120
+and is a different limit; the two were conflated.
 The enclave's public key is published in `deployments.<network>.json`.
+
+## Additive changes to the frozen interface
+
+Adding an error is additive: it changes no existing selector, no event topic and no function
+signature. An existing error is reused only when its argument is still true of the new case.
+
+- `WrongComponentCount(uint256 count)` on `ICaplaneRegistry` — a report whose body carries the
+  wrong number of component commitments. `BadMetadata` would have named a field that was intact.
+- `WrongSubmissionId(bytes32 expected, bytes32 given)` on `ICaplaneInbox` — the id is derived,
+  `keccak256(msg.sender ‖ ciphertext)`, and the contract enforces it. Without that check a
+  mempool observer burns someone else's id for the price of one transaction. `DuplicateSubmission`
+  would have told a caller they had already sent something they never sent.
+
+`CaplaneRegistry`'s constructor takes a fourth argument, `chainSelector`, so a report minted for
+another chain cannot be replayed here. Still no id to pin, so the deployment graph is unchanged.
 
 ## Budgets
 
@@ -78,15 +96,23 @@ The enclave's public key is published in `deployments.<network>.json`.
 | Report payload | 5,011 bytes (5,120 minus the 109-byte header) | golden vector: **576 bytes** |
 | Transaction gas on Arc | 5,000,000 | — |
 | `onReport` gas | budget ≤ 4,800,000 | — |
-| `ClaimSubmitted` event | 5,120 bytes (LogTrigger) | — |
+| `ClaimSubmitted` event | 5,000 bytes (LogTrigger) | serialized log at the 4,096-byte cap: **~4,400 bytes** |
 | `Lien` storage | 3 slots | reordering saves **24,248 gas** per lien |
+| `submit` gas | 275-byte envelope ≤ 60,000 | receipt: **53,935**; at the 4,096-byte cap **186,980**, the EIP-7623 floor exactly |
+
+What the event budget weighs is the whole protobuf `Log` — address, three topics, transaction
+hash, block hash, the event signature repeated and the block number, around 239 bytes of
+overhead — not the event data alone. A `.gas-snapshot` cannot police `submit`: it is identical
+whether or not `foundry.toml` declares `network = "arc"`, and that line is what turns on Arc's
+calldata floor. Receipts are the source; see `evidence/contracts/01-inbox.txt`.
 
 ## Deployment order
 
 With no id to pin, the graph has no cycle:
 
-1. `CaplaneInbox` and `CaplaneRegistry(forwarder, workflowOwner, workflowName)` — every
-   constructor argument is known offline, so these can go in either order
+1. `CaplaneInbox` and
+   `CaplaneRegistry(forwarder, workflowOwner, workflowName, chainSelector)` — every constructor
+   argument is known offline, so these can go in either order
 2. Workflow config, carrying both addresses
 3. `cre workflow deploy --deployment-registry private` — on the private registry the deploy lands
    `Active` and the first cron tick fires without a separate `activate`

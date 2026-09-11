@@ -47,8 +47,19 @@ export const COMMITMENT = { version: 1, pepperVersion: 1 } as const
 export const ClaimType = { Unset: 0, Invoice: 1, Lease: 2, Equipment: 3 } as const
 
 /**
+ * Tuple positions the registry indexes: debtor, invoice number, due date. The amount bucket is
+ * position 2 and is deliberately absent — a doubling bucket takes a handful of values, so one
+ * posting list would hold a large share of the registry and the walk would grow with it. At the
+ * 6-of-7 threshold at most one discriminating component differs, so at least two of these three
+ * still agree: indexing three cannot miss a match.
+ *
+ * This is the single place the choice is written. Solidity mirrors it; nothing re-types it.
+ */
+export const INDEXED_POSITIONS = [0, 1, 3] as const
+
+/**
  * The browser→enclave envelope carried by `ClaimSubmitted.ciphertext`.
- * Packed, in this order. The whole event must stay under the 5,120-byte LogTrigger budget.
+ * Packed, in this order. The whole event must stay under the 5,000-byte LogTrigger budget.
  */
 export const ENVELOPE = {
   version: { offset: 0, bytes: 1 },

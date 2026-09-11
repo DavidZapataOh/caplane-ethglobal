@@ -7,6 +7,11 @@ interface ICaplaneInbox {
   error SubmissionTooLarge(uint256 length);
   error DuplicateSubmission(bytes32 submissionId);
 
+  /// @param expected keccak256(abi.encodePacked(msg.sender, ciphertext)).
+  /// @param given What the caller passed. Derivation is enforced, not assumed: a caller-chosen
+  ///        id lets a mempool observer burn someone else's id for the price of one transaction.
+  error WrongSubmissionId(bytes32 expected, bytes32 given);
+
   /// @param submissionId keccak256(abi.encodePacked(msg.sender, ciphertext)). Derived, never
   ///        caller-chosen, so it cannot be front-run onto a colliding value.
   /// @param ciphertext Sealed to the enclave's public key. Envelope shape is frozen in FREEZE.md.

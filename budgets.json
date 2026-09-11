@@ -7,14 +7,20 @@
     "secretCallsPerExecution": 5,
     "executionTimeoutSeconds": 300,
     "reportPayloadBytes": 5120,
-    "logTriggerEventBytes": 5120
+    "logTriggerEventBytes": 5000
   },
   "data": {
     "accounting": { "callsPerExecution": 2, "accessTokenSeconds": 1800, "invoiceResponseBytes": 10240 },
     "screening": { "callsPerExecution": 1, "responseBytesAtSizeThree": 16384 },
     "httpCallPlan": { "stageOne": 4, "stageTwo": 2, "reserve": 1 }
   },
-  "contracts": { "gasSnapshotPath": ".gas-snapshot", "maxGasDeltaPercent": null },
+  "contracts": {
+    "gasSnapshotPath": ".gas-snapshot",
+    "maxGasDeltaPercent": null,
+    "receiptMeasured": {
+      "CaplaneInbox.submit": { "envelopeBytes": 275, "gas": 53935, "evidence": "evidence/contracts/01-inbox.txt" }
+    }
+  },
   "web": { "firstLoadJsBytes": null, "lcpMs": null, "clsScore": null },
   "site": { "firstLoadJsBytes": null, "lcpMs": null, "clsScore": null },
   "services": { "api": { "p95Ms": null }, "mcp": { "p95Ms": null } },

@@ -1,0 +1,99 @@
+Inbox cost, measured from transaction receipts on an Osaka node at the 20 Gwei floor.
+
+--- which EVM rules were actually in effect ------------------------------------
+
+No tool prints this, so it was settled by behaviour rather than by configuration. On the node
+the measurements ran against:
+
+  gas_limit 16,777,217   rejected: "tx.gas_limit > env.cfg.tx_gas_limit_cap"
+  gas_limit 16,777,216   accepted, status 1
+
+That is EIP-7825, so the node runs Osaka rules and the EIP-7623 calldata floor applies. The
+figures below are receipts from that node, not estimates.
+
+--- what one submission costs --------------------------------------------------
+
+Arc's gas token is USDC with 18 native decimals, and the base fee sits at its 20 Gwei floor, so
+the dollar figure needs no price assumption at all: cost = gas x 2e-8.
+
+  deploy CaplaneInbox                                     198,813 gas    $0.003976
+  submit, 275-byte envelope       (388 B calldata)         53,935 gas    $0.001079
+  submit, 4,096-byte envelope   (4,196 B calldata)        186,980 gas    $0.003740
+  submit refused as duplicate, 4,096-byte envelope        186,980 gas    $0.003740
+  cheapest valid submission, empty envelope (100 B)        46,983 gas    $0.000940
+
+The duplicate and the accepted submission cost the same number, not approximately the same one.
+Calldata is charged whether the frame reverts or not, and at that size calldata is the whole
+bill.
+
+--- the size that matters ------------------------------------------------------
+
+The seven components of a claim serialize to roughly 200 bytes, so a real envelope is about
+275: one version byte, one algorithm byte, a 32-byte ephemeral key, a 24-byte nonce, the
+ciphertext and a 16-byte Poly1305 tag. The 4,096-byte cap is the ceiling, not the workload, and
+budgeting against the ceiling would flatter the design: it is precisely where EIP-7623's
+calldata floor absorbs every storage decision and makes them all cost the same.
+
+--- what the floor does, arithmetically ----------------------------------------
+
+The floor is 21,000 + 10 x (zeros + 4 x non-zeros), and it binds when execution gas falls below
+the gap between it and the standard calldata charge. Measured on the 4,096-byte submission:
+
+  calldata                4,196 bytes, 62 zero, 4,134 non-zero
+  floor                   21,000 + 10 x (62 + 4 x 4,134)  =  186,980
+  standard calldata       21,000 + 4 x 62 + 16 x 4,134    =   87,392
+  execution                                                    60,360
+  charged                 max(186,980, 147,752)           =  186,980
+
+The receipt is the floor to the gas. Execution is absorbed entirely: the 20,000-gas SSTORE that
+makes `submittedAt` a permanent record is free at this size. The ciphertext is XChaCha20 output,
+so it is uniformly random and has almost no zero bytes — the floor binds by construction of the
+envelope rather than by chance.
+
+At 275 bytes the floor does not bind: the gap is 34,300 - 26,320 = 7,980 and execution is about
+27,600, so the transaction pays standard calldata plus execution. That is the size the budget is
+set against.
+
+--- why no snapshot can answer this --------------------------------------------
+
+`.gas-snapshot` records the test function's own gas, which never includes the intrinsic charge
+or the calldata. Measured in-test against the receipts above, it understates by 1.64x at 275
+bytes and by 2.81x at 4,096 (66,495 against 186,980).
+
+Worse, and this is the part worth writing down: the snapshot is byte-identical whether or not
+`foundry.toml` declares `network = "arc"`. Deleting that line silently removes 39,228 gas of
+real cost at maximum size and moves no snapshot line and no test. `evm_version` is not the
+switch — cancun and osaka produce the same numbers; the network selector is. What does see it is
+the gas report, which under `network = "arc"` reproduces both receipts exactly, 53,935 and
+186,980, and reports 147,752 for the larger one without it.
+
+So this contract is budgeted from receipts, and the script that produced them is committed as
+`contracts/script/MeasureInbox.s.sol`.
+
+--- what the caps are, and which one binds -------------------------------------
+
+  EIP-7825 per-transaction cap   16,777,216 gas    a max submission is 1.1% of it
+  Arc block gas limit           30,000,000 gas     a max submission is 0.6% of it
+  Largest ciphertext under the per-transaction cap: about 418,850 bytes
+
+None of those is the constraint. The binding limit is CRE's log trigger at 5,000 bytes, which
+the 4,096-byte cap exists to respect. The cap is a budget from another system expressed in
+Solidity, and the contract says so where it is declared.
+
+--- what a flood costs ---------------------------------------------------------
+
+The cheapest valid submission is 46,983 gas, $0.00094. The log trigger accepts ten events every
+six seconds, so saturating it for a day is 144,000 submissions and $135. That is a price, not a
+wall, and the contract has no owner, no fee and no allowlist with which to raise it.
+
+--- permanence, which the logs do not provide ----------------------------------
+
+A reth node in full mode retains receipts for 10,064 blocks. At Arc's half-second blocks that is
+about 84 minutes, after which `eth_getLogs` returns an empty array rather than an error — a
+silent loss. The public endpoint answers for far older blocks today, but that is an operator
+configuration on infrastructure we do not control, not a guarantee in a specification. EIP-7708
+makes every value movement emit a log, so chain-wide log volume on Arc pushes operators toward
+pruning rather than away from it.
+
+That is why the contract keeps `submittedAt`: the ciphertext may be pruned, the proof that a
+submission existed at a given block is contract state and cannot be.

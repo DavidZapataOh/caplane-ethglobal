@@ -3,6 +3,7 @@ import type { Snapshot } from "./scan";
 import {
   brandInvariants,
   enclaveSafeJavaScript,
+  contractsHaveNoGovernance,
   registryReadsChainOnly,
   noMockDependencies,
   noMockCallSites,
@@ -219,7 +220,7 @@ test("flags a workflow directory still named my-workflow", () => {
 });
 
 test("every rule is registered in ALL_RULES", () => {
-  expect(ALL_RULES).toHaveLength(15);
+  expect(ALL_RULES).toHaveLength(16);
 });
 
 test("does not flag the rule engine's own definitions and fixtures", () => {
@@ -440,4 +441,26 @@ test("does not flag the lender SDK, which runs in Node and browsers", () => {
 test("does not flag plain toUpperCase", () => {
   const s = snap({ files: [{ path: "claim/canonical.ts", content: "x.toUpperCase()" }] });
   expect(enclaveSafeJavaScript(s)).toEqual([]);
+});
+
+// The registry's whole claim is that reading the file settles it. A rule that only caught the
+// word "onlyOwner" would miss the way it actually arrives: an inherited base contract.
+test("a contract that inherits governance is refused", () => {
+  const s = snap({
+    files: [
+      { path: "contracts/src/CaplaneRegistry.sol", content: "contract CaplaneRegistry is ICaplaneRegistry, Ownable {" },
+    ],
+  });
+  const found = contractsHaveNoGovernance(s);
+  expect(found).toHaveLength(1);
+  expect(found[0]!.detail).toContain("no ownership, pause, upgrade or delegatecall");
+});
+
+test("a contract with no governance surface passes", () => {
+  const s = snap({
+    files: [
+      { path: "contracts/src/CaplaneRegistry.sol", content: "contract CaplaneRegistry is ICaplaneRegistry {" },
+    ],
+  });
+  expect(contractsHaveNoGovernance(s)).toHaveLength(0);
 });

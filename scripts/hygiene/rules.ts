@@ -386,6 +386,34 @@ export const registryReadsChainOnly = (s: Snapshot): Finding[] =>
 
 
 /**
+ * The registry's core claim is checkable by reading the file: no owner, no pause, no upgrade.
+ * A single inherited modifier would make it false while every test stayed green.
+ */
+const GOVERNANCE_SURFACE = [
+  /\bonlyOwner\b/,
+  /\bOwnable\b/,
+  /\bAccessControl\b/,
+  /\bPausable\b/,
+  /\bUUPSUpgradeable\b/,
+  /\bInitializable\b/,
+  /\bselfdestruct\b/,
+  /\bdelegatecall\b/,
+];
+
+export const contractsHaveNoGovernance = (s: Snapshot): Finding[] =>
+  s.files
+    .filter(isFirstPartySource)
+    .filter((f) => f.path.startsWith("contracts/src/"))
+    .flatMap((f) =>
+      GOVERNANCE_SURFACE.filter((re) => re.test(f.content)).map((re) => ({
+        rule: "contracts-have-no-governance",
+        where: f.path,
+        detail: `contracts/src must expose no ownership, pause, upgrade or delegatecall surface: ${re.source}`,
+      })),
+    );
+
+
+/**
  * JavaScript the enclave cannot run, or runs differently.
  *
  * The SDK's own validator already refuses what throws loudly — node:crypto, fetch, setTimeout.
@@ -437,4 +465,5 @@ export const ALL_RULES = [
   brandInvariants,
   registryReadsChainOnly,
   enclaveSafeJavaScript,
+  contractsHaveNoGovernance,
 ];

@@ -1,4 +1,5 @@
 import { expect, test } from 'bun:test'
+import { INDEXED_POSITIONS } from '../contracts/abi/frozen'
 import { COMPONENT_ORDER, INDEXED_COMPONENTS, LEDGER_CONSTANT } from './schema'
 
 test('ships exactly seven components, with no duplicates', () => {
@@ -32,13 +33,30 @@ test('the index excludes every component the ledger fixes', () => {
   for (const name of LEDGER_CONSTANT) expect(INDEXED_COMPONENTS).not.toContain(name)
 })
 
-test('the index holds the four components that discriminate', () => {
-  expect(INDEXED_COMPONENTS).toEqual(['debtorTaxId', 'invoiceNumber', 'amountBucket', 'dueDate'])
+test('the index holds the three components that discriminate and stay sparse', () => {
+  expect(INDEXED_COMPONENTS).toEqual(['debtorTaxId', 'invoiceNumber', 'dueDate'])
 })
 
-// Excluded from the index, not from the tuple: they still hash, still count, and are what will
-// separate two ledgers the day there are two. Cardinality alone would not catch a name that
-// belongs to neither set, or to both, so the partition is checked as a partition.
-test('the index and the constants partition the tuple exactly', () => {
-  expect([...INDEXED_COMPONENTS, ...LEDGER_CONSTANT].sort()).toEqual([...COMPONENT_ORDER].sort())
+// The one place the choice is written. A registry that indexed other positions and a schema
+// that described these would disagree silently, and the disagreement is unobservable off-chain.
+test('the declared index is derived from the frozen positions, not retyped', () => {
+  expect(INDEXED_COMPONENTS).toEqual(INDEXED_POSITIONS.map((i) => COMPONENT_ORDER[i]))
+})
+
+// Excluded from the index, not from the tuple: it still hashes with its position and still
+// counts toward `matched`. A doubling bucket takes a handful of values, so a posting list keyed
+// on one holds a large share of the registry and the walk grows with it.
+test('the amount bucket is scored but never indexed', () => {
+  expect(COMPONENT_ORDER).toContain('amountBucket')
+  expect(INDEXED_COMPONENTS).not.toContain('amountBucket')
+})
+
+// The index and the constants no longer partition the tuple: the amount bucket is in neither.
+// What must still hold is that nothing indexed is a ledger constant, and nothing indexed is
+// outside the tuple — a name belonging to neither set, or to both, is the real hazard.
+test('every indexed component is part of the tuple and none is a ledger constant', () => {
+  for (const name of INDEXED_COMPONENTS) {
+    expect(COMPONENT_ORDER).toContain(name)
+    expect(LEDGER_CONSTANT).not.toContain(name)
+  }
 })

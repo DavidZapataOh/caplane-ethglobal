@@ -1,0 +1,66 @@
+Registry cost, measured against the contract in this repository.
+
+--- what these numbers are -----------------------------------------------------
+
+Gas from `arc-forge test --gas-report` and from in-test measurement, under Arc semantics with the
+optimizer at 200 runs. The `matchesOf` figures are internal calls inside a test, not remote
+`eth_call`s: the transaction base cost is missing, which a remote view does not pay either.
+
+They are taken COLD. A populated registry leaves every slot warm, and a remote call never arrives
+warm — measured warm, the same query reports about a quarter of its real cost. Every figure below
+follows a `vm.cool` of the registry.
+
+--- onReport, by branch --------------------------------------------------------
+
+   Record      428,571 gas    writes three slots of lien, seven commitments, three posting
+                              entries and one nonce — 8.9% of the 4,800,000 budget
+   Release      36,288 gas
+   Default      36,612 gas
+   Reject       36,182 gas    writes no lien state at all: one nonce and one event
+
+Every branch pays the nonce write, which is why the three that change one status byte cost the
+same to within one percent.
+
+--- matchesOf, against registry size -------------------------------------------
+
+The whole reason the index holds three components and not four. A doubling bucket takes seven
+distinct values across 43 real receivables, and one of them holds 44% of them, so a posting list
+keyed on the amount bucket grows with the registry and the walk grows with it.
+
+      43 liens     60,044 gas
+   1,000 liens     62,522 gas
+
+Four percent, across a registry twenty-three times larger. That is the property the three-component
+index was chosen for, and it is now measured against this contract rather than argued from a
+reproduction.
+
+--- where it is NOT flat, which is the honest edge ------------------------------
+
+Flat in registry size is not flat in posting-list density, and nothing bounds density. Two hundred
+liens sharing one debtor and one due date — an ordinary factoring relationship, one client with
+two hundred invoices — cost:
+
+   5,075,156 gas
+
+That is 17% of the call cap observed on Arc's primary endpoint. It is inside, and it is the number
+to watch: the cap is reached somewhere near twelve hundred liens on a single debtor. There is a
+test that measures it, so a change that makes it worse fails rather than surprises.
+
+--- the call cap, which Circle does not document -------------------------------
+
+Probed by sending an `eth_call` whose init code is an infinite loop (`0x5b600056`) and reading the
+allowance the node reports back:
+
+  rpc.testnet.arc.io              30,000,000   (primary)
+  rpc.quicknode.testnet.arc.io    30,000,000
+  rpc.drpc.testnet.arc.io         50,000,000
+  rpc.blockdaemon.testnet.arc.io  50,000,000
+
+Passing 60,000,000 to the primary is clamped to 30M; 20,000,000 is honoured. Separately,
+`eth_estimateGas` refuses above 16,777,216 — the EIP-7825 per-transaction cap that ships with
+Osaka, which Arc's documentation does not mention. Note precisely what that cap binds: the
+estimate, not the `gas` field a caller submits. It does not constrain this contract, and it will
+surprise anyone who reaches for `estimateGas` to size a call.
+
+These caps are read out of error strings, not published, and a provider can change one without
+notice. That is why the design rests on the cost being flat rather than on the margin.
