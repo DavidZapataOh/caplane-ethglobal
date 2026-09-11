@@ -263,6 +263,10 @@ contract EscrowTest is RegistryFixture {
 
     vm.warp(EXPIRES);
     _default(lienId);
+    // The loss has to be realised first. While principal is still out on the lien this money may
+    // yet be owed to the pool, and handing it back before then is how a covered advance became
+    // a total loss. `writeDown` is permissionless, so the payer can call it themselves.
+    pool.writeDown(lienId);
 
     uint256 before = USDC.balanceOf(DEBTOR);
     vm.prank(DEBTOR);
@@ -337,6 +341,7 @@ contract EscrowTest is RegistryFixture {
 
     vm.warp(EXPIRES);
     _default(lienId);
+    pool.writeDown(lienId);
 
     uint256 before = USDC.balanceOf(DEBTOR);
     vm.prank(DEBTOR);
@@ -371,5 +376,45 @@ contract EscrowTest is RegistryFixture {
     uint256 word = uint256(vm.load(address(escrow), slot));
     assertEq(word >> 248, 1, "the settled flag is not in the payment word");
     assertEq(vm.load(address(escrow), bytes32(uint256(slot) + 1)), bytes32(0), "it spilled");
+  }
+
+  /// @dev The defect the audit found, end to end, kept as a regression test. A debtor pays in
+  ///      full late in the term, nobody calls `settle`, and the default report lands. Before the
+  ///      fix, `settle` reverted for ever inside `pool.repay`, `refund` opened, the payer walked
+  ///      out whole and the investors absorbed the entire advance — with the cash to cover it
+  ///      sitting in this contract the whole time. No attacker, no collusion.
+  function test_Settle_StillReachesThePoolAfterATerminalReport() public {
+    _seedPool(500e6);
+    bytes32 lienId = _activeLien(BORROWER, 250e6, 150);
+    pool.disburse(lienId);
+
+    uint256 due = pool.amountDue(lienId);
+    _pay(DEBTOR, lienId, due);
+
+    vm.warp(EXPIRES);
+    _default(lienId);
+    assertEq(uint256(registry.statusOf(lienId)), 3, "the lien really is closed");
+
+    uint256 poolBefore = USDC.balanceOf(address(pool));
+    escrow.settle(lienId);
+
+    assertEq(USDC.balanceOf(address(pool)) - poolBefore, due, "the pool must still be made whole");
+    assertEq(pool.outstandingPrincipal(), 0);
+    assertEq(USDC.balanceOf(address(escrow)), 0, "the escrow keeps nothing");
+  }
+
+  /// @dev And the mirror: while the pool is still owed, that money cannot leave backwards.
+  function test_Refund_IsClosedWhileThePoolIsStillOwed() public {
+    _seedPool(500e6);
+    bytes32 lienId = _activeLien(BORROWER, 250e6, 150);
+    pool.disburse(lienId);
+    _pay(DEBTOR, lienId, pool.amountDue(lienId));
+
+    vm.warp(EXPIRES);
+    _default(lienId);
+
+    vm.prank(DEBTOR);
+    vm.expectRevert(abi.encodeWithSelector(CaplaneEscrow.StillSettleable.selector, lienId));
+    escrow.refund(lienId);
   }
 }

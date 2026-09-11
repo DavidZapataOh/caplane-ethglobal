@@ -19,7 +19,6 @@ contract CaplanePool is ERC4626 {
   error LienNotFundable(bytes32 lienId);
   error NotDisbursed(bytes32 lienId);
   error AlreadySettled(bytes32 lienId);
-  error LienNotRepayable(bytes32 lienId);
   error LienNotDefaulted(bytes32 lienId);
 
   uint256 private constant BPS = 10_000;
@@ -51,11 +50,13 @@ contract CaplanePool is ERC4626 {
     REGISTRY = registry;
   }
 
-  /// @dev Twelve, over a six-decimal asset, so shares are eighteen-decimal. This is the entire
-  ///      defence against the first-depositor attack, and on this chain that attack is cheaper
-  ///      than elsewhere: the asset's `balanceOf` is the account's native balance divided by
-  ///      1e12, so a plain value transfer inflates it for the price of a bare send. The vault
-  ///      has no `receive()` for the same reason.
+  /// @dev Twelve, over a six-decimal asset, so shares are eighteen-decimal. This is the whole
+  ///      defence against the first-depositor attack, and it is load-bearing alone: on this
+  ///      chain `balanceOf` is the account's native balance divided by 1e12, so a donation
+  ///      reaches this contract through an ordinary `USDC.transfer` that never touches a
+  ///      `receive()`, and a forced native transfer reaches it past a missing one anyway.
+  ///      Declaring no `receive()` removes one route of several; it is not a second line of
+  ///      defence and must not be credited as one.
   function _decimalsOffset() internal pure override returns (uint8) {
     return 12;
   }
@@ -69,6 +70,11 @@ contract CaplanePool is ERC4626 {
 
     ICaplaneRegistry.Lien memory lien = REGISTRY.lienOf(lienId);
     if (lien.status != 1) revert LienNotFundable(lienId);
+    // Status 1 means "not yet closed", not "not yet due" — the registry never flips a lien on
+    // the clock. Funding one whose term has ended pays out an advance that is defaultable in the
+    // same second: the whole loss, none of the fee. The struct is already in memory.
+    // forge-lint: disable-next-line(block-timestamp)
+    if (block.timestamp >= lien.expiresAt) revert LienNotFundable(lienId);
     // A zero advance would mark the lien funded while leaving nothing to repay or write down,
     // and it could never be settled again.
     if (lien.advanceUsdc6 == 0) revert LienNotFundable(lienId);
@@ -131,10 +137,11 @@ contract CaplanePool is ERC4626 {
     if (_advances[lienId].fundedAt == 0) revert NotDisbursed(lienId);
     uint256 principal = _advances[lienId].principal;
     if (principal == 0) revert AlreadySettled(lienId);
-    // Every function here obeys the registry, and this one is no exception: a released or
-    // defaulted lien is not repayable.
-    if (REGISTRY.statusOf(lienId) != 1) revert LienNotRepayable(lienId);
-
+    // No status check. A lien leaving the active set closes settlement, not the obligation: the
+    // escrow may already be holding the full repayment when a release or default report lands,
+    // and refusing here would strand that cash for ever and hand the whole advance to the
+    // investors as a loss. Live principal is the authorisation, and it is also what makes this
+    // idempotent — a repaid advance has none left.
     uint256 due = amountDue(lienId);
 
     // Books first, then money. Mid-transfer the vault would otherwise hold the repayment AND

@@ -69,8 +69,8 @@ ERC-20. Budget for the real token, never for a test double.
 
 Other paths, from the suite's own gas report:
 
-    disburse               136,936 gas     was 158,851 before an advance was packed into one word
-    repay                   75,893 gas     was 73,070; see below
+    disburse               136,973 gas     was 158,851 before an advance was packed into one word
+    repay                   74,936 gas     was 73,070; see below
     writeDown               34,582 gas     was 33,088; same reason
     totalAssets             15,684 gas     it reads the token, which is a proxy call
 
@@ -81,7 +81,14 @@ struct in one word. Disbursement pays one cold slot instead of two and falls 13.
 named rather than hidden: `repay` used to zero the principal's own slot and collect the 4,800-gas
 refund for freeing it, and now the funding block keeps the word occupied, so that refund is gone
 and repayment rises 2,823. Write-down rises 1,494 for the same reason. Net over a lien's whole
-life it is 19,092 gas cheaper if repaid and 20,421 if it defaults.
+life it is 20,049 gas cheaper if repaid and 20,421 if it defaults.
+
+Two guards changed after a security review, and both move these numbers slightly. `disburse` now
+refuses a lien whose term has already ended — status 1 means "not yet closed", never "not yet
+due", and funding an expired lien buys the whole loss and none of the fee. `repay` no longer
+consults the registry's status at all: live principal is the authorisation, which is what keeps
+an escrow already holding the repayment reachable after a release or default report. Dropping
+that external call is why repayment came out cheaper than the packing alone predicted.
 
 --- what the demo can actually hold ---------------------------------------------
 

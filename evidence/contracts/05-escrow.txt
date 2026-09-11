@@ -30,8 +30,8 @@ pulls less, a live allowance would otherwise survive.
 --- measured gas, receipt level -------------------------------------------------
 
     pay                  103,556 gas     $0.0021
-    settle               116,006 gas     $0.0023
-    refund                63,499 gas     $0.0013
+    settle               115,049 gas     $0.0023
+    refund                62,828 gas     $0.0013
     deployment           805,182 gas     3,436 bytes of runtime, 21,140 of margin
 
 A debtor's whole journey — one payment and the settlement — is 219,562 gas, under half a cent at
@@ -66,9 +66,21 @@ inside:
   honest thing to do — and leaves the escrow holding a payment with nowhere to go.
 
 None needs an attacker or a bug. So each payer's own contribution is tracked separately, and
-`refund` returns it to them once settlement is impossible: the lien is no longer active, or the
-pool's principal for it is already gone. It opens nowhere else. While settlement is still on the
-table a payment stays, because it is going to be handed on.
+`refund` returns it to them once this money can no longer discharge the debt — that is, once the
+pool has no principal left out on the lien, whether because it was repaid or because the loss was
+realised. It opens nowhere else.
+
+The guard used to ask a different question, and a security review showed the difference costs the
+whole advance. It asked whether `settle` happened to be callable — active lien, live principal —
+and `settle` is blocked by a terminal status. So a release or default report closed the pool's
+claim on this cash and opened the payer's claim on it in the same instant, mirror-image guards
+with no ordering in which the money reached the advance it was paid against. A debtor paying in
+full on the last day of the term, with nobody calling `settle`, walked out whole while the
+investors absorbed the entire principal — no attacker, no collusion, and the cash to cover it
+sitting in this contract the whole time. Both halves were corrected: `CaplanePool.repay` no
+longer consults the registry's status, so settlement still reaches the pool after the lien
+closes, and this gate now asks only whether the pool is still owed. Pinned by
+`test_Settle_StillReachesThePoolAfterATerminalReport` and its mirror.
 
 This is not the shape that was rejected. It moves a payer's own money back to that payer: it
 never touches the vault's assets, so it cannot be sequenced against a write-down, and it can

@@ -43,12 +43,14 @@ contract PoolTest is RegistryFixture {
   }
 
   /// @dev On Arc `balanceOf` IS the native balance divided by 1e12, so a plain value send moves
-  ///      it for 21,000 gas and leaves no log on the token. Refusing native value is the first
-  ///      half of the defence; the offset is the second.
+  ///      it for 21,000 gas and leaves no log on the token. Refusing it closes the cheapest
+  ///      route and nothing more — the test twenty lines below donates through the token to this
+  ///      same contract and asserts it lands. The twelve-decimal offset is the actual defence.
   function test_Pool_RefusesAPlainNativeSend() public {
     vm.deal(address(this), 1e18);
     (bool ok,) = address(pool).call{value: 1e18}("");
     assertFalse(ok, "the pool must have no receive(): a value send would inflate totalAssets");
+    assertEq(USDC.balanceOf(address(pool)), 0, "and nothing landed");
   }
 
   /// @dev The first-depositor attack, run for real. With an offset of 12 the attacker must
@@ -392,18 +394,21 @@ contract PoolTest is RegistryFixture {
     pool.disburse(lienId);
   }
 
-  /// @dev Repayment obeys the registry too: a lien that left the active set cannot be repaid,
-  ///      even though the pool's own books still say principal is out on it.
-  function test_Repay_RefusesALienTheRegistryNoLongerCallsActive() public {
+  /// @dev A lien leaving the active set closes settlement, not the obligation. Refusing here
+  ///      would strand any escrow already holding the repayment and hand the whole advance to
+  ///      the investors as a loss, with the cash to cover it sitting one contract away. Live
+  ///      principal is the authorisation; the registry's status is not.
+  function test_Repay_SettlesALienTheRegistryHasAlreadyClosed() public {
     _seedPool(500e6);
     bytes32 lienId = _activeLien(BORROWER, 250e6, 150);
     pool.disburse(lienId);
     _release(lienId);
 
-    address payer = _payer();
-    vm.prank(payer);
-    vm.expectRevert(abi.encodeWithSelector(CaplanePool.LienNotRepayable.selector, lienId));
-    pool.repay(lienId);
+    uint256 before = pool.totalAssets();
+    _repay(lienId);
+
+    assertEq(pool.outstandingPrincipal(), 0, "a closed lien must still be repayable");
+    assertEq(pool.totalAssets(), before + 3_750_000, "and its fee must still reach the investors");
   }
 
   function test_WriteDown_RefusesALienThatWasNeverDisbursed() public {
@@ -424,5 +429,18 @@ contract PoolTest is RegistryFixture {
 
     vm.expectRevert(abi.encodeWithSelector(CaplanePool.AlreadySettled.selector, lienId));
     pool.writeDown(lienId);
+  }
+
+  /// @dev Status 1 means "not yet closed", not "not yet due" — the registry never flips a lien
+  ///      on the clock. Funding an expired one pays out an advance that is defaultable in the
+  ///      same second, so the pool takes the whole loss and earns no fee.
+  function test_Disburse_RefusesALienWhoseTermHasAlreadyEnded() public {
+    _seedPool(500e6);
+    bytes32 lienId = _activeLien(BORROWER, 250e6, 150);
+    vm.warp(EXPIRES);
+
+    assertEq(uint256(registry.statusOf(lienId)), 1, "the registry still calls it active");
+    vm.expectRevert(abi.encodeWithSelector(CaplanePool.LienNotFundable.selector, lienId));
+    pool.disburse(lienId);
   }
 }

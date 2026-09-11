@@ -129,6 +129,9 @@ contract MoneyInvariantsTest is RegistryFixture {
     handler.repay(1);
     handler.pay(2, 30e6);
     handler.releaseLien(2);
+    // The loss has to be realised before the payer's money is released: while principal is out
+    // on the lien, that payment may still be owed to the pool.
+    handler.writeDown(2);
     handler.refund(2);
 
     handler.recordLien(11, 50e6, 150, 30 days);

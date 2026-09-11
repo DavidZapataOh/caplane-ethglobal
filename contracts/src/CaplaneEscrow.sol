@@ -141,11 +141,11 @@ contract CaplaneEscrow {
     uint256 amount = paidBy[lienId][msg.sender];
     if (amount == 0) revert NothingToRefund(lienId, msg.sender);
 
-    // Open only where settlement is impossible: `settle` needs an active lien with live
-    // principal, because `pool.repay` demands both.
-    if (REGISTRY.statusOf(lienId) == 1 && POOL.principalOf(lienId) != 0) {
-      revert StillSettleable(lienId);
-    }
+    // Keyed on the debt, not on whether `settle` happens to be callable right now. Asking the
+    // latter meant a terminal report closed the pool's claim on this cash and opened the payer's
+    // claim on it in the same instant — mirror-image guards, with no ordering in which the money
+    // reached the advance it was paid against.
+    if (POOL.principalOf(lienId) != 0) revert StillSettleable(lienId);
 
     paidBy[lienId][msg.sender] = 0;
     // casting to 'uint248' is safe because this amount was added through `pay`, which narrowed
