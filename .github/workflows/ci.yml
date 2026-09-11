@@ -57,8 +57,10 @@ jobs:
         working-directory: contracts
       - run: arc-forge lint
         working-directory: contracts
-      # ChainConformance needs a fork, so it belongs to the credentialed tier, not here.
-      - run: arc-forge test -vvv --no-match-contract ChainConformance
+      # ChainConformance and the pool suites need a fork of Arc, so they belong to the
+      # credentialed tier, not here. Excluded by name: skipping them silently would let the
+      # hermetic job go green while proving nothing about either.
+      - run: arc-forge test -vvv --no-match-contract "ChainConformance|Pool"
         working-directory: contracts
         env: { FOUNDRY_PROFILE: ci }
       # `forge test` exits 0 when it finds no tests at all, so a green job proves nothing
@@ -66,7 +68,7 @@ jobs:
       - name: Assert the contract suite is not empty
         working-directory: contracts
         run: |
-          n=$(arc-forge test --json --no-match-contract ChainConformance | node -e "
+          n=$(arc-forge test --json --no-match-contract "ChainConformance|Pool" | node -e "
             let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{
               const s=JSON.parse(d);
               console.log(Object.values(s).reduce((a,x)=>a+Object.keys(x.test_results||{}).length,0));
@@ -254,6 +256,13 @@ jobs:
         working-directory: contracts
         env: { ARC_TESTNET_RPC_URL: "${{ secrets.ARC_TESTNET_RPC_URL }}" }
         run: arc-forge test --match-contract ChainConformance --fork-url "$ARC_TESTNET_RPC_URL" -vvv
+      - name: The pool, against the USDC Arc actually runs
+        working-directory: contracts
+        env:
+          FOUNDRY_PROFILE: ci
+          ARC_TESTNET_RPC_URL: "${{ secrets.ARC_TESTNET_RPC_URL }}"
+          ARC_FORK_BLOCK: "${{ vars.ARC_FORK_BLOCK }}"
+        run: arc-forge test --match-contract "PoolTest|PoolInvariants" -vvv
 
   clean-clone:
     runs-on: ubuntu-latest

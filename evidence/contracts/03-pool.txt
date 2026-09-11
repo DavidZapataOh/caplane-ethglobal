@@ -1,0 +1,98 @@
+Pool cost and behaviour, measured against the USDC that is actually deployed on Arc Testnet,
+on a fork of that chain. No test double appears anywhere in this file or in the suite.
+
+--- the premise everything rests on ---------------------------------------------
+
+The token at 0x3600000000000000000000000000000000000000 is a Circle proxy whose implementation
+is `NativeFiatTokenV2_2`, verified on the explorer. It is not mainnet's FiatTokenV2_2 and it
+does not keep a balance mapping:
+
+    function _balanceOf(address a) internal view override returns (uint256) {
+        return _from18Decimals(a.balance, DECIMALS_SCALING_FACTOR);   // native balance / 1e12
+    }
+
+Asserted against the live token, not believed: a plain value send of 1,500,000,000,000,000,000
+wei to an address raised its ERC-20 balance by exactly 1,500,000, with no call to the token at
+all. The assertion is by delta rather than by absolute value, because the suite runs against
+live testnet state and any address's balance can change between runs.
+
+Measured on the same fork, moving the same 1.5 USDC of value to an account that already exists,
+at receipt level:
+
+    plain value send        27,923 gas     no log at the token address
+    ERC-20 transfer         51,879 gas     one Transfer log
+
+So the cheaper of the two paths is the one an indexer watching the token never sees. Three
+consequences, all designed for rather than discovered:
+
+  a plain send inflates a vault's assets for roughly half what the token charges, and leaves no
+  trace at the token;
+
+  balanceOf truncates: up to 1e12 wei of real value is invisible to the six-decimal view, so a
+  zero balance does not mean an empty account;
+
+  one movement can be observed twice, a factor of 1e12 apart. Summing both double-counts.
+
+The vault answers the first with two independent measures: it declares no `receive()`, so a
+plain send reverts, and it carries a twelve-decimal share offset, so a donation routed through
+the ERC-20 is not profitable either. Both are asserted, and both were proven to discriminate by
+mutation: adding a `receive()` turns the first test red, and dropping the offset from 12 to 2
+turns the second red at 97,907,950 against the 99,999,999 an offset of 12 returns.
+
+--- measured gas, against the real token ---------------------------------------
+
+Two units, because they answer different questions and the difference is large.
+
+Receipt level — intrinsic gas and calldata included, what an account actually pays:
+
+    approve                 60,886 gas
+    deposit                112,977 gas
+    redeem                  66,816 gas
+    investor round trip    240,679 gas     $0.0048 at the 20 Gwei floor
+
+Execution only — comparable with a probe of OpenZeppelin's reference vault:
+
+    approve                 38,942 gas
+    deposit                 77,581 gas
+    redeem                  52,304 gas
+    investor round trip    168,827 gas
+
+The budget for this contract was set from execution-only probes of a reference vault, so the
+execution column is the one those numbers can be compared against, and it sits inside every one
+of them. Stated plainly so nobody compares across units later: at receipt level `approve` costs
+886 gas more than the 60,000 the budget names and `deposit` costs 32,977 more than its 80,000,
+and neither figure is a regression — they are the same operations measured with the intrinsic
+charge included, which the probes never had.
+
+Going through Circle's proxy and its precompile is what makes the difference from a plain
+ERC-20. Budget for the real token, never for a test double.
+
+Other paths, from the suite's own gas report:
+
+    disburse               158,851 gas
+    repay                   73,070 gas
+    writeDown               33,088 gas
+    totalAssets             15,684 gas     it reads the token, which is a proxy call
+
+    deployment           1,608,864 gas     6,888 bytes of runtime, 17,688 of margin
+
+--- what the demo can actually hold ---------------------------------------------
+
+The faucet dispenses 20 USDC per address per two hours, confirmed at faucet.circle.com. Gas is
+irrelevant beside that ceiling: a full investor lifecycle costs about 0.0048 USDC, roughly two
+hundredths of a percent of one claim. Principal is the constraint.
+
+Three investor addresses, one claim each, hold 60 USDC and can fund a 60 USDC advance. Anything
+above about 100 USDC has to be farmed across several addresses and several hours before the
+demonstration; it cannot be assembled while someone is watching.
+
+--- what the invariants prove, and that they prove it ---------------------------
+
+256 runs, 128,000 sequenced calls, zero reverts: no user operation lowers what a share is worth.
+The property is asserted at par — 1e6 assets per 1e18 shares, because shares carry twelve more
+decimals than the asset, and an empty vault already answers exactly that through OpenZeppelin's
+virtual offset.
+
+That the suite has coverage rather than merely a green light was established by mutation: making
+`previewRedeem` round up, in the user's favour, drives the price to 999,999 and the invariant
+fails. A run that never reached a redemption could not have caught it.

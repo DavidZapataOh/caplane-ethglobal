@@ -78,6 +78,19 @@ abstract contract RegistryFixture is Test {
     _send(Reports.body(1, SELECTOR, _next(), lienId, SUBMISSION_1, BORROWER, advance, rateBps, expiresAt, _fresh()));
   }
 
+  /// @dev A lien that really exists: written through the registry's only write path, with a
+  ///      signed report, so nothing downstream is testing against a shape the chain would
+  ///      refuse. The id is derived from the commitments the way the enclave derives it.
+  function _activeLien(
+    address borrower,
+    uint128 advance,
+    uint32 rateBps
+  ) internal returns (bytes32 lienId) {
+    bytes32[] memory c = _fresh();
+    lienId = keccak256(abi.encodePacked(c[0], c[1], c[2], c[3], c[4], c[5], c[6]));
+    _send(Reports.body(1, SELECTOR, _next(), lienId, SUBMISSION_1, borrower, advance, rateBps, EXPIRES, c));
+  }
+
   function _release(
     bytes32 lienId
   ) internal {
