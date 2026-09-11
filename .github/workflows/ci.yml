@@ -194,15 +194,22 @@ jobs:
         with:
           path: ~/.cache/javy/v8.1.0
           key: javy-v8.1.0-${{ runner.os }}
+      # javy publishes the digest bare, with no filename beside it, so `sha256sum -c` rejects
+      # its own sidecar. Compare the digests directly, and refuse anything that is not one.
       - name: Install javy, pinned and checksum-verified
         run: |
           D="$HOME/.cache/javy/v8.1.0/linux-x64"
           if [ ! -x "$D/javy" ]; then
             mkdir -p "$D" && cd "$D"
             A=javy-x86_64-linux-v8.1.0.gz
-            curl -sSLO "https://github.com/bytecodealliance/javy/releases/download/v8.1.0/$A"
-            curl -sSLO "https://github.com/bytecodealliance/javy/releases/download/v8.1.0/$A.sha256"
-            sha256sum -c "$A.sha256"
+            curl -fsSLO "https://github.com/bytecodealliance/javy/releases/download/v8.1.0/$A"
+            curl -fsSLO "https://github.com/bytecodealliance/javy/releases/download/v8.1.0/$A.sha256"
+            expected=$(tr -d '[:space:]' < "$A.sha256")
+            actual=$(sha256sum "$A" | cut -d' ' -f1)
+            if [ ${#expected} -ne 64 ] || [ "$expected" != "$actual" ]; then
+              echo "::error::javy checksum mismatch: expected ${expected:-<empty>}, got $actual"
+              exit 1
+            fi
             gunzip -c "$A" > javy && chmod +x javy
           fi
           echo "$D" >> $GITHUB_PATH
