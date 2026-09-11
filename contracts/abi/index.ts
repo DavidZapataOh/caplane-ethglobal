@@ -329,6 +329,44 @@ export const inboxAbi = [
     "stateMutability": "nonpayable"
   },
   {
+    "type": "function",
+    "name": "submittedAt",
+    "inputs": [
+      {
+        "name": "submissionId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "submitterOf",
+    "inputs": [
+      {
+        "name": "submissionId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
     "type": "event",
     "name": "ClaimSubmitted",
     "inputs": [

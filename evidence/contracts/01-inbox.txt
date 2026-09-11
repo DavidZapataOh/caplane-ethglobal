@@ -16,11 +16,16 @@ figures below are receipts from that node, not estimates.
 Arc's gas token is USDC with 18 native decimals, and the base fee sits at its 20 Gwei floor, so
 the dollar figure needs no price assumption at all: cost = gas x 2e-8.
 
-  deploy CaplaneInbox                                     198,813 gas    $0.003976
-  submit, 275-byte envelope       (388 B calldata)         53,935 gas    $0.001079
+  deploy CaplaneInbox                                     232,316 gas    $0.004646
+  submit, 275-byte envelope       (388 B calldata)         54,144 gas    $0.001083
   submit, 4,096-byte envelope   (4,196 B calldata)        186,980 gas    $0.003740
   submit refused as duplicate, 4,096-byte envelope        186,980 gas    $0.003740
-  cheapest valid submission, empty envelope (100 B)        46,983 gas    $0.000940
+  cheapest valid submission, empty envelope (100 B)        47,192 gas    $0.000944
+
+Those first and last figures each rose by 209 gas when the submission record grew from a bare
+block number to a block number packed beside the submitter's address. The 4,096-byte figure did
+not move at all, and could not: it is the calldata floor, which is a function of the calldata
+alone, so it absorbs the whole execution cost and any change to it.
 
 The duplicate and the accepted submission cost the same number, not approximately the same one.
 Calldata is charged whether the frame reverts or not, and at that size calldata is the whole
@@ -58,7 +63,7 @@ set against.
 
 `.gas-snapshot` records the test function's own gas, which never includes the intrinsic charge
 or the calldata. Measured in-test against the receipts above, it understates by 1.64x at 275
-bytes and by 2.81x at 4,096 (66,495 against 186,980).
+bytes and by 2.81x at 4,096 (66,706 against 186,980).
 
 Worse, and this is the part worth writing down: the snapshot is byte-identical whether or not
 `foundry.toml` declares `network = "arc"`. Deleting that line silently removes 39,228 gas of

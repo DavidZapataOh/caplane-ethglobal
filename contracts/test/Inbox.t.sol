@@ -7,6 +7,7 @@ import {Test} from "forge-std/Test.sol";
 
 contract InboxTest is Test {
   uint256 internal constant MAX = 4096;
+  address internal constant SUBMITTER = address(0x50B);
 
   CaplaneInbox internal inbox;
 
@@ -30,7 +31,22 @@ contract InboxTest is Test {
   function _id(
     bytes memory ciphertext
   ) internal view returns (bytes32) {
-    return keccak256(abi.encodePacked(address(this), ciphertext));
+    return _idFor(address(this), ciphertext);
+  }
+
+  function _idFor(
+    address who,
+    bytes memory ciphertext
+  ) internal pure returns (bytes32) {
+    return keccak256(abi.encodePacked(who, ciphertext));
+  }
+
+  function _submit(
+    address who,
+    bytes memory ciphertext
+  ) internal {
+    vm.prank(who);
+    inbox.submit(_idFor(who, ciphertext), ciphertext);
   }
 
   /// @dev An oversize event is dropped by the log trigger before an execution id exists: no
@@ -158,5 +174,59 @@ contract InboxTest is Test {
       )
     );
     inbox.submit(taken, envelope);
+  }
+
+  /// @dev The submitter lives only in the log otherwise, and logs are pruned: a full node keeps
+  ///      receipts for about ten thousand blocks, an hour and a half here. After that the link
+  ///      between a lien's borrower and the person who submitted is unverifiable by any means.
+  function test_SubmitterOf_SurvivesWhereTheLogWillNot() public {
+    bytes memory envelope = _envelope(275);
+    _submit(SUBMITTER, envelope);
+
+    assertEq(inbox.submitterOf(_idFor(SUBMITTER, envelope)), SUBMITTER);
+  }
+
+  function test_SubmitterOf_IsZeroForSomethingNeverSubmitted() public view {
+    assertEq(inbox.submitterOf(keccak256("never happened")), address(0));
+  }
+
+  /// @dev Both halves live in one word, so recording who submitted costs nothing beyond what
+  ///      recording that they submitted already cost.
+  function test_Submit_StillRecordsTheBlockAlongsideTheSubmitter() public {
+    vm.roll(1_234_567);
+    bytes memory envelope = _envelope(275);
+    _submit(SUBMITTER, envelope);
+
+    bytes32 id = _idFor(SUBMITTER, envelope);
+    assertEq(inbox.submittedAt(id), 1_234_567);
+    assertEq(inbox.submitterOf(id), SUBMITTER);
+  }
+
+  /// @dev One word, proven against storage rather than argued from field widths. A layout that
+  ///      spilled would cost a second cold SSTORE on every submission and nothing else would say so.
+  function test_Submit_KeepsBothHalvesInOneSlot() public {
+    bytes memory envelope = _envelope(275);
+    _submit(SUBMITTER, envelope);
+
+    bytes32 slot = keccak256(abi.encode(_idFor(SUBMITTER, envelope), uint256(0)));
+    bytes32 word = vm.load(address(inbox), slot);
+    // Declaration order packs from the low end, so the block number is the low 96 bits and the
+    // submitter the 160 above it — asserted in that order rather than assumed the other way.
+    assertEq(uint256(word) & type(uint96).max, block.number, "the block number moved");
+    assertEq(address(uint160(uint256(word) >> 96)), SUBMITTER, "the submitter moved");
+    assertEq(vm.load(address(inbox), bytes32(uint256(slot) + 1)), bytes32(0), "it spilled");
+  }
+
+  /// @dev Duplicate detection hangs off the submitter, not the block number. At block zero the
+  ///      block-number version accepts the same submission twice and silently overwrites it.
+  function test_Submit_StillRefusesADuplicateAtBlockZero() public {
+    vm.roll(0);
+    bytes memory envelope = _envelope(275);
+    _submit(SUBMITTER, envelope);
+
+    bytes32 id = _idFor(SUBMITTER, envelope);
+    vm.prank(SUBMITTER);
+    vm.expectRevert(abi.encodeWithSelector(ICaplaneInbox.DuplicateSubmission.selector, id));
+    inbox.submit(id, envelope);
   }
 }

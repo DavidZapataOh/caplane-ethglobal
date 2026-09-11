@@ -16,10 +16,31 @@ contract CaplaneInbox is ICaplaneInbox {
   ///      retry, no trace — so refusing it here is the only place the submitter learns.
   uint256 private constant MAX_ENVELOPE_BYTES = 4096;
 
-  /// @notice Block in which a submission id was first accepted; zero if never.
-  /// @dev The permanent record. Log data is prunable — a full node keeps receipts for about
-  ///      10,000 blocks — and this is not.
-  mapping(bytes32 submissionId => uint256 blockNumber) public submittedAt;
+  struct Submission {
+    uint96 blockNumber;
+    address submitter;
+  }
+
+  /// @dev One word: 96 bits of block number beside a 160-bit address. The width is what is left
+  ///      over rather than what is needed — at half a second a block a uint96 outlasts the age
+  ///      of the universe — and packing costs nothing, because an SSTORE from zero prices the
+  ///      slot and not its contents. This is the permanent record: log data is prunable and
+  ///      contract state is not.
+  mapping(bytes32 submissionId => Submission) private _submissions;
+
+  /// @inheritdoc ICaplaneInbox
+  function submittedAt(
+    bytes32 submissionId
+  ) external view returns (uint256) {
+    return _submissions[submissionId].blockNumber;
+  }
+
+  /// @inheritdoc ICaplaneInbox
+  function submitterOf(
+    bytes32 submissionId
+  ) external view returns (address) {
+    return _submissions[submissionId].submitter;
+  }
 
   function submit(
     bytes32 submissionId,
@@ -29,9 +50,13 @@ contract CaplaneInbox is ICaplaneInbox {
 
     bytes32 expected = keccak256(abi.encodePacked(msg.sender, ciphertext));
     if (submissionId != expected) revert WrongSubmissionId(expected, submissionId);
-    if (submittedAt[submissionId] != 0) revert DuplicateSubmission(submissionId);
+    // Keyed on the submitter, not on the block: at block zero a block-number check accepts the
+    // same submission twice and silently overwrites the record. Neither half is infallible —
+    // a submission pranked from the zero address would break this one — but the submitter is
+    // the half a real transaction always fills in.
+    if (_submissions[submissionId].submitter != address(0)) revert DuplicateSubmission(submissionId);
 
-    submittedAt[submissionId] = block.number;
+    _submissions[submissionId] = Submission({blockNumber: uint96(block.number), submitter: msg.sender});
     emit ClaimSubmitted(submissionId, msg.sender, ciphertext);
   }
 }

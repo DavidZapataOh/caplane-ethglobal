@@ -1,0 +1,96 @@
+The custody chain, link by link, and what preemptive poisoning actually costs.
+
+--- the four links, and who can check each one ---------------------------------
+
+  ClaimSubmitted(submissionId, submitter, ciphertext)
+      the id is keccak256(submitter, ciphertext), enforced by the contract, so the identifier
+      cannot belong to anyone but its sender
+        |
+  Lien{submissionId, borrower}
+      asserted by the enclave. The registry stores the identifier without looking at it
+        |
+  Disbursed(lienId, borrower, advance)
+      the pool reads borrower and amount from the registry, never from its caller
+        |
+  Settled(lienId, toPool, toBorrower)
+      three public views recompute the split
+
+Two of the four are enforced by contract. The middle one is not, and this file is about what
+that means.
+
+--- what changed, and what deliberately did not ---------------------------------
+
+The inbox now records who submitted, in the same word that already recorded when: a uint96 block
+number beside a 160-bit address. Measured by receipt, on an Osaka node:
+
+    submit, 275-byte envelope     53,935  ->  54,144 gas     +209
+    submit, 4,096-byte envelope  186,980  ->  186,980 gas       +0
+    cheapest valid submission     46,983  ->   47,192 gas     +209
+    storage per submission              one slot, unchanged
+
+The plan this came from predicted +164 at the real size and a 361-gas SAVING at the cap. Both
+were wrong, and the second could not have been right: at the cap the charge is the EIP-7623
+calldata floor, which is a function of the calldata alone. It absorbs the execution cost
+entirely, so no change to this contract's execution can move that number in either direction.
++209 is the honest figure, and it is what an extra address costs to pack, not what a slot costs:
+an SSTORE from zero prices the slot and not its contents, and the slot was already being paid
+for.
+
+Duplicate detection now keys on the submitter rather than the block number. At block zero the
+old check accepted the same submission twice and silently overwrote the record — asserted in a
+test, and the test goes red if the check moves back. Neither half is infallible: a submission
+pranked from the zero address would defeat this one. The submitter is the half a real
+transaction always fills in, and the change was free.
+
+No contract enforces that a lien's borrower is that submitter, and that is a decision rather than
+an omission. The forwarder only relays reports the DON signed after verifying an enclave
+attestation, so no outsider can mint one; the only reports that could name the wrong borrower are
+our own, malformed. A bug belongs in front of its own test, not behind a cold storage read on the
+money path forever — and a guard on the payment would not have stopped the bad lien from being
+recorded anyway, only from being paid.
+
+So the comparison is the workflow's, where both halves are in hand and it costs nobody gas. What
+this file buys is that the comparison stays checkable by anyone, indefinitely, with one call —
+which before this change it was not.
+
+The boundary, stated rather than discovered: a malformed report can record a lien naming an
+address that asked for nothing, and the pool would pay it. Nothing on chain refuses. What is now
+true is that anybody can prove it happened, long after the logs are gone.
+
+If that is to be enforced on chain rather than audited, the right place is the registry, which is
+what writes the lien — not the pool. It would cost a fifth constructor argument and a mandatory
+deployment order, and it would refuse the false lien outright rather than merely refusing to pay
+it. Putting the same guard in the pool, which is where it was first drafted, is the worst of the
+three: it arrives too late, it does not prevent the false lien, and it charges a cold read on
+every disbursement forever.
+
+--- the link that time destroys -------------------------------------------------
+
+A submitter used to exist only inside the ClaimSubmitted log. A full node retains receipts for
+10,064 blocks, which at half a second a block is about 84 minutes, after which a query returns an
+empty array rather than an error. The stored mapping is the reason the borrower/submitter link
+can still be checked a week later, by anyone, with one call.
+
+--- what preemptive poisoning costs, measured ------------------------------------
+
+A hostile submission is an ordinary submission: the cheapest one, measured by receipt against an
+Osaka node at the 20 Gwei floor, is 47,192 gas. Arc denominates fees in USDC at eighteen native
+decimals, so the cost needs no price assumption:
+
+    47,192 gas x 2e-8  =  $0.00094 per hostile submission
+
+The dossier claimed this attack was closed by binding the lien atomically to its disbursement,
+so that an adversary would have to fund the advance — to pay their victim. That construction is
+not available: the registry's only write path carries no disbursement, and wiring it to the
+money would require the registry to know the pool, a deployment cycle, and a setter, which is
+the governance the registry exists not to have.
+
+So the attack is priced, not closed, and the price is small. What raises it is elsewhere and not
+yet built: an envelope whose plaintext names the address entitled to submit it, so that copying
+someone's ciphertext stops working; and a debtor confirmation that binds the CREDITOR and not
+only the invoice. As written, debtor confirmation asks the debtor whether they owe the money,
+and a copyist is asserting a real invoice the debtor will truthfully confirm.
+
+One leg of the original argument does hold, and it is the one nobody expected: a poisoner cannot
+reach a victim's lien id by shifting characters between components. The seven-digest tuple with
+its per-component domain separation closes that, and it is measured elsewhere.

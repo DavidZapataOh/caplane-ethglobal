@@ -21,4 +21,17 @@ interface ICaplaneInbox {
     bytes32 submissionId,
     bytes calldata ciphertext
   ) external;
+
+  /// @notice Block in which a submission id was first accepted; zero if never.
+  function submittedAt(
+    bytes32 submissionId
+  ) external view returns (uint256);
+
+  /// @notice Who sent that submission, or the zero address if nobody did.
+  /// @dev The log carries this too, and log data is prunable — a full node keeps receipts for
+  ///      roughly ten thousand blocks. Without this, the link between a lien's borrower and the
+  ///      person who submitted stops being checkable by any means about ninety minutes later.
+  function submitterOf(
+    bytes32 submissionId
+  ) external view returns (address);
 }

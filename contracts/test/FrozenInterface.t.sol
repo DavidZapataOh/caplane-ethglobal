@@ -38,6 +38,14 @@ contract FrozenInterfaceTest is Test {
     );
   }
 
+  /// @dev The inbox's reads. `submittedAt` was a public mapping and is now an explicit
+  ///      function; both forms produce the same signature, so the selector must not have moved.
+  function test_InboxReadSurface_SelectorsAreFrozen() public pure {
+    assertEq(bytes32(ICaplaneInbox.submittedAt.selector), bytes32(bytes4(keccak256("submittedAt(bytes32)"))));
+    assertEq(bytes32(ICaplaneInbox.submitterOf.selector), bytes32(bytes4(keccak256("submitterOf(bytes32)"))));
+    assertEq(bytes32(ICaplaneInbox.submittedAt.selector), bytes32(bytes4(0x5cb1cf58)));
+  }
+
   function test_Events_Topic0IsFrozen() public pure {
     assertEq(ICaplaneInbox.ClaimSubmitted.selector, keccak256("ClaimSubmitted(bytes32,address,bytes)"));
     assertEq(ICaplaneRegistry.LienRecorded.selector, keccak256("LienRecorded(bytes32,address,uint64)"));

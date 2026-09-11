@@ -81,6 +81,12 @@ signature. An existing error is reused only when its argument is still true of t
 
 - `WrongComponentCount(uint256 count)` on `ICaplaneRegistry` — a report whose body carries the
   wrong number of component commitments. `BadMetadata` would have named a field that was intact.
+- `submittedAt(bytes32)` and `submitterOf(bytes32)` on `ICaplaneInbox` — the inbox's two reads,
+  declared on the interface rather than left as contract-only getters. `submittedAt` keeps the
+  selector its public mapping had, `0x5cb1cf58`; `submitterOf` is new. The submitter is held in
+  the same storage word as the block number, so it costs no extra slot, and it exists because
+  the log that also carries it is prunable: without it the link between a lien's borrower and
+  the person who submitted stops being checkable about ninety minutes later.
 - `WrongSubmissionId(bytes32 expected, bytes32 given)` on `ICaplaneInbox` — the id is derived,
   `keccak256(msg.sender ‖ ciphertext)`, and the contract enforces it. Without that check a
   mempool observer burns someone else's id for the price of one transaction. `DuplicateSubmission`
@@ -98,7 +104,7 @@ another chain cannot be replayed here. Still no id to pin, so the deployment gra
 | `onReport` gas | budget ≤ 4,800,000 | — |
 | `ClaimSubmitted` event | 5,000 bytes (LogTrigger) | serialized log at the 4,096-byte cap: **~4,400 bytes** |
 | `Lien` storage | 3 slots | reordering saves **24,248 gas** per lien |
-| `submit` gas | 275-byte envelope ≤ 60,000 | receipt: **53,935**; at the 4,096-byte cap **186,980**, the EIP-7623 floor exactly |
+| `submit` gas | 275-byte envelope ≤ 60,000 | receipt: **54,144**; at the 4,096-byte cap **186,980**, the EIP-7623 floor exactly |
 
 What the event budget weighs is the whole protobuf `Log` — address, three topics, transaction
 hash, block hash, the event signature repeated and the block number, around 239 bytes of
