@@ -1,0 +1,43 @@
+How the threshold was chosen, 2026-09-10.
+
+No published work supplies a value. The nearest source — reliable homomorphic matching for
+fuzzy labeled PSI — fixes k = 2 and states outright that k is a cost parameter rather than an
+accuracy one: raising it inflates per-pair work and the soundness bound, while the accept
+probability is lowered by token rounds instead. Its sixty-four components are hash subsamples
+of a face embedding evaluated on face datasets. Two of seven semantic invoice fields would be
+currency plus jurisdiction, which every claim from one ledger shares, so that value is not
+transferable and is not transferred.
+
+What is transferable is the method, from the earlier paper by the same authors: fix the
+threshold by brute force against a real corpus, with a target taken from what the domain
+requires rather than from theory.
+
+--- the measurement, over the seeded corpus ----------------------------------
+
+  worst legitimate reformatting        6 of 7    invoice number without its prefix
+  every other reformatting             7 of 7    absorbed by canonicalisation
+  second real invoice, same ledger     3 of 7    currency, issuer and country only
+
+Three of the seven are constants of the ledger, so three is the floor for any two claims from
+one book, not zero. That leaves the threshold free to be 4, 5 or 6.
+
+The target: the largest threshold that still accepts every reformatting real data produces.
+Larger is safer — near-collision squatting requires the attacker to guess more of someone
+else's claim — and no observed variant falls below six, so a lower threshold buys nothing.
+
+  k = 6
+
+Seven is refused: it would reject the prefix-less invoice number, a legitimate reformatting.
+
+What this measurement cannot support: a false-match RATE. One negative sample is one sample.
+The rate, and how few samples it rests on, belong to the measurement plan.
+
+--- measured by this code, against the seeded corpus ---
+
+7/7  collision as required  invoice number with a separator
+6/7  collision as required  invoice number without its prefix
+7/7  collision as required  tax id without separators
+7/7  collision as required  amount written with a decimal separator
+7/7  collision as required  due date in day-first format
+7/7  collision as required  lowercase country
+3/7  clear     as required  a second real invoice: different debtor, number, amount bucket and due date

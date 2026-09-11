@@ -49,3 +49,18 @@ export class ClaimError extends Error {
     super(`${component}: ${reason}`)
   }
 }
+
+/**
+ * The components the registry indexes. A posting list for a component that every claim shares
+ * holds the entire registry, so indexing one bounds nothing and costs the most to walk.
+ *
+ * Excluded from the index, not from the tuple: the ledger constants still hash with their
+ * index and still count toward the returned match count. They are what will separate two
+ * ledgers the day there are two.
+ */
+export const INDEXED_COMPONENTS = [
+  'debtorTaxId',
+  'invoiceNumber',
+  'amountBucket',
+  'dueDate',
+] as const satisfies readonly ComponentName[]

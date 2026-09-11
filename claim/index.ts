@@ -1,5 +1,6 @@
 export * from './schema'
 export * from './canonical'
+export * from './match'
 
 import {
   canonicalAmountBucket,
