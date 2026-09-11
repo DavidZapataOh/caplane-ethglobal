@@ -1,0 +1,92 @@
+Escrow behaviour and cost, measured against the real registry, pool and USDC on Arc Testnet.
+
+--- what this contract is for ---------------------------------------------------
+
+In factoring the debtor owes the face value of their invoice, and the financier is owed the
+advance plus a fee. Those are different numbers, and only the second is on chain. The escrow is
+where the first becomes the second: the debtor pays what they owe, in one payment or several,
+and settlement hands the pool its number and returns the difference to the business.
+
+Nothing here holds discretion. Paying credits a lien, settling is arithmetic anyone can check,
+and the contract never keeps a balance that is not attributed to a lien and to the payer who
+sent it.
+
+--- the split, measured ---------------------------------------------------------
+
+One advance of 250.000000 USDC at 150 basis points, funded from a pool of 500, with the debtor
+paying 300 — the face value they owe, which is not the financier's number:
+
+    pool receives        253.750000 USDC      the advance plus its flat fee
+    business receives     46.250000 USDC      the surplus, returned
+    escrow retains         0.000000 USDC      asserted, not assumed
+
+Exactly the amount due settles too, and returns nothing to the business. Below it, settlement
+reverts carrying both numbers — what was paid and what is owed — rather than a bare failure.
+
+The allowance the escrow grants the pool is set back to zero explicitly after `repay` returns,
+and that zero is asserted. Today `repay` happens to pull exactly what was approved; the day it
+pulls less, a live allowance would otherwise survive.
+
+--- measured gas, receipt level -------------------------------------------------
+
+    pay                  105,307 gas     $0.0021
+    settle               131,753 gas     $0.0026
+    refund                65,260 gas     $0.0013
+    deployment           805,182 gas     3,436 bytes of runtime, 21,140 of margin
+
+A debtor's whole journey — one payment and the settlement — is 237,060 gas, about half a cent at
+the 20 Gwei floor. Both figures sit inside their budgets of 110,000 and 200,000.
+
+--- money only enters where it can leave, and leaves where it cannot ------------
+
+Settlement is the way this contract passes money on, and it needs a lien that is active and not
+yet settled. So those are exactly the conditions under which a payment is accepted. A released
+lien, a defaulted one, one that does not exist, or one already settled is refused at the door,
+with the status inside the error.
+
+That rule replaced an earlier design with a second exit for late payments. Building it showed why
+it was wrong: it paid the vault money the vault had never lent, it could be sequenced ahead of
+the loss write-down to inflate the share price by half and be redeemed in the same transaction,
+and its premise was false — the vault counts its own balance, so a plain transfer already
+recovers value for anyone who wants to send one.
+
+But the door rule is checked on the way in and can be revoked on the way out, and that would
+destroy money nobody mishandled. Three ordinary events close the exit after a payment is already
+inside:
+
+  a default report arrives after a partial payment;
+  a release report arrives for the same reason;
+  the business calls the pool's `repay` itself, which is permissionless by design and is an
+  honest thing to do — and leaves the escrow holding a payment with nowhere to go.
+
+None needs an attacker or a bug. So each payer's own contribution is tracked separately, and
+`refund` returns it to them once settlement is impossible: the lien is no longer active, or the
+pool's principal for it is already gone. It opens nowhere else. While settlement is still on the
+table a payment stays, because it is going to be handed on.
+
+This is not the shape that was rejected. It moves a payer's own money back to that payer: it
+never touches the vault's assets, so it cannot be sequenced against a write-down, and it can
+never pay out an advance the vault did not make. Each of the three guards was proven to
+discriminate by mutation — removing the settled check, opening the refund unconditionally, and
+paying out the aggregate instead of the payer's share each turn a different test red, the last
+handing one payer 140.000000 USDC where 100.000000 was theirs.
+
+--- what it does not do ---------------------------------------------------------
+
+It does not hide the financing terms from the debtor. `registry.lienOf(lienId)` is a public view
+returning the advance and the rate to anyone holding the identifier, and no contract can take
+that back. What the escrow removes is the NEED for the debtor to know them: they pay their own
+number, not the financier's.
+
+It does not decide when an advance is released. It emits `Settled`, and a workflow watching that
+event produces the signed report that moves the lien to released. Until that workflow exists, a
+settled advance is paid in full and still reads as encumbered — asserted in a test, so the gap is
+recorded rather than assumed — and, because it is marked settled here, it refuses further
+payments rather than swallowing them.
+
+It does not know that a payment arrived late. A debtor paying after a default gets their money
+back through `refund`; deciding that the payment should instead have settled the advance needs a
+system that knows when it arrived, which is the workflow's knowledge and not a status byte's.
+
+It cannot help if Circle blocks this address. The blocklist runs below the EVM, so a blocked
+escrow can neither pay out nor refund, and no code here changes that.
