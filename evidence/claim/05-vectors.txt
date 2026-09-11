@@ -1,0 +1,56 @@
+Commitment vectors, derived from the seeded invoice.
+
+Why fixed widths: the naive encoding collided on this project's own data. Captured from
+the run before the fix, using the tax number the ledger stores and the invoice number it
+assigned:
+
+  A (the seeded invoice):       11000111000ORC1043242026-12-31AUDE1218A28743747ECBFB5252092825083AU
+  B (one character shifted):    11000111000ORC1043242026-12-31AUDE1218A28743747ECBFB5252092825083AU
+  identical: true
+  
+  Both claims are valid: the tax number is the one the ledger stores and the invoice
+  number is the one it assigned. Joining the components as strings gives one lien id
+  for two different claims, and the second borrower is refused as already encumbered.
+
+The canonical components are not repeated here — they are already in the corpus. What is
+published is the lien id, which is a hash of the whole tuple and does not invert.
+
+{
+  "testPepper": [
+    42,
+    42,
+    42,
+    42,
+    42,
+    42,
+    42,
+    42,
+    42,
+    42,
+    42,
+    42,
+    42,
+    42,
+    42,
+    42,
+    42,
+    42,
+    42,
+    42,
+    42,
+    42,
+    42,
+    42,
+    42,
+    42,
+    42,
+    42,
+    42,
+    42,
+    42,
+    42
+  ],
+  "invoice": {
+    "lienId": "0xf84b7a4a3620bb18f5486af09e223c7273d3d6118acda3b4b322a6f037403900"
+  }
+}

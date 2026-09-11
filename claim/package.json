@@ -6,7 +6,9 @@
   "main": "index.ts",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "bun test"
+    "test": "bun test",
+    "build:wasm": "bun build tools/probe.ts --target=browser --format=esm --outfile=/tmp/caplane-probe.js >/dev/null && javy build -C deterministic=y /tmp/caplane-probe.js -o /tmp/caplane-probe.wasm",
+    "derive:wasm": "bun run build:wasm >/dev/null 2>&1 && node --no-warnings tools/run-wasi.mjs /tmp/caplane-probe.wasm"
   },
   "dependencies": {
     "@noble/hashes": "^2.2.0"

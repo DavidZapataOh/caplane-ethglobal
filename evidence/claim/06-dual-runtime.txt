@@ -1,0 +1,23 @@
+The same vectors, derived in both runtimes, 2026-09-10.
+
+engine   Javy 8.1.0 embedding QuickJS, compiled with -C deterministic=y
+host     node:wasi, preview1
+bundler  bun build --target=browser --format=esm
+cycle    ~2.1 s end to end; the wasm is 1.28 MB, which is QuickJS, not our code
+
+--- native ---
+{"lienId":"0xf84b7a4a3620bb18f5486af09e223c7273d3d6118acda3b4b322a6f037403900","commitments":["0x7fe06f21c37c947f5bb033166b40969d9d5b6d03fbd51e44acd75d232c642c1b","0x8847a3f022c214b1a1bf561141a83c88743735ae925b1bcaa704493130256762","0xd131ee2c4c380931bf43c22bbb207dffb5bc4a86df10474746d74d859deb1ad0","0x65ed4772dfd67f8394ef6775fc611d901eae658f39e81e91c4682952473b9d53","0x471cf8810873a4b405f7dbb9054ab86edb77910c57bdf861af2d14e35bcbb219","0xa192b3319758f0de5489ddb014293f128f387b35bce8b63bbafbf2d6fdfa93b4","0xff306f7e552c92eafb81b35b9e71066896a624bbb3c6e75e8a0d89a6f7c8525c"]}
+--- enclave ---
+{"lienId":"0xf84b7a4a3620bb18f5486af09e223c7273d3d6118acda3b4b322a6f037403900","commitments":["0x7fe06f21c37c947f5bb033166b40969d9d5b6d03fbd51e44acd75d232c642c1b","0x8847a3f022c214b1a1bf561141a83c88743735ae925b1bcaa704493130256762","0xd131ee2c4c380931bf43c22bbb207dffb5bc4a86df10474746d74d859deb1ad0","0x65ed4772dfd67f8394ef6775fc611d901eae658f39e81e91c4682952473b9d53","0x471cf8810873a4b405f7dbb9054ab86edb77910c57bdf861af2d14e35bcbb219","0xa192b3319758f0de5489ddb014293f128f387b35bce8b63bbafbf2d6fdfa93b4","0xff306f7e552c92eafb81b35b9e71066896a624bbb3c6e75e8a0d89a6f7c8525c"]}
+
+The SDK's own validator already refuses what throws: node:crypto, fetch, setTimeout. For that
+class it is cheaper than any test and should be relied on. This refuses what it cannot see.
+
+Demonstrated by putting one locale-aware call on the derivation path and running both again:
+
+  native   lienId 0x6b13b84724cf3954793b6ac32bb58ae64f7db74f6880d91792e158b1024a348d
+  enclave  lienId 0x40438acd2a97f2e2e570e3947c46c748a694f2a4b4d112a251d0f7766eae9de6
+
+Two different registry keys for one invoice, and nothing raised an error on either side. The
+enclave has no ICU, so toLocaleString and the locale-aware case folds return something else and
+say nothing. That is the failure this test exists for, and no lint rule can reach it.

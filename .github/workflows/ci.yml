@@ -180,6 +180,39 @@ jobs:
           PRIVY_SERVER_CREDENTIAL: ${{ secrets.PRIVY_SERVER_CREDENTIAL }}
         run: bun run scripts/privy/deny.ts --teardown
 
+  claim-dual-runtime:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with: { bun-version: 1.2.21 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      # The enclave runtime is a 13 MB download. A cache with nothing to populate it is a
+      # permanent miss, so the install step follows rather than replaces it.
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/javy/v8.1.0
+          key: javy-v8.1.0-${{ runner.os }}
+      - name: Install javy, pinned and checksum-verified
+        run: |
+          D="$HOME/.cache/javy/v8.1.0/linux-x64"
+          if [ ! -x "$D/javy" ]; then
+            mkdir -p "$D" && cd "$D"
+            A=javy-x86_64-linux-v8.1.0.gz
+            curl -sSLO "https://github.com/bytecodealliance/javy/releases/download/v8.1.0/$A"
+            curl -sSLO "https://github.com/bytecodealliance/javy/releases/download/v8.1.0/$A.sha256"
+            sha256sum -c "$A.sha256"
+            gunzip -c "$A" > javy && chmod +x javy
+          fi
+          echo "$D" >> $GITHUB_PATH
+      - run: npm ci
+        working-directory: claim
+      # The SDK's validator refuses what throws. This refuses what does not: a locale-aware
+      # call returns different bytes in the two runtimes and raises nothing at all.
+      - run: bun test dual-runtime.test.ts
+        working-directory: claim
+
   credentialed:
     runs-on: ubuntu-latest
     steps:

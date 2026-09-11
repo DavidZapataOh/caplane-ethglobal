@@ -108,6 +108,36 @@ The component *order* cannot change at all once a lien exists. The index is insi
 commitment preimage and the pepper does not rotate, so there is no reindex: appending an eighth
 component is possible, inserting or reordering is not.
 
+## Commitment encoding
+
+Every scalar is one byte; the one variable field sits between fixed widths.
+
+    componentDigest i     = keccak256(0x01 ‖ version:u8 ‖ claimType:u8 ‖ i:u8 ‖ utf8(component))
+    componentCommitment i = keccak256(0x02 ‖ version:u8 ‖ claimType:u8 ‖ i:u8 ‖ utf8(component) ‖ pepper:32)
+    lienId                = keccak256(0x03 ‖ version:u8 ‖ claimType:u8 ‖ digest[0] ‖ … ‖ digest[6])
+
+The leading byte separates the three preimage spaces. Without it a digest preimage can equal a
+commitment preimage whenever a component ends in the pepper's bytes — unreachable today only
+because canonical text is letters and digits and the pepper is random binary, which is a
+property of the inputs rather than of the construction.
+
+The tuple is seven 32-byte digests, never seven strings. Joining the strings collides: a
+character moved from one variable field into the next produces identical bytes, demonstrated on
+the tax number and invoice number a real ledger issued.
+
+The pepper is exactly 32 random bytes. It travels hex-encoded in its environment variable and
+is decoded before use: used as 32 ASCII hex characters it would fall inside the canonical text
+alphabet, and the two commitment tiers would stop being separated by their content as well as
+by their domain byte.
+
+`pepperVersion` enters no preimage. The pepper does not rotate, so a version that can never
+change would be dead weight; it records which generation built the index.
+
+⚠️ `contracts/abi/frozen.ts` still carries the shorter formula with an undefined bar, and it is
+the file an implementer opens — it is vendored into `claim/abi/` and will be into the workflow.
+This section is the authoritative encoding; that comment is an incomplete summary. Changing it
+means regenerating every vendored copy so the drift rule approves them all at once.
+
 ## Not frozen
 
 Storage slot layout · underwriting thresholds ·
