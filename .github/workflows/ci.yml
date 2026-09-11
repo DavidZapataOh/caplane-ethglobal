@@ -180,7 +180,7 @@ jobs:
           PRIVY_SERVER_CREDENTIAL: ${{ secrets.PRIVY_SERVER_CREDENTIAL }}
         run: bun run scripts/privy/deny.ts --teardown
 
-  claim-dual-runtime:
+  claim:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -208,9 +208,11 @@ jobs:
           echo "$D" >> $GITHUB_PATH
       - run: npm ci
         working-directory: claim
+      # The whole suite, not just the dual-runtime file: `libraries` only type-checks this
+      # package, so anything else here would run on a developer's laptop and nowhere else.
       # The SDK's validator refuses what throws. This refuses what does not: a locale-aware
       # call returns different bytes in the two runtimes and raises nothing at all.
-      - run: bun test dual-runtime.test.ts
+      - run: bun test
         working-directory: claim
 
   credentialed:

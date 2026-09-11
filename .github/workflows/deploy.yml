@@ -19,8 +19,8 @@ jobs:
       # `workflow_run.conclusion` is the whole workflow's, and two of its jobs must not block a
       # release: `credentialed` goes red when a third party has a bad minute, and
       # `data-sources` reports a missing secret on every push. Gating on the workflow would
-      # mean never promoting. So the five hermetic jobs are checked by name.
-      - name: Require the five hermetic jobs to have passed
+      # mean never promoting. So the six hermetic jobs are checked by name.
+      - name: Require the six hermetic jobs to have passed
         env:
           GH_TOKEN: "${{ github.token }}"
           RUN_ID: "${{ github.event.workflow_run.id }}"
@@ -29,10 +29,19 @@ jobs:
                  --jq '.jobs[] | "\(.name)=\(.conclusion)"')
           echo "$jobs"
           failed=0
-          for name in hygiene contracts libraries web workflow; do
-            conclusion=$(printf '%s\n' "$jobs" | grep -E "^$name=" | cut -d= -f2 | head -1)
-            if [ "$conclusion" != "success" ]; then
-              echo "::error::$name did not pass (${conclusion:-missing})"
+          # A matrix job is reported as `name (shard)`, never as a bare `name`, so an exact
+          # match finds nothing and the gate refuses every promotion. Every shard has to be
+          # green, not just the one that happens to come back first.
+          for name in hygiene contracts claim libraries web workflow; do
+            shards=$(printf '%s\n' "$jobs" | grep -E "^$name(=| \()" || true)
+            if [ -z "$shards" ]; then
+              echo "::error::$name did not run"
+              failed=1
+              continue
+            fi
+            bad=$(printf '%s\n' "$shards" | grep -v '=success$' || true)
+            if [ -n "$bad" ]; then
+              echo "::error::$name did not pass: $(printf '%s' "$bad" | tr '\n' ' ')"
               failed=1
             fi
           done
