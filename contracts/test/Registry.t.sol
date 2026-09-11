@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+import {CaplaneRegistry} from "../src/CaplaneRegistry.sol";
 import {ICaplaneRegistry} from "../src/interfaces/ICaplaneRegistry.sol";
 import {RegistryFixture} from "./support/RegistryFixture.sol";
 import {Reports} from "./support/Reports.sol";
@@ -217,5 +218,13 @@ contract RegistryTest is RegistryFixture {
 
     assertLt(spent, 16_777_216, "past the EIP-7825 per-transaction cap");
     assertLt(spent, 30_000_000 / 4, "one report must not take a quarter of a block");
+  }
+
+  /// @dev A zero forwarder leaves the registry with no write path that could ever be accepted,
+  ///      and there is no setter to repair it. The contract-local error keeps this off the
+  ///      frozen interface.
+  function test_Constructor_RefusesAZeroForwarder() public {
+    vm.expectRevert(CaplaneRegistry.ZeroAddress.selector);
+    new CaplaneRegistry(address(0), OWNER, NAME, SELECTOR);
   }
 }

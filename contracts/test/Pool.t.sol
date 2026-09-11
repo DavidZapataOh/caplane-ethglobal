@@ -382,4 +382,47 @@ contract PoolTest is RegistryFixture {
     assertEq((word >> 128) & type(uint64).max, block.number, "fundedAt is not beside it");
     assertEq(vm.load(address(pool), bytes32(uint256(slot) + 1)), bytes32(0), "it spilled");
   }
+
+  /// @dev A zero advance would mark the lien funded while leaving nothing to repay or write
+  ///      down, and it could never be settled again.
+  function test_Disburse_RefusesALienWithNothingToAdvance() public {
+    _seedPool(500e6);
+    bytes32 lienId = _activeLien(BORROWER, 0, 150);
+    vm.expectRevert(abi.encodeWithSelector(CaplanePool.LienNotFundable.selector, lienId));
+    pool.disburse(lienId);
+  }
+
+  /// @dev Repayment obeys the registry too: a lien that left the active set cannot be repaid,
+  ///      even though the pool's own books still say principal is out on it.
+  function test_Repay_RefusesALienTheRegistryNoLongerCallsActive() public {
+    _seedPool(500e6);
+    bytes32 lienId = _activeLien(BORROWER, 250e6, 150);
+    pool.disburse(lienId);
+    _release(lienId);
+
+    address payer = _payer();
+    vm.prank(payer);
+    vm.expectRevert(abi.encodeWithSelector(CaplanePool.LienNotRepayable.selector, lienId));
+    pool.repay(lienId);
+  }
+
+  function test_WriteDown_RefusesALienThatWasNeverDisbursed() public {
+    bytes32 lienId = _activeLien(BORROWER, 250e6, 150);
+    _release(lienId);
+    vm.expectRevert(abi.encodeWithSelector(CaplanePool.NotDisbursed.selector, lienId));
+    pool.writeDown(lienId);
+  }
+
+  /// @dev An advance that was repaid has no loss left to realise, and the error says that rather
+  ///      than silently subtracting a principal that is already zero.
+  function test_WriteDown_RefusesAnAdvanceThatWasAlreadyRepaid() public {
+    _seedPool(500e6);
+    bytes32 lienId = _activeLien(BORROWER, 250e6, 150);
+    pool.disburse(lienId);
+    _repay(lienId);
+    _release(lienId);
+
+    vm.expectRevert(abi.encodeWithSelector(CaplanePool.AlreadySettled.selector, lienId));
+    pool.writeDown(lienId);
+  }
 }

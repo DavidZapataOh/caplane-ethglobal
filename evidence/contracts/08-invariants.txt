@@ -1,0 +1,111 @@
+Stateful properties: what holds, what does not, and what deriving them found.
+
+--- what it found ---------------------------------------------------------------
+
+Deriving these properties and then attacking them produced three real defects in code that had
+already been written and reviewed. That is the argument for the work, and it is worth more than
+the green run that follows. Note the order honestly: the fuzzer did not find them. Writing down
+what had to be true, and then asking what sequence would break it, did — and the suite is what
+keeps them fixed.
+
+A lien released without ever being repaid satisfied neither repayment (which requires an active
+lien) nor loss realisation (which required a defaulted one). Its principal stayed counted for
+ever: the vault permanently over-reported what it was worth, the share price stayed inflated, and
+whoever redeemed last absorbed the whole difference. One line: any terminal status now authorises
+realising the loss, and `test_AReleasedButUnrepaidLienCanStillBeWrittenDown` keeps it that way.
+
+The vault advertised withdrawals it would refuse. Capping only the redemption ceiling left its
+sibling promising an amount that reverts on transfer — which the standard forbids in as many
+words. Removing the cap today turns the test red at 500.000000 advertised against 100.000000 held.
+
+And a repayment moved money before it moved its books. Mid-transfer the vault would hold the
+repayment and still count the principal that repayment cancels, so its assets spike rather than
+dip and a reentrant redemption would exit at an inflated price. Latent on this chain today,
+because the token moves through a precompile and calls no hook; the safe ordering is also the
+cheaper one, so there was nothing to trade.
+
+--- running it at all ----------------------------------------------------------
+
+An invariant suite on this chain must pin its senders. Without that the fuzzer draws a fresh
+random address per call, every one a cache miss against the fork, and the run either rate-limits
+the endpoint or fails outright: the toolchain enforces the chain's blocked-sender rules and the
+fuzzer eventually picks a blocked address. With senders pinned, the money suite's 1,600 sequenced
+calls against the live endpoint take about one second.
+
+Two handler bounds are not tuning, and their absence produces a false finding: the block number
+never reaches zero and no call is ever sent from the zero address. Both sentinel guards in this
+system — the inbox's duplicate check on `submitter != address(0)` and the pool's `fundedAt != 0`
+— open in exactly those states, and production can reach neither.
+
+--- proving the suite is not decorative ----------------------------------------
+
+Two different failures, and they need two different checks, because one check for both is either
+flaky or useless.
+
+An action the fuzzer never calls is caught after every run: every exposed handler action must
+have been REACHED, which is a counter incremented on success or on revert. That catches a
+misnamed function or one dropped from the target selectors.
+
+An action that can never SUCCEED is caught by a scripted test that drives the same handler
+through a deterministic sequence and asserts every success counter moved. Asserting success in
+the per-run check instead would be flaky by construction — whether a release lands inside forty
+random calls is luck — and a gate that fails on luck gets switched off.
+
+Foundry evaluates `invariant_` functions once before the first call, so a coverage counter
+written as an invariant can only ever fail: every counter is legitimately zero at that point.
+It lives in `afterInvariant` for that reason.
+
+That the money invariants discriminate was established by mutation. Removing the write-down's
+decrement of live principal, removing the liquidity cap on redemption, and leaving settled money
+attributed after it was handed on each turn a different invariant red.
+
+--- what does not hold ---------------------------------------------------------
+
+Five properties that sound like invariants are false by design, and are pinned as tests so they
+stay deliberate:
+
+An active lien need not have been disbursed. Recording and funding are separate permissionless
+calls, and an under-capitalised pool leaves active, unfunded liens indefinitely.
+
+A disbursed lien need not still be active. The funding record is never cleared, which is what
+makes an audit possible a year later.
+
+The fuzzy lookup is not an argmax over every active lien. It runs over liens reachable through
+the three indexed positions — a claim agreeing only on the amount bucket, which is scored but
+never indexed, returns nothing at all. The frozen interface's own wording overstates it, and the
+wording is what changes.
+
+A shareholder cannot always redeem. An advance can take idle liquidity to exactly zero, and that
+is a legitimate state of a lending vault rather than a failure of one.
+
+The write-down window is not harmless, and the test emits the number rather than an adjective.
+Measured on one advance of 250.000000 USDC against a single shareholder: redeeming between the
+default landing and anyone calling for the loss avoids the entire 250.000000, paid by whoever
+stays. Nothing closes that window without a privileged keeper, which is what this system promises
+not to have.
+
+--- what 100% branch coverage does not mean ------------------------------------
+
+| File                          | % Lines          | % Statements     | % Branches      | % Funcs         |
+| src/CaplaneEscrow.sol         | 100.00% (42/42)  | 100.00% (51/51)  | 100.00% (10/10) | 100.00% (6/6)   |
+| src/CaplaneInbox.sol          | 100.00% (11/11)  | 100.00% (12/12)  | 100.00% (3/3)   | 100.00% (3/3)   |
+| src/CaplanePool.sol           | 100.00% (46/46)  | 100.00% (56/56)  | 100.00% (9/9)   | 100.00% (11/11) |
+| src/CaplaneRegistry.sol       | 100.00% (75/75)  | 100.00% (97/97)  | 100.00% (24/24) | 100.00% (11/11) |
+| src/libraries/ReportCodec.sol | 100.00% (4/4)    | 100.00% (3/3)    | 100.00% (0/0)   | 100.00% (1/1)   |
+| Total                         | 93.19% (178/191) | 92.02% (219/238) | 100.00% (46/46) | 94.12% (32/34)  |
+
+An `if` with no `else` counts as one branch, not two — only the body. Deleting the two tests for
+a short metadata header takes the registry from 100.00% (24/24) to 95.83% (23/24), so that one
+does have coverage pressure behind it.
+
+A compound condition counts as one branch however many operands it has. The tie-break that makes
+the fuzzy lookup deterministic across nodes is one entry, so deleting its test leaves the number
+at exactly 100.00% (24/24) — verified. The property that matters most about the index has no
+coverage pressure behind it at all, and that is why it has its own named test.
+
+Solidity's generated checks — loop bounds, `unchecked` blocks, the casts to uint8, uint64, uint96
+and uint248, arithmetic overflow — are not counted, so the denominator is smaller than the code.
+
+And the number depends on how it is measured. Under `--ir-minimum` the same code and the same
+tests read 97.33% of lines on the registry instead of 100%. The flag is never used here; it is
+not needed, because nothing that compiles under `build` fails under `coverage`.

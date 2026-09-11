@@ -30,7 +30,7 @@ jobs:
     # the test run, the not-empty guard and the gas gate — and three copies of it drifting
     # apart is how one of them ends up running a suite without the credentials it needs.
     env:
-      NETWORKED: "ChainConformance|PoolTest|PoolInvariantsTest|EscrowTest"
+      NETWORKED: "ChainConformance|PoolTest|EscrowTest|MoneyInvariantsTest|FalsifiedTest"
     steps:
       - uses: actions/checkout@v4
       # NEVER foundry-rs/foundry-toolchain here. Circle's own README: it installs upstream
@@ -279,7 +279,7 @@ jobs:
           FOUNDRY_PROFILE: ci
           ARC_TESTNET_RPC_URL: "${{ secrets.ARC_TESTNET_RPC_URL }}"
           ARC_FORK_BLOCK: "${{ vars.ARC_FORK_BLOCK }}"
-        run: arc-forge test --match-contract "PoolTest|PoolInvariants|EscrowTest" -vvv
+        run: arc-forge test --match-contract "PoolTest|EscrowTest|MoneyInvariantsTest|FalsifiedTest" -vvv
       - name: Gas has not regressed on the forked suites
         working-directory: contracts
         env:
@@ -289,6 +289,28 @@ jobs:
         run: >-
           arc-forge snapshot --isolate --check --tolerance 2 --snap .gas-snapshot.fork
           --match-contract "PoolTest|EscrowTest"
+      # Coverage needs the fork, so it belongs here. The invariant suites are excluded because
+      # `coverage` runs them in full — thousands of sequenced calls inside a command that only
+      # wanted to count branches — and never with --ir-minimum, which lowers the numbers by
+      # itself: the registry reads 97.33% under it against 100% without, same code, same tests.
+      - name: Branch coverage on the contracts
+        working-directory: contracts
+        env:
+          FOUNDRY_PROFILE: ci
+          ARC_TESTNET_RPC_URL: "${{ secrets.ARC_TESTNET_RPC_URL }}"
+        run: >-
+          arc-forge coverage --report summary --exclude-tests
+          --no-match-contract "RegistryInvariants|MoneyInvariants" | tee /tmp/coverage.txt
+      - name: Refuse anything under 100% on src/
+        working-directory: contracts
+        run: |
+          awk -F'|' '/src\/Caplane|src\/libraries/ {
+            for (i = 3; i <= 5; i++) { gsub(/ /, "", $i) }
+            if ($3 !~ /^100\.00%/ || $4 !~ /^100\.00%/ || $5 !~ /^100\.00%/) {
+              gsub(/ /, "", $2); print "::error::uncovered in " $2 ": " $3 " " $4 " " $5; bad = 1
+            }
+            seen = 1
+          } END { if (!seen) { print "::error::the coverage table named no contract at all"; exit 1 } exit bad }' /tmp/coverage.txt
 
   clean-clone:
     runs-on: ubuntu-latest
