@@ -384,6 +384,43 @@ export const registryReadsChainOnly = (s: Snapshot): Finding[] =>
       detail: "the public registry must read the chain, never the backend — it has to survive the backend being switched off",
     }));
 
+
+/**
+ * JavaScript the enclave cannot run, or runs differently.
+ *
+ * The SDK's own validator already refuses what throws loudly — node:crypto, fetch, setTimeout.
+ * This covers what it does not: `Intl` is absent from the enclave and absent from the
+ * validator, so it typechecks, compiles and throws where there is no stack to read; and the
+ * locale-aware methods exist in both runtimes and return different bytes, which is worse
+ * because nothing fails at all.
+ *
+ * Scoped to what is vendored into WASM. The lender SDK and the browser surfaces run where
+ * `Intl` is correct and wanted.
+ */
+const VENDORED_INTO_WASM = /^(claim|caplane-workflow)\//;
+
+const ENCLAVE_UNSAFE: Array<[RegExp, string]> = [
+  [/\bIntl\b/, "Intl does not exist in the enclave, and neither the SDK's types nor its build validator catch it"],
+  [/\.toLocale(Upper|Lower)Case\b/, "locale-blind in the enclave: use toUpperCase, or the commitment diverges with no error"],
+  [/\.toLocaleString\b/, "formats differently in the two runtimes"],
+  // The trailing guard rejects both an identifier and a quote: without the quote, a path
+  // ending in `/v` inside an import reads as a flag list.
+  [/\/[gimsuyd]*v[gimsuyd]*(?![\w$'"`])/, "the RegExp v flag throws in the enclave: use u"],
+  [/new RegExp\([^)]*["'][gimsuyd]*v[gimsuyd]*["']\s*\)/, "the RegExp v flag throws in the enclave: use u"],
+];
+
+export const enclaveSafeJavaScript = (s: Snapshot): Finding[] =>
+  s.files
+    .filter(isScannable)
+    .filter((f) => VENDORED_INTO_WASM.test(f.path))
+    .flatMap((f) =>
+      ENCLAVE_UNSAFE.filter(([pattern]) => pattern.test(f.content)).map(([, detail]) => ({
+        rule: "enclave-safe-javascript",
+        where: f.path,
+        detail,
+      })),
+    );
+
 export const ALL_RULES = [
   noMockDependencies,
   noMockCallSites,
@@ -399,4 +436,5 @@ export const ALL_RULES = [
   secretNamesAreRegistered,
   brandInvariants,
   registryReadsChainOnly,
+  enclaveSafeJavaScript,
 ];

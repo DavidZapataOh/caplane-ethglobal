@@ -1,0 +1,43 @@
+The enclave runtime, established by execution rather than by reading, 2026-09-10.
+
+  engine   Javy 8.1.0 embedding QuickJS (rquickjs-core 0.11.0)
+  not      Node. The CRE SDK's own README: "compiled to WASM and executed through
+           Javy (QuickJS). This is not a full Node.js runtime."
+
+Verified by compiling a probe with `javy build`, running it under WASI, running the identical
+probe under Node, and comparing output byte for byte.
+
+  SAFE      normalize('NFC'|'NFD'|'NFKC'|'NFKD')   full Unicode tables present in the plugin
+  SAFE      toUpperCase / toLowerCase              "straße" -> "STRASSE" in both
+  SAFE      RegExp \p{L} \p{N} with the u flag
+  SAFE      BigInt, Number.parseInt, padStart, replaceAll, TextEncoder
+  UNSAFE    Intl                                   typeof Intl === "undefined" in the enclave
+  UNSAFE    toLocaleUpperCase / toLocaleLowerCase  present but locale-blind:
+                                                   "istanbul" -> ISTANBUL here, İSTANBUL in Node
+  UNSAFE    toLocaleString                         "1234.5" here, "1,234.5" in Node
+  UNSAFE    RegExp v flag                          throws here, works in Node
+  UNSAFE    structuredClone, globalThis.crypto     undefined
+  WARNED    Date, Math.random                      flagged by the determinism validator
+
+The dangerous half of that list is Intl. It is not in the SDK's restricted-API types and the
+build validator does not catch it, so it typechecks, compiles, and throws inside a confidential
+workflow where there is no stack to read. toLocaleUpperCase is worse: it does not throw at all,
+it returns different bytes.
+
+--- the hash library ---------------------------------------------------------
+
+  @noble/hashes 1.8.0  esm/utils.js:12 imports '@noble/hashes/crypto', whose export map
+                       resolves to ./esm/cryptoNode.js under the "node" condition, which
+                       imports node:crypto. The hash code is pure; the static import is not,
+                       and it sits on the module graph of sha3.js.
+  @noble/hashes 2.2.0  no node: import anywhere in the package, verified by grep over every
+                       .js/.mjs/.json it ships. No esm/ directory at all — the layout changed,
+                       so a check written against esm/*.js errors rather than passing empty.
+                       This is the version the CRE SDK already compiles to WASM.
+
+--- making typecheck able to see the tests ------------------------------------
+
+tsconfig.json includes **/*.ts, so test files enter the tsc program, and bun:test has no
+ambient types. Before: error TS2307: Cannot find module 'bun:test'. @types/bun is now a
+devDependency and "types": ["bun"] is declared. Installed with npm, not bun: the lockfile is
+what CI reads, and `npm ci` is green.

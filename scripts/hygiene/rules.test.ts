@@ -2,6 +2,7 @@ import { test, expect } from "bun:test";
 import type { Snapshot } from "./scan";
 import {
   brandInvariants,
+  enclaveSafeJavaScript,
   registryReadsChainOnly,
   noMockDependencies,
   noMockCallSites,
@@ -218,7 +219,7 @@ test("flags a workflow directory still named my-workflow", () => {
 });
 
 test("every rule is registered in ALL_RULES", () => {
-  expect(ALL_RULES).toHaveLength(14);
+  expect(ALL_RULES).toHaveLength(15);
 });
 
 test("does not flag the rule engine's own definitions and fixtures", () => {
@@ -387,4 +388,56 @@ test("the rule follows the registry wherever its route lives", () => {
     files: [{ path: "web/app/registry/lookup.ts", content: "const base = process.env.NEXT_PUBLIC_API_URL" }],
   });
   expect(registryReadsChainOnly(s)).toHaveLength(1);
+});
+
+// Intl is not in the SDK's restricted-API types and its build validator does not catch it, so
+// code using it typechecks, compiles, and throws inside the enclave. toLocaleUpperCase is
+// worse: it does not throw, it returns different bytes.
+
+test("flags Intl in code that runs inside the enclave", () => {
+  const s = snap({ files: [{ path: "claim/canonical.ts", content: "new Intl.NumberFormat()" }] });
+  expect(enclaveSafeJavaScript(s)).toHaveLength(1);
+});
+
+test("flags a locale-aware case fold, which diverges silently rather than throwing", () => {
+  const s = snap({ files: [{ path: "claim/canonical.ts", content: "x.toLocaleUpperCase()" }] });
+  expect(enclaveSafeJavaScript(s)[0]!.detail).toContain("toUpperCase");
+});
+
+test("flags a v-flag literal", () => {
+  const s = snap({ files: [{ path: "claim/canonical.ts", content: "const r = /[\\p{L}]/v" }] });
+  expect(enclaveSafeJavaScript(s)).toHaveLength(1);
+});
+
+// The constructor form is what the SDK's own documentation uses as its example, so a rule that
+// only read literals would miss the case that put it here.
+test("flags the v flag passed to the RegExp constructor", () => {
+  const s = snap({ files: [{ path: "claim/canonical.ts", content: 'new RegExp("[a]", "v")' }] });
+  expect(enclaveSafeJavaScript(s)).toHaveLength(1);
+});
+
+test("does not flag division that looks like a regular expression", () => {
+  const s = snap({ files: [{ path: "claim/canonical.ts", content: "const r = total/rate/volume;" }] });
+  expect(enclaveSafeJavaScript(s)).toEqual([]);
+});
+
+// A path ending in /v inside an import reads as a flag list unless the guard rejects quotes.
+test("does not flag an import path that ends in a letter that is also a flag", () => {
+  const s = snap({ files: [{ path: "claim/canonical.ts", content: "import x from '../evidence/v'" }] });
+  expect(enclaveSafeJavaScript(s)).toEqual([]);
+});
+
+test("does not flag Intl in a browser surface", () => {
+  const s = snap({ files: [{ path: "web/app/page.tsx", content: "new Intl.NumberFormat()" }] });
+  expect(enclaveSafeJavaScript(s)).toEqual([]);
+});
+
+test("does not flag the lender SDK, which runs in Node and browsers", () => {
+  const s = snap({ files: [{ path: "sdk/index.ts", content: "new Intl.NumberFormat()" }] });
+  expect(enclaveSafeJavaScript(s)).toEqual([]);
+});
+
+test("does not flag plain toUpperCase", () => {
+  const s = snap({ files: [{ path: "claim/canonical.ts", content: "x.toUpperCase()" }] });
+  expect(enclaveSafeJavaScript(s)).toEqual([]);
 });

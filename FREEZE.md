@@ -93,8 +93,19 @@ With no id to pin, the graph has no cycle:
 
 Never rename the workflow after step 1: the name is immutable in the contract.
 
+## Component count and order
+
+`N` is 7 — the seven components of the claim schema. `k` and the nearness predicate stay open.
+The interface does not constrain `N`: `componentCommitments` is a dynamic array and `matchesOf`
+takes a variable-length one. What does constrain it is the golden vector and its test, which
+must be regenerated together with any change.
+
+The component *order* cannot change at all once a lien exists. The index is inside every
+commitment preimage and the pepper does not rotate, so there is no reindex: appending an eighth
+component is possible, inserting or reordering is not.
+
 ## Not frozen
 
-Storage slot layout · `k`, `N` and the nearness predicate · underwriting thresholds ·
+Storage slot layout · `k` and the nearness predicate · underwriting thresholds ·
 deployed addresses and the workflow id · the enclave public key · ERC-4626 share math ·
 Privy policy contents · the indexer's schema · human-readable rejection copy.

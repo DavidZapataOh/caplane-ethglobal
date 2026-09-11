@@ -1,0 +1,22 @@
+Component agreement against the canonical claim, seven components.
+
+Three of the seven — currency, issuerTaxId, country — are properties of the
+ledger, so any two claims from this book agree on them before anything about
+the debt is compared. Three is the floor, not zero.
+
+7/7  must match      invoice number with a separator
+      differs on: none
+6/7  must match      invoice number without its prefix
+      differs on: invoiceNumber
+7/7  must match      tax id without separators
+      differs on: none
+7/7  must match      amount written with a decimal separator
+      differs on: none
+7/7  must match      due date in day-first format
+      differs on: none
+7/7  must match      lowercase country
+      differs on: none
+3/7  MUST NOT match  a second real invoice: different debtor, number, amount bucket and due date
+      differs on: debtorTaxId, invoiceNumber, amountBucket, dueDate
+
+The gap between 6 and 3 is the room a threshold has to live in.

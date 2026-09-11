@@ -1,0 +1,51 @@
+/**
+ * The seven components of a claim, in the order their index takes inside the commitment
+ * preimage. The index is hashed and the pepper that salts it never rotates, so this order
+ * cannot be rearranged once a lien exists: appending an eighth is safe, inserting one is a
+ * reindex nobody can perform.
+ *
+ * Six are read from the claim document. `issuerTaxId` is not — it comes from the organisation
+ * making the submission, which the enclave already knows from the credential it used to read
+ * the ledger. That is why it has no value in the seeded corpus.
+ */
+export const COMPONENT_ORDER = [
+  'debtorTaxId',
+  'invoiceNumber',
+  'amountBucket',
+  'dueDate',
+  'currency',
+  'issuerTaxId',
+  'country',
+] as const
+
+export type ComponentName = (typeof COMPONENT_ORDER)[number]
+
+/**
+ * Properties of the ledger rather than of the claim: every claim from one organisation carries
+ * the same three. Two unrelated invoices from one book therefore agree on three components
+ * before anything about the debt is compared.
+ */
+export const LEDGER_CONSTANT = ['currency', 'issuerTaxId', 'country'] as const
+
+/** Raw, as submitted. Every field is a string: this is what arrives over the wire. */
+export type ClaimInput = {
+  debtorTaxId: string
+  invoiceNumber: string
+  amountMinor: string
+  currency: string
+  dueDate: string
+  issuerTaxId: string
+  country: string
+}
+
+/** Canonical text, one entry per component, ready to be hashed. */
+export type ClaimComponents = Record<ComponentName, string>
+
+export class ClaimError extends Error {
+  constructor(
+    readonly component: ComponentName,
+    readonly reason: string,
+  ) {
+    super(`${component}: ${reason}`)
+  }
+}
