@@ -14,14 +14,13 @@ await liensOf(client, borrower)
 
 ## Install
 
-There is no npm publication: no organisation, no token, no release flow. A git dependency does not
-work either, because this package lives in a subdirectory and a git dep installs the repository
-root. What works is a file dependency, the way the other packages here consume each other, or a
-tarball:
+```
+npm install @caplane/sdk
+```
 
-```
-npm install ../sdk          # or: npm pack && npm install ./caplane-sdk-0.1.0.tgz
-```
+A git dependency does not work — this package lives in a subdirectory and a git dep installs the
+repository root — so the alternatives, if you would rather not take it from the registry, are a
+file dependency (`npm install ../sdk` from inside a checkout) or a tarball (`npm pack`).
 
 ## What this proves
 

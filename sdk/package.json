@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "type": "module",
   "license": "MIT",
-  "description": "Read the Caplane lien registry on Arc Testnet",
+  "description": "Read the Caplane lien registry on Arc Testnet from your own machine, against your own endpoint",
   "main": "./dist/src/index.js",
   "types": "./dist/src/index.d.ts",
   "exports": {
@@ -24,7 +24,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
-    "test": "npm run build && node --test --test-concurrency=1 dist/src/*.test.js"
+    "test": "npm run build && node --test --test-concurrency=1 dist/src/*.test.js",
+    "prepublishOnly": "npm run build"
   },
   "dependencies": {
     "viem": "2.34.0"
@@ -32,5 +33,27 @@
   "devDependencies": {
     "@types/node": "22.19.1",
     "typescript": "5.9.3"
+  },
+  "keywords": [
+    "caplane",
+    "lien",
+    "registry",
+    "arc",
+    "arc-testnet",
+    "receivables",
+    "viem",
+    "onchain"
+  ],
+  "homepage": "https://github.com/DavidZapataOh/caplane-ethglobal/tree/main/caplane/sdk#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DavidZapataOh/caplane-ethglobal.git",
+    "directory": "caplane/sdk"
+  },
+  "bugs": {
+    "url": "https://github.com/DavidZapataOh/caplane-ethglobal/issues"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
