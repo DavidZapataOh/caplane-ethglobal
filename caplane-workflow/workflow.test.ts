@@ -66,12 +66,16 @@ test('accepts the deployed inbox', () => {
 test('both config files carry the same shape and no dead keys', async () => {
 	const production = await Bun.file('./config.production.json').json()
 	expect(Object.keys(STAGING).sort()).toEqual([
+		'advanceRateBps',
+		'feeRateBps',
+		'graceSeconds',
 		'inboxAddress',
 		'ledgerApiBase',
 		'ledgerTenantId',
 		'ledgerTokenUrl',
 		'registryAddress',
 		'rpcUrl',
+		'settlementBaseUsdc6',
 		'watchlistUrl',
 	])
 	expect(Object.keys(production).sort()).toEqual(Object.keys(STAGING).sort())
@@ -153,7 +157,7 @@ test('the handler returns facts about the body, never the body', () => {
 	// Seven became eight when the collision verdict joined. Pinned, because the return value is
 	// the widest channel out of the enclave that does not look like one.
 	// Eight became nine when the debtor confirmation joined.
-	expect(returned.match(/\$\{/g) ?? []).toHaveLength(9)
+	expect(returned.match(/\$\{/g) ?? []).toHaveLength(10)
 	expect(returned).toContain('collision.status')
 	expect(returned).toContain('confirmed')
 	// The signature is the debtor's and it stays sealed; only the verdict crosses.
@@ -172,11 +176,33 @@ test('the registry is asked whenever the envelope opened', () => {
 	expect(source).toMatch(/submitted\s*\n?\s*\?\s*readRegistry/)
 })
 
-// Anything logged leaves the enclave by Chainlink's own definition, and the ledger response is
-// the single most sensitive object the handler ever holds.
+const enclaveSources = () =>
+	readdirSync('.')
+		.filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))
+		.map((f) => readFileSync(f, 'utf8'))
+		.join('\n')
+
+// Anything logged leaves the enclave by Chainlink's own definition, and the ledger response is the
+// single most sensitive object the handler ever holds. Swept rather than listed: the hand-written
+// list named two files and three enclave modules have appeared since, the newest of them being
+// exactly where someone would put a trace to see what is being signed.
 test('the enclave never logs', () => {
-	const source = readFileSync('./workflow.ts', 'utf8') + readFileSync('./verify.ts', 'utf8')
-	expect(source).not.toMatch(/runtime\.log\(|console\./)
+	expect(enclaveSources()).not.toMatch(/runtime\.log\(|console\./)
+})
+
+// The door is not a filter: what crosses is exactly what the payload carries. One crossing, one
+// report, both pinned across the whole package — a second one anywhere is how confidentiality ends
+// with nothing failing.
+test('the enclave crosses the door exactly once', () => {
+	const sources = enclaveSources()
+	expect(sources.match(/usingTheDons\(\)/g) ?? []).toHaveLength(1)
+	expect(sources.match(/\.report\(/g) ?? []).toHaveLength(1)
+})
+
+// The borrower is the address the chain says submitted, never one the plaintext asserts. This is
+// the guard that stops a copyist's relay from landing a lien on the victim's receivable.
+test('a record never names a borrower the event did not', () => {
+	expect(readFileSync('./workflow.ts', 'utf8')).toMatch(/borrower:\s*claim\.submitter/)
 })
 
 // Four calls cost the ledger a token exchange and two queries, plus one to the registry. A claim
@@ -189,4 +215,23 @@ test('an unauthorized submission reaches no external service', () => {
 	expect(guards).toHaveLength(2)
 	expect(new Set(guards.map((g) => g[1])).size).toBe(1)
 	expect(source).toMatch(/const submitted = authorized \?/)
+})
+
+// The underwriting policy is configuration, not a secret. The ring sits exactly at the documented
+// ceiling of five and a published policy buys no confidentiality — the same call the collision
+// threshold makes, where publishing it is what makes the measured rate checkable.
+test('the policy is readable and numeric', () => {
+	for (const key of ['advanceRateBps', 'feeRateBps', 'settlementBaseUsdc6', 'graceSeconds']) {
+		expect(STAGING[key]).toMatch(/^[0-9]+$/)
+	}
+	expect(Number(STAGING.advanceRateBps)).toBeLessThanOrEqual(10_000)
+	expect(Number(STAGING.feeRateBps)).toBeLessThanOrEqual(10_000)
+})
+
+// The pool holds sixteen USDC. An advance it cannot fund reverts inside SafeERC20 with no named
+// error, so base times rate has to stay under what is actually there.
+test('the configured advance fits what the pool holds', () => {
+	const advance =
+		(BigInt(STAGING.settlementBaseUsdc6) * BigInt(STAGING.advanceRateBps)) / 10_000n
+	expect(advance).toBeLessThanOrEqual(16_000_000n)
 })

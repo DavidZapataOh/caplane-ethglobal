@@ -5,6 +5,10 @@ import { CHAIN } from './abi/frozen'
 import type { Config } from './config'
 import { blockNumberOf, confirmationBinds, recoverConfirmer } from './attestation'
 import { open } from './envelope'
+import { lienIdOf } from '../claim/commit'
+import { toComponents } from '../claim/index'
+import { ClaimType, RejectReason, ReportKind } from './abi/frozen'
+import { encodeReportBody, nonceFor, reportPayload, underwrite } from './report'
 import { decodeClaim } from './ledger'
 import { readRegistry, verdictOf } from './registry'
 import { UNVERIFIED, verifyExternally } from './verify'
@@ -69,8 +73,8 @@ export const decodeClaimSubmitted = (log: {
 
 /**
  * Runs inside the enclave. It reads nothing off chain: every EVM method on this SDK takes the
- * ordinary runtime, so a read would mean `usingTheDons()`, which routes the request out of the
- * enclave. Its three outbound calls go out under the TEE runtime instead.
+ * ordinary runtime, so a read would route the request out of the enclave. Its four outbound calls
+ * go out under the TEE runtime instead. The one deliberate crossing is the report, at the end.
  *
  * No logging. The CLI states that for a TEE trigger user logs are not visible and do not leave
  * the TEE, and a deployed execution returned `No logs found` — so a handler that leaned on them
@@ -137,7 +141,49 @@ export const onClaimSubmitted = (runtime: TeeRuntime<Config>, log: EVMLog): stri
 	// length used to be in it: that was safe while nothing confidential distinguished one claim
 	// from another, and stopped being safe the moment the ledger's answer did. A length is the
 	// body too — it tells one invoice from another — so it is gone and the verdicts replace it.
-	return `${claim.submissionId} ${claim.submitter} ${authorized} ${verified.exists} ${verified.unpaid} ${verified.matches} ${verified.screened} ${collision.status} ${confirmed}`
+	const decision = underwrite(
+		{
+			authorized,
+			confirmed,
+			verified,
+			collision,
+			dueDate: submitted?.dueDate ?? '1970-01-01',
+		},
+		config,
+	)
+
+	const body = {
+		kind: decision.kind,
+		chainSelector: CHAIN.arcTestnet.chainSelector,
+		nonce: nonceFor(claim.submissionId, decision.kind),
+		lienId:
+			submitted === undefined
+				? (`0x${'00'.repeat(32)}` as Hex)
+				: lienIdOf(ClaimType.Invoice, toComponents(submitted)),
+		submissionId: claim.submissionId,
+		// The chain's word, never the plaintext's. This is the custody guard: a copyist relaying
+		// somebody else's ciphertext would land the lien on their own address, not the victim's.
+		borrower: claim.submitter,
+		advanceUsdc6: decision.kind === ReportKind.Record ? decision.advanceUsdc6 : 0n,
+		// On a Reject this field carries the reason. Not a shortcut: the frozen schema has no field
+		// for one and the registry reads it here, which is why every reason is checked to fit a
+		// uint8 before it can be chosen.
+		rateBps: decision.kind === ReportKind.Record ? decision.rateBps : decision.reason,
+		expiresAt: decision.kind === ReportKind.Record ? decision.expiresAt : 0n,
+		componentCommitments: decision.kind === ReportKind.Record ? registryRead.commitments : [],
+	}
+
+	// The single crossing. Nothing the enclave read goes through it — ten derived fields, and the
+	// commitments are peppered hashes whose pepper stays behind. The door is not a filter: it
+	// carries exactly what the payload carries, which is why this is pinned by a test rather than
+	// asserted in a comment.
+	const donRuntime = runtime.usingTheDons()
+	const report = donRuntime.report(reportPayload(body)).result()
+	new cre.capabilities.EVMClient(CHAIN.arcTestnet.chainSelector)
+		.writeReport(donRuntime, { receiver: config.registryAddress as Hex, report })
+		.result()
+
+	return `${claim.submissionId} ${claim.submitter} ${authorized} ${verified.exists} ${verified.unpaid} ${verified.matches} ${verified.screened} ${collision.status} ${confirmed} ${decision.kind}`
 }
 
 export function initWorkflow(config: Config) {

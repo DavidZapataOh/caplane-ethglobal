@@ -1,0 +1,131 @@
+The enclave decides, encodes ten fields, and crosses the door once.
+
+  binary hash   0b1f29887f50b5bf80e364e566baef2097c9247c74fbd9fcb7b6e87cc7e1098f
+  registry      0xf2de8798750ea3bcb0faca049fc7581a118ef1f6
+
+
+--- the decision, and the six facts that produced it ------------------------------
+
+Two real submissions already on chain, run through the whole handler:
+
+  0x6d004376…61b3   authorized ✓ exists ✓ unpaid ✓ matches ✓ screened ✓ clear ✓ confirmed ✓
+                    → kind 1, Record
+
+  0x6b42da69…caab   the same six, and confirmed ✗ — the debtor named a third party as creditor
+                    → kind 4, Reject, reason 2 (DebtorUnconfirmed)
+
+The tenth field of the return value is the decision. Everything upstream of it is unchanged, which
+is what makes the difference attributable to the one fact that moved.
+
+`undecidable` never approves. A registry that could not answer and a registry that said no are not
+the same thing, but neither of them records — collapsing the first into "clear" is how a debtor
+with too many liens becomes the easiest one to double-pledge.
+
+
+--- two implementations, one committed vector --------------------------------------
+
+The Solidity tests that already existed encode in Solidity and decode in Solidity. They cannot
+catch a TypeScript encoder that drifts from the schema, and a drifted encoder does not error — it
+produces bytes the registry decodes into a *different lien*.
+
+So the vector is emitted once from Solidity, committed to `claim/fixtures/report.json`, and the
+TypeScript encoder is checked against it byte for byte:
+
+  record body    576 B    budget 5,011 B    11.5%
+  reject body    352 B
+
+Then the same bytes are sent back the other way — through the forwarder, into the real registry:
+
+  test_Registry_RecordsFromTheEncodersOwnBytes       LienRecorded(0x11e, 0xb0110e1, 1799000000)
+  test_Registry_RejectsWithTheReasonTheEncoderChose  SubmissionRejected(0x5ab, 6)
+
+The reject arm carries its own nonce. The registry marks a nonce used *before* it looks at the
+kind, so reusing the record's body reverts as a replay instead of rejecting — this plan's own
+lesson, applied to its own fixture.
+
+Integers travel through the fixture as strings. `chainSelector` is 3,034,092,155,422,581,607, past
+`Number.MAX_SAFE_INTEGER`: `JSON.parse` rounds it to 3,034,092,155,422,582,000 and the encoder
+would produce a different body without complaining.
+
+
+--- the budget was left unmeasured by the plan, and it is measurable ---------------
+
+The plan said to declare it unmeasured — that the SDK has no size guard and the simulator was not
+known to apply one. It does apply one, and the ablation says something more useful than pass/fail:
+
+  --limits with ChainWrite.EVM.ReportSizeLimit = 500
+  ✗ [8]ResourceExhausted: EVM chain write report of 685 bytes exceeds the simulation limit of 500
+
+  cap 684 → refused        cap 685 → accepted
+
+685 against a 576-byte body. The difference is 109 bytes, and 109 is exactly the forwarder header
+the body budget is derived from: 5,120 − 109 = 5,011. That arithmetic was taken from the frozen
+interface; it is now confirmed from the other side, by the limiter itself, against a real body.
+
+So the number to check a body against is 5,011 — not 5,120, which is the raw limit before the
+header, and not 5,000, which is `LogTrigger.EventSizeLimit`, a different limit on a different
+object. `budgets.json` now carries all three and says which is which.
+
+
+--- the nonce, and what it does not protect ----------------------------------------
+
+`keccak256(submissionId ‖ kind)`. Derived, never drawn: the enclave has no entropy and two nodes
+disagreeing on a nonce is a report that never reaches consensus.
+
+The kind is in the preimage because the registry remembers every nonce for ever, and the same lien
+is later released or defaulted. Without that byte the second of those two reverts as a replay — and
+it would be discovered with the workflow already deployed.
+
+What it does not protect against: two copyists submitting the same claim get *different* submission
+ids, because the inbox derives one from `keccak(sender ‖ ciphertext)`. Both reports pass the replay
+guard, and the second reverts inside the registry with `AlreadyEncumbered`. A revert in `onReport`
+emits nothing — no event, no trace, nothing the second submitter can read. The in-enclave collision
+check closes that only once the first lien is mined.
+
+
+--- one crossing -------------------------------------------------------------------
+
+Exactly one `usingTheDons()` and one `.report(` in the whole package, pinned by a test that sweeps
+every non-test file in it rather than naming them. The hand-written list this replaced named two
+files; three enclave modules had appeared since, the newest of them the one where someone would put
+a trace to see what is being signed.
+
+The door is not a filter. Nothing in the SDK stops a payload carrying whatever it likes — what
+crosses is exactly what the encoder puts in it. Ten derived fields, and the commitments are
+peppered hashes whose pepper stays behind. That is why it is a test and not a claim.
+
+The borrower is `claim.submitter`, from the event topic, never from the plaintext. A copyist
+relaying somebody else's ciphertext lands the lien on their own address.
+
+
+--- what this does not prove -------------------------------------------------------
+
+**That a report lands.** The golden vector proves the bytes are the ones the contract decodes, and
+the test forwarder proves `onReport` accepts them. That the DON signs and the production forwarder
+transmits is only visible on deployment, and staging cannot exercise it: it carries a different
+workflow name on purpose, the registry checks that name, and there is no setter.
+
+**That the test fixture's identity is production's.** `RegistryFixture` deploys with its own
+workflow name. The interop test proves the registry accepts *these bytes*; that it accepts them
+under the deployed identity is a separate claim.
+
+
+--- the policy is chosen, not derived ----------------------------------------------
+
+80% advance and 2% fee come from no measurement. There is no default history, no pricing model and
+no data in this repository that could produce them, and there will not be. They are published in
+configuration precisely so that is visible — the same call the collision threshold makes. What the
+system demonstrates is the mechanism: that the decision happens inside the enclave and only the
+conclusion leaves. Not that the numbers are right.
+
+**There is no currency conversion anywhere in this system.** The invoice is in the ledger's
+currency and the pool settles in USDC. The advance is a fraction of a configured settlement base,
+never of the claim's own amount — assigning the claim's minor units into a six-decimal field would
+be a scale error of roughly 8,000× wearing the costume of a policy. The base is capped at what the
+pool actually holds: 16 USDC on chain, 10 configured, 8 advanced. Closing this properly needs one
+more HTTP call to a price source, which would be the sixth of a budget of five. A design
+constraint, not an oversight.
+
+**The fee is low for a mechanical reason.** `repay` credits the whole fee to total assets in one
+transaction, so anyone can deposit in the block before and take a proportional share without having
+carried the term. At demo size that is cents, but it is real and it scales with the fee.

@@ -5,7 +5,7 @@ import {ICaplaneInbox} from "../src/interfaces/ICaplaneInbox.sol";
 import {ICaplaneRegistry} from "../src/interfaces/ICaplaneRegistry.sol";
 import {ReportCodec} from "../src/libraries/ReportCodec.sol";
 import {MinimalReceiver} from "./receivers/MinimalReceiver.sol";
-import {Test} from "forge-std/Test.sol";
+import {Test, console2} from "forge-std/Test.sol";
 
 contract FrozenInterfaceTest is Test {
   function test_ReceiverInterfaceId_IsChainlinkIReceiver() public pure {
@@ -104,6 +104,30 @@ contract FrozenInterfaceTest is Test {
     uint256 before = gasleft();
     r.supportsInterface(0x805f2132);
     assertLt(before - gasleft(), 30_000);
+  }
+
+  /// @dev The vector is built here and asserted here, which proves Solidity against Solidity.
+  ///      Printing it is what lets a second implementation be checked against the same bytes.
+  function test_ReportCodec_EmitsTheGoldenVector() public pure {
+    console2.logBytes(_goldenVector());
+    console2.logBytes(_rejectVector());
+  }
+
+  /// @dev Its own nonce: the registry marks a nonce used before it looks at the kind, so a reject
+  ///      reusing the record's body reverts as a replay rather than rejecting.
+  function _rejectVector() private pure returns (bytes memory) {
+    return abi.encode(
+      uint8(4), // kind: Reject
+      uint64(3_034_092_155_422_581_607),
+      bytes32(uint256(0x000CF)), // nonce, distinct from the record's
+      bytes32(uint256(0x11E)),
+      bytes32(uint256(0x5AB)),
+      address(uint160(0xB0110E1)),
+      uint128(0),
+      uint32(6), // rateBps carries the reason for a Reject: UnauthorizedSubmitter
+      uint64(0),
+      new bytes32[](0)
+    );
   }
 
   function _goldenVector() private pure returns (bytes memory) {

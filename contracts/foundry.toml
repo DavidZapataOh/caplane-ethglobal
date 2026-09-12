@@ -18,6 +18,10 @@ optimizer_runs = 200
 # against this repo, without the network key, gets numbers far too small.
 evm_version = "prague"
 gas_reports = ["*"]
+# Read-only, one directory. The report interop test sends the same committed bytes the TypeScript
+# encoder is checked against, so both implementations are pinned to one vector rather than to each
+# other. Without this the cheatcode is sandboxed and the test cannot see the fixture.
+fs_permissions = [{ access = "read", path = "../claim/fixtures" }]
 
 [fmt]
 tab_width = 2

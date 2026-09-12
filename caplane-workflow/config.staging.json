@@ -5,5 +5,9 @@
   "ledgerTenantId": "e1218a28-7437-47ec-bfb5-252092825083",
   "watchlistUrl": "https://data.trade.gov/consolidated_screening_list/v1/search",
   "registryAddress": "0xf2de8798750ea3bcb0faca049fc7581a118ef1f6",
-  "rpcUrl": "https://rpc.testnet.arc.io"
+  "rpcUrl": "https://rpc.testnet.arc.io",
+  "advanceRateBps": "8000",
+  "feeRateBps": "200",
+  "settlementBaseUsdc6": "10000000",
+  "graceSeconds": "2592000"
 }

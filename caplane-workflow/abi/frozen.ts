@@ -21,6 +21,16 @@ export const RejectReason = {
   ComplianceHit: 3,
   SourceUnverified: 4,
   BelowThreshold: 5,
+  /**
+   * The sealed plaintext names the address entitled to submit, and the event names the address
+   * that paid. A relay of somebody else's ciphertext differs on those two, and until now there
+   * was no code for it — the rejection had nothing to say.
+   *
+   * Additive and TypeScript-only: the registry emits a `uint8` and there is no enum in Solidity,
+   * so nothing regenerates. But the three copies are checked byte for byte, so it is three edits
+   * or none.
+   */
+  UnauthorizedSubmitter: 6,
 } as const
 
 export const UNITS = {
