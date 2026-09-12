@@ -1,0 +1,73 @@
+The debtor-confirmation channel, end to end. Measured 2026-09-12.
+
+The acceptance is not a sent email: a service that accepted an address from the caller would send
+the same message and tie nothing. What the channel buys is that the link goes to an address only
+the ledger knows — a copyist cannot read their victim's ledger, so they never receive it. That, and
+not the signature, is what connects the signing key to the real debtor; the enclave cannot make
+that connection, because the ledger holds no chain address.
+
+--- 1. the credential, and what it cannot reach ------------------------------
+  scope asked for            accounting.contacts.read
+  GET /Invoices              401 AuthorizationUnsuccessful
+  GET /Contacts/{id}         200
+
+--- 2. the address, resolved and never accepted -----------------------------
+  resolved                   yes, 22 characters (withheld: personal data)
+  unknown contact            undefined
+
+--- 3. the link, minted with no store behind it -----------------------------
+  token length               482
+  carries an address         false
+  receipt                    _iMZaIaGH-yg5r3okA8P32cgsqpNOQmD
+  idempotency key            confirmation/ab1215dc887f996485b82480c120f25b
+
+--- 4. the real send ---------------------------------------------------------
+  accepted                   true id 0f45840a-7c29-4d74-a536-e015b61b794a
+  same key, same body        true id 0f45840a-7c29-4d74-a536-e015b61b794a (replayed, nothing sent)
+
+--- 5. the debtor signs, and the service verifies ---------------------------
+  shown to the debtor        creditor  invoiceNumber  currency  amountMinor  dueDate  expiresAtBlock
+  debtor                     0xBB8449f3eAf624AC83c08855aCb1aa77926ff704
+  signature                  0x8d82beeddd886fd651300f6a… (132 chars)
+  verified against the named true
+  verified against another   false
+
+--- what each line above is load-bearing for ---------------------------------
+
+`GET /Invoices 401` is why a ledger credential is allowed here at all. See 02-scope-isolation.txt,
+including what is not closed yet.
+
+`carries an address false` matters because the token travels in a URL that can be forwarded. The
+address is resolved per request and never put inside the link, and never accepted from the caller:
+a POST carrying `email`, `to`, `address`, `emailAddress` or `recipient` is refused with 400 before
+anything is resolved or sent. Negative control run — a service that took the caller's address fails
+that test and exits 1.
+
+`receipt` is what the submitter keeps. The response carries it and never the token, because handing
+the token back would let whoever asked open the link without receiving the mail — the same anchor
+defeated by another route.
+
+`same key, same body … replayed, nothing sent` is the idempotency contract, measured: the same key
+returns the same id and sends nothing. The key derives from the token rather than from the message,
+because the message is rebuilt each time and the same key with a changed body answers 409.
+
+`accepted true` is the strongest thing this transport can say. The credential is send-only — the
+read route answers 401 `restricted_api_key` — so delivery cannot be read back, and the module never
+uses the word. The one real message this domain sent before today landed in spam with DKIM, SPF and
+DMARC all published: that is reputation, not configuration, and a debtor who never sees the link
+never confirms. It is a limitation of the demonstration, not of the mechanism, and the rehearsal
+needs an out-of-band nudge.
+
+`verified against another false` is the check that makes the service worth having in the path at
+all: it verifies with the same structure the enclave will, so a channel fault is refused here
+instead of becoming a refusal on chain that costs gas and reads as the debtor saying no.
+
+--- what is not measured here ------------------------------------------------
+
+The signature above was produced with the demo debtor's key directly, not through the page. The
+page is built, both trees still prerender, and it walks the field list the service sends rather than
+naming fields — so screen and structure cannot drift. Driving it needs a browser with a wallet and
+a human, which belongs to the rehearsal.
+
+And the service is not deployed with these routes yet. The deployed configuration needs the two
+contacts credentials, `LINK_SIGNING_KEY`, and `NEXT_PUBLIC_API_URL` on the web project.

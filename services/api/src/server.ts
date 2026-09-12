@@ -1,10 +1,14 @@
 import { createServer } from 'node:http'
+import { type ConfirmDeps, routeConfirm } from './confirm.js'
 import type { Index } from './index-state.js'
 
-const CORS = {
+const CORS: Record<string, string> = {
   'access-control-allow-origin': '*',
-  'access-control-allow-methods': 'GET, OPTIONS',
-} as const
+  // POST is here for the confirmation channel only. The activity feed stays read-only and answers
+  // 405 to anything but GET.
+  'access-control-allow-methods': 'GET, POST, OPTIONS',
+  'access-control-allow-headers': 'content-type',
+}
 
 /** The snapshot carries the head and the cursor as bigint, and JSON.stringify throws on one. */
 const json = (value: unknown) =>
@@ -20,8 +24,11 @@ const json = (value: unknown) =>
  * There is deliberately no route that answers whether a right is taken. The threat model closes
  * registrar equivocation on the ground that no view is served by an operator, and a lookup here
  * would reopen it. That question is answered by reading the chain.
+ *
+ * The confirmation channel hangs off the same server because it is the same process: stopping this
+ * service stops both, which is written down where the outage is planned.
  */
-export const createApi = (index: Index) =>
+export const createApi = (index: Index, deps: ConfirmDeps = {}) =>
   createServer((request, response) => {
     if (request.method === 'OPTIONS') {
       response.writeHead(204, CORS)
@@ -42,6 +49,9 @@ export const createApi = (index: Index) =>
       // the answer can be redone without believing this service.
       return response.end(json({ source: 'chain', ...index.snapshot() }))
     }
-    response.writeHead(404, { 'content-type': 'text/plain', ...CORS })
-    response.end('not found')
+    void routeConfirm(request, response, CORS, deps).then((handled) => {
+      if (handled) return
+      response.writeHead(404, { 'content-type': 'text/plain', ...CORS })
+      response.end('not found')
+    })
   })

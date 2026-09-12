@@ -1,0 +1,37 @@
+The ledger credential on the platform, and what it cannot reach. Measured 2026-09-12.
+
+Why this file exists: every other ledger credential in this system lives in the vault, because a
+copy on a platform surface would hand a server of ours the ability to read the invoice — which is
+the gap this design describes as its advantage. The confirmation service needs a ledger read
+anyway, because the invoice response carries the contact's id and name and no address, so the
+channel cannot be operated from inside the enclave. What makes the exception defensible is scope.
+
+  scope requested            accounting.contacts.read
+  GET /api.xro/2.0/Invoices  401  AuthorizationUnsuccessful
+  GET /api.xro/2.0/Contacts  200
+  EmailAddress               present, non-empty
+  unknown contact            undefined, not an error
+
+Measured, not asserted. And measured the other way round too: asking the token endpoint for
+`accounting.transactions.read` answers `invalid_scope`, so the grant is narrow at the provider and
+not merely unused by this code.
+
+A hygiene rule holds the other half: `services-cannot-read-the-ledger-invoice` fails the build if
+anything under `services/` names the invoice scope. Negative control run — adding
+`accounting.invoices.read` to this service exits 1 with that rule named.
+
+--- the part that is not closed yet, and it is not a detail -------------------
+
+The two names the code reads, `LEDGER_CONTACTS_ID` and `LEDGER_CONTACTS_PASSPHRASE`, are meant to
+be a SEPARATE custom connection at the provider, granted contacts and nothing else. That connection
+does not exist yet; creating it is a manual action in the provider's portal.
+
+Everything above was measured with those two names pointed at the existing pair, in a shell
+environment only — nothing was written to a file. With that pair the isolation is a property of the
+TOKEN: a contacts-scoped token cannot read an invoice, which is what the 401 shows. It is not yet a
+property of the CREDENTIAL: the same pair could mint an invoices token if code asked it to, and what
+stops that is the hygiene rule rather than the provider.
+
+With the separate connection, the credential itself cannot reach an invoice and the rule becomes
+belt and braces. Until then the weaker claim is the true one, and this is where it is written down
+rather than left to be discovered.

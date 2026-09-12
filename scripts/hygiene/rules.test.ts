@@ -10,6 +10,7 @@ import {
   noLoopbackUrls,
   noTemplateMockServer,
   noSprintReferences,
+  servicesCannotReadTheLedgerInvoice,
   noPlanningVocabulary,
   noForbiddenCreIdentifiers,
   onlyApprovedTeeConstraint,
@@ -268,7 +269,7 @@ test("flags a workflow directory still named my-workflow", () => {
 });
 
 test("every rule is registered in ALL_RULES", () => {
-  expect(ALL_RULES).toHaveLength(18);
+  expect(ALL_RULES).toHaveLength(19);
 });
 
 test("does not flag the rule engine's own definitions and fixtures", () => {
@@ -583,4 +584,31 @@ test("sees secret ids declared in a constant, not just in a literal call", () =>
   const found = secretNamesAreRegistered(s);
   expect(found).toHaveLength(1);
   expect(found[0].detail).toContain("ENCLAVE_ENVELOPE_KEY");
+});
+
+// The invoice-reading credential is the enclave's. A service that asked for its scope would have
+// exactly the ability the design claims no server of ours has, so the ask is what gets checked.
+test("a service asking for the ledger's invoice scope is a finding", () => {
+  const found = servicesCannotReadTheLedgerInvoice(
+    snap({ files: [{ path: "services/api/src/ledger.ts", content: "scope=accounting.invoices.read" }] }),
+  );
+  expect(found).toHaveLength(1);
+  expect(found[0]!.detail).toContain("never read an invoice");
+});
+
+test("a service resolving a contact is not", () => {
+  expect(
+    servicesCannotReadTheLedgerInvoice(
+      snap({ files: [{ path: "services/api/src/ledger.ts", content: "scope=accounting.contacts.read" }] }),
+    ),
+  ).toEqual([]);
+});
+
+// The enclave is where that scope belongs, so the rule must not reach it.
+test("the workflow may ask for the invoice scope", () => {
+  expect(
+    servicesCannotReadTheLedgerInvoice(
+      snap({ files: [{ path: "caplane-workflow/verify.ts", content: "scope=accounting.invoices.read" }] }),
+    ),
+  ).toEqual([]);
 });

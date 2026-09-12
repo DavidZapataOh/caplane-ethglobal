@@ -1,11 +1,21 @@
 # Which credential belongs on which target
 
-The rule, stated once: **a credential the enclave consumes never appears on a platform
-variable surface.** Three of them are in that category, and putting them on Vercel or Railway
-would not be a hygiene slip — it would be a thesis failure. The accounting API and the
-screening list are queried *inside* the TEE precisely so that no server of ours can read the
-invoice. A copy of those credentials on a platform hands a server exactly that ability, which
-is the gap in the competing design we describe as our advantage.
+The rule, stated once: **a credential that can read the invoice never appears on a platform
+variable surface.**
+
+⚠️ That used to read "a credential the enclave consumes", and the confirmation service made the
+looser wording false: it needs a ledger read of its own, because the invoice response carries no
+address and the enclave therefore cannot operate the channel. What keeps the rule true as restated
+is scope — its connection is granted contacts and nothing else, and a token on that scope answers
+401 to the invoice route, measured. See `../api/02-scope-isolation.txt`, including the part that is
+not closed yet: the separate connection is a manual action at the provider and until it exists the
+isolation is a property of the token rather than of the credential.
+
+Three credentials are in the forbidden category, and putting them on Vercel or Railway would not be
+a hygiene slip — it would be a thesis failure. The accounting API and the screening list are queried
+*inside* the TEE precisely so that no server of ours can read the invoice. A copy of those
+credentials on a platform hands a server exactly that ability, which is the gap in the competing
+design we describe as our advantage.
 
 | Name | Vercel | Railway | Note |
 |---|---|---|---|
@@ -13,6 +23,9 @@ is the gap in the competing design we describe as our advantage.
 | `PRIVY_SERVER_CREDENTIAL` | `web` | — | |
 | `ARC_TESTNET_RPC_URL` | both | all three | A public endpoint, not a secret |
 | `NOTIFY_TRANSPORT_KEY` | — | `api` only | Debtor confirmation runs there |
+| `LINK_SIGNING_KEY` | — | `api` only | HMAC for the one-time confirmation link; no store behind it |
+| `LEDGER_CONTACTS_ID` · `LEDGER_CONTACTS_PASSPHRASE` | — | `api` only | **A separate connection, contacts scope only.** Measured: a token on that scope answers 401 to the invoice route |
+| `NEXT_PUBLIC_API_URL` | `web` | — | Where the browser reaches the confirmation service. Forbidden under the registry route by `registry-reads-chain-only` |
 | `HARNESS_SIGNER_SECRET` | — | `harness` only | See below |
 | `LEDGER_APP_ID` · `LEDGER_APP_PASSPHRASE` · `WATCHLIST_SUBSCRIPTION` | — | — | **Enclave credentials. Vault only** |
 | `CRE_ETH_PRIVATE_KEY` · `ARC_TESTNET_DEPLOYER_PRIVATE_KEY` | — | — | Local `.env` only |

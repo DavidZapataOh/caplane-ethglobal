@@ -40,7 +40,15 @@ That is a limitation of the demonstration, not of the mechanism, and it is decla
 $ GET https://api.resend.com/emails/<id>
   401 {"name":"restricted_api_key","message":"This API key is restricted to only send emails"}
 
-Deliberate. This credential is destined for the vault and therefore for the enclave, and an
-enclave that could read a mail history is a larger enclave than the one being argued for. The
-cost is that delivery state cannot be read back programmatically, which is why the delivery
-line above is a human confirmation.
+Deliberate, and the reasoning survives a correction to the destination.
+
+⚠️ This said the credential is "destined for the vault and therefore for the enclave". That was
+wrong by architecture, not by plan: the enclave does not operate this channel. It would spend the
+fifth HTTP call, and — the load-bearing half — it has no way to know which address to write to,
+because the invoice response carries the contact's id and name and no email. The channel runs
+outside, on the platform, which is where this credential belongs.
+
+What holds either way is that it should be send-only: whichever side carries it should not be able
+to read a mail history. The cost is that delivery state cannot be read back programmatically, which
+is why the delivery line above is a human confirmation, and why the service says `accepted` and
+never `delivered`.

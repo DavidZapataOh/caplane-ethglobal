@@ -509,6 +509,26 @@ export const noSecretThroughTheDoor = (s: Snapshot): Finding[] =>
       })),
   );
 
+/**
+ * A ledger credential is allowed on a platform surface only because its scope cannot reach an
+ * invoice — measured: a contacts-scoped token answers 401 to the invoice route. That is a property
+ * of what the code asks for, so it is checked where it is asked for.
+ *
+ * The invoice-reading credential belongs to the enclave, and a copy of it on a platform would hand
+ * a server of ours exactly the ability this design claims no server of ours has.
+ */
+const LEDGER_INVOICE_SCOPE = /accounting\.(invoices|transactions)\.read/;
+
+export const servicesCannotReadTheLedgerInvoice = (s: Snapshot): Finding[] =>
+  s.files
+    .filter(isFirstPartySource)
+    .filter((f) => f.path.startsWith("services/") && LEDGER_INVOICE_SCOPE.test(f.content))
+    .map((f) => ({
+      rule: "services-cannot-read-the-ledger-invoice",
+      where: f.path,
+      detail: "a platform service may resolve a contact, never read an invoice",
+    }));
+
 export const ALL_RULES = [
   noMockDependencies,
   noMockCallSites,
@@ -528,4 +548,5 @@ export const ALL_RULES = [
   contractsHaveNoGovernance,
   secretsAreReadOnce,
   noSecretThroughTheDoor,
+  servicesCannotReadTheLedgerInvoice,
 ];
