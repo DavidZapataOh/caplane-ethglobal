@@ -1,14 +1,11 @@
 import { type EVMLog, type TeeRuntime, cre, logTriggerConfig } from '@chainlink/cre-sdk'
 import { type Hex, bytesToHex, decodeEventLog, hexToBytes, toEventSelector } from 'viem'
-import { z } from 'zod'
 import { inboxAbi } from './abi'
 import { CHAIN } from './abi/frozen'
+import type { Config } from './config'
 import { open } from './envelope'
-
-export const configSchema = z.object({
-	inboxAddress: z.string().regex(/^0x[0-9a-fA-F]{40}$/),
-})
-type Config = z.infer<typeof configSchema>
+import { decodeClaim } from './ledger'
+import { UNVERIFIED, verifyExternally } from './verify'
 
 /**
  * The registration filters on this and on nothing else, so a wrong value produces a subscription
@@ -69,12 +66,13 @@ export const decodeClaimSubmitted = (log: {
 }
 
 /**
- * Runs inside the enclave. It reads nothing off chain and calls nobody: every EVM method on this
- * SDK takes the ordinary runtime, so a read would mean `usingTheDons()`, which routes the request
- * out of the enclave. Nothing here needs one.
+ * Runs inside the enclave. It reads nothing off chain: every EVM method on this SDK takes the
+ * ordinary runtime, so a read would mean `usingTheDons()`, which routes the request out of the
+ * enclave. Its three outbound calls go out under the TEE runtime instead.
  *
- * No logging. Log output is not visible for a TEE trigger, so a handler that leaned on it would
- * be debugging into a void — and anything that did escape would stop being confidential.
+ * No logging. The CLI states that for a TEE trigger user logs are not visible and do not leave
+ * the TEE, and a deployed execution returned `No logs found` — so a handler that leaned on them
+ * would be debugging into a void.
  */
 export const onClaimSubmitted = (runtime: TeeRuntime<Config>, log: EVMLog): string => {
 	const claim = decodeClaimSubmitted(log)
@@ -91,9 +89,18 @@ export const onClaimSubmitted = (runtime: TeeRuntime<Config>, log: EVMLog): stri
 	const authorized =
 		bytesToHex(opened.authorizedSubmitter).toLowerCase() === claim.submitter.toLowerCase()
 
-	// The length and a verdict, never the content: what this returns is the only thing that
-	// leaves, and returning the plaintext would turn the one-way door into a window.
-	return `${claim.submissionId} ${claim.submitter} ${opened.claim.length} ${authorized}`
+	// Three calls cost a token exchange and two queries. A claim whose sealer did not authorise
+	// this submitter is refused whatever the ledger says, so verifying it buys nothing and
+	// spends the quota the collision check still needs.
+	const verified = authorized
+		? verifyExternally(runtime, secrets, decodeClaim(opened.claim))
+		: UNVERIFIED
+
+	// Derived facts only. This return value is the one thing that crosses, and the plaintext's
+	// length used to be in it: that was safe while nothing confidential distinguished one claim
+	// from another, and stopped being safe the moment the ledger's answer did. A length is the
+	// body too — it tells one invoice from another — so it is gone and the verdicts replace it.
+	return `${claim.submissionId} ${claim.submitter} ${authorized} ${verified.exists} ${verified.unpaid} ${verified.matches} ${verified.screened}`
 }
 
 export function initWorkflow(config: Config) {

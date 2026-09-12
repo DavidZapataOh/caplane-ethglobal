@@ -1,0 +1,153 @@
+Three outbound calls from inside the enclave, and four booleans out.
+
+The claim under test is the sealed submission already on chain: tx
+0xb5c78ba8e089d3c7663f7b1eec034f4b3d094270e87379dab26c5232b54b4b88, whose plaintext is the seven
+submitted fields as JSON. The handler opens it, decodes it, and spends three HTTP calls against
+two live services.
+
+  binary hash   82168bced6310ff6a4dd2041a83676f5beb4396417298fea9d0121cec95fc6e6
+  config hash   25c82d50150aed8b5a1cdc6fd512c376353cce6ffa1a5aaca065a28f5020c785
+
+
+--- the three calls, in order --------------------------------------------------
+
+  1. POST identity.xero.com/connect/token      Basic, client_credentials, invoices.read
+  2. GET  api.xero.com/api.xro/2.0/Invoices    ?where=InvoiceNumber=="ORC1043", Bearer + tenant
+  3. GET  data.trade.gov/.../v1/search         ?name=<Contact.Name>&size=3, subscription key
+
+The second depends on the first, so they cannot be issued together. The tenant identifier is
+configuration, not a fourth call: resolving it at runtime would cost the margin the collision
+check needs.
+
+
+--- the result -----------------------------------------------------------------
+
+$ cre workflow simulate ./caplane-workflow --target staging-settings \
+    --evm-tx-hash 0xb5c7…4b88 --evm-event-index 0 --limits ../prod-limits.json \
+    --non-interactive --trigger-index 0
+
+"0x13afb97d…19574 0x86Ec9f04485Db066CF155353f15eef356Ae90253 true true true true true"
+
+  submissionId    already public in the log
+  submitter       already public in the log
+  authorized      the envelope's named submitter is the address that paid
+  exists          the ledger holds an invoice under the claimed number
+  unpaid          AUTHORISED, with a live balance
+  matches         amount, currency and due date agree with the claim
+  screened        the debtor's name returns no match on the watchlist
+
+Nothing else crosses. In particular the plaintext's length is gone: it was in the return value
+while nothing confidential distinguished one claim from another, and the ledger's answer changed
+that. A length is the body too.
+
+`matches` is the half that was missing. Without it the enclave attests that *an* invoice exists
+under that number, not that the claimed one does, and a submitter could pledge a real number
+against someone else's amount and due date.
+
+
+--- the screening is a real answer, not a 200 ----------------------------------
+
+A clean name and a rejected key both return 200 with no matches, so a green arm alone proves
+nothing. Two consecutive runs, same subscription key, same binary shape, differing only in the
+name screened:
+
+  Contact.Name (Bayside Club)   → screened = true     no match
+  "Bank of Kunlun Co Ltd"       → screened = false    match
+
+The second arm was produced by temporarily substituting the name in the source; the file was
+restored and rebuilt to the identical hash 82168bce… above. It is an ablation across two runs,
+not one run — stated plainly because the divergence is the evidence and the method is part of it.
+
+The name screened comes from the ledger, not from the claim. The claim's identity field is
+canonical text, and measured against this same service canonicalisation destroys the query —
+three sanctioned entities of more than one word, `total > 0` raw and `total: 0` canonicalised.
+
+
+--- what the plan predicted, and what the measurement said ---------------------
+
+Two questions were left open, with an inference attached to each. Both inferences were wrong,
+and the second was wrong in the safe direction only by luck.
+
+1. Does the simulator enforce `HTTPAction.CallLimit`? The prediction was no, reasoning from the
+   secret-ring finding that eight secret reads passed under production limits. It does:
+
+     --limits with HTTPAction.CallLimit = 2
+     ✗ [101]LimitExceeded: capability call limit exceeded for http-actions.SendRequest:
+       PerWorkflow.HTTPAction.CallLimit ... cannot use 3, limit is 2
+
+   The error names the call count. Three is therefore measured, not asserted — and the budget is
+   a live gate locally, not a number waiting for deployment to test it.
+
+2. What happens past the response cap — truncation or error? The inference was error, from the
+   existence of `LimitExceeded = 101` and two strings in the CLI binary. It is an error, but a
+   different one:
+
+     --limits with HTTPAction.ResponseSizeLimit = 100b
+     ✗ [8]ResourceExhausted: HTTP response body of 1083 bytes exceeds the simulation limit of
+       100 bytes. This limit mirrors a production constraint.
+
+   Nothing is truncated and nothing is silently short. A handler cannot read a partial body and
+   conclude the wrong thing.
+
+
+--- the bytes, measured from inside ---------------------------------------------
+
+The ResourceExhausted message names the offending body's exact size, so walking the cap upward
+sizes each response from inside the enclave rather than from a probe outside it:
+
+  cap    outcome                                       what it establishes
+  100b   fails naming 1083 bytes                       token response = 1,083 B
+  1083b  passes the token, fails naming 1564 bytes     invoice response = 1,564 B
+  1564b  all three pass                                screening response ≤ 1,564 B
+  2000b  all three pass
+
+  response                 measured      budget      source of the budget
+  token                     1,083 B      —           no key; it is the smallest of the three
+  invoice (collection)      1,564 B      2,048 B     data.accounting.invoiceQueryResponseBytes
+  screening (clean name)   ≤ 1,564 B     32,768 B    data.screening.responseBytesAtSizeThree
+
+The invoice figure agrees to the byte with the 1,564 B measured externally by the data-source
+probe against the same query — two paths to the same number.
+
+The screening figure is a bound, not a pin, and the reason is structural: the invoice response is
+1,564 B and arrives first, so no cap the run survives can be tighter than that. The budget it is
+checked against is the largest observed over four names at size=3 — 16,305 B for `international`,
+where size follows the fatness of the three returned records rather than the total.
+
+The comparison is strictly greater: a body of exactly 1,083 B passed a 1,083 B cap.
+
+
+--- what this run does not prove ------------------------------------------------
+
+The simulator says so itself, in its own banner: *"The simulator is not a real TEE, and is meant
+to debug."* Three specific gaps:
+
+  · Not a real enclave. The code path is real and the calls are real; the attestation is not.
+  · The secrets did not come from the vault. `cre workflow simulate` resolves them from the `.env`
+    file on disk through its own `-e` flag and never consults the vault — established by four
+    experiments in the secret-ring evidence. The vault upload is required for deployment and
+    invisible to every local verification.
+  · No DON signature and no report. Nothing here is attested by anyone.
+
+What it does prove is that three chained calls against two live services fit inside the enclave's
+budget, that the answers are read correctly, and that of roughly 4.2 KB of confidential response
+body not one byte reaches the return value.
+
+
+--- limitations that belong to the system, not to this run ----------------------
+
+The watchlist is a United States consolidation — Treasury, Commerce and State. There are no EU,
+UK or UN designations in it, so a counterparty listed only in Europe screens clean.
+
+The name screened is the one the issuing business typed into its own ledger. Screening it is
+better than screening the claim's canonical field, but anyone wishing to evade the list can
+misspell their own debtor. The registry proves uniqueness, not existence.
+
+The debtor has not agreed to anything at this point. The verdict rests on the ledger and the list
+alone; the signed confirmation is collected before submission and travels inside the envelope,
+which is why there is no second stage waiting on a human inside the execution timeout.
+
+The ledger organisation is a demo company the provider documents as reset every 28 days — stated
+by their documentation, never observed here. The two invoices were seeded 2026-09-10. After a
+reset the invoice number changes, because the provider assigns it; nothing outside the corpus
+depends on `ORC1043`, which is what keeps re-seeding cheap.

@@ -10,9 +10,29 @@
     "logTriggerEventBytes": 5000
   },
   "data": {
-    "accounting": { "callsPerExecution": 2, "accessTokenSeconds": 1800, "invoiceResponseBytes": 10240 },
-    "screening": { "callsPerExecution": 1, "responseBytesAtSizeThree": 16384 },
-    "httpCallPlan": { "stageOne": 4, "stageTwo": 2, "reserve": 1 }
+    "accounting": {
+      "callsPerExecution": 2,
+      "accessTokenSeconds": 1800,
+      "_invoiceResponseBytes": "the path form, GET /Invoices/{id}: 4,684 B measured, and what the data-source probe reads",
+      "invoiceResponseBytes": 10240,
+      "_invoiceQueryResponseBytes": "the collection form the enclave uses: 1,564 B for the seeded invoice, 1,571 B for the negative control",
+      "invoiceQueryResponseBytes": 2048
+    },
+    "screening": {
+      "callsPerExecution": 1,
+      "_responseBytesAtSizeThree": "largest observed over four names at size=3: 16,305 B (international). Size follows the fatness of the three returned records, not the total",
+      "responseBytesAtSizeThree": 32768
+    },
+    "httpCallPlan": {
+      "_comment": [
+        "One execution. Three calls read the ledger and the watchlist, one asks the registry",
+        "about a collision, one is held back. There is no second stage: the debtor's confirmation",
+        "is collected before submission and travels inside the sealed plaintext, so nothing waits",
+        "on a human inside the execution timeout."
+      ],
+      "stageOne": 4,
+      "reserve": 1
+    }
   },
   "contracts": {
     "gasSnapshotPath": "contracts/.gas-snapshot",

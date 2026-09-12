@@ -1,7 +1,8 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import { expect, test } from 'bun:test'
 import { type Hex, hexToBytes } from 'viem'
-import { CLAIM_SUBMITTED_TOPIC, SECRET_IDS, configSchema, decodeClaimSubmitted } from './workflow'
+import { configSchema } from './config'
+import { CLAIM_SUBMITTED_TOPIC, SECRET_IDS, decodeClaimSubmitted } from './workflow'
 
 const ID = '0x5ab0000000000000000000000000000000000000000000000000000000000001'
 const SUBMITTER = '0x86Ec9f04485Db066CF155353f15eef356Ae90253'
@@ -43,24 +44,54 @@ test('the derived topic matches the one the deployed contract emits', () => {
 })
 
 // A config is the only thing that varies between staging and production, so a malformed one is
-// the likeliest way to register a subscription against nothing.
+// the likeliest way to register a subscription against nothing. Built from the shipped file
+// rather than from a literal: a bare `{ inboxAddress }` now throws for the four missing keys,
+// which would make this pass while proving nothing about the address.
+const STAGING = await Bun.file('./config.staging.json').json()
+
 test('refuses an address that is not twenty bytes', () => {
-	expect(() => configSchema.parse({ inboxAddress: '0x14f3bb' })).toThrow()
+	expect(() => configSchema.parse({ ...STAGING, inboxAddress: '0x14f3bb' })).toThrow()
+})
+
+test('refuses an endpoint that is not https', () => {
+	expect(() => configSchema.parse({ ...STAGING, watchlistUrl: 'http://data.trade.gov/x' })).toThrow()
 })
 
 test('accepts the deployed inbox', () => {
-	expect(configSchema.parse({ inboxAddress: INBOX }).inboxAddress).toBe(INBOX)
+	expect(configSchema.parse(STAGING).inboxAddress).toBe(INBOX)
 })
 
 // The config files ship with the workflow and are read by the platform, not by the tests, so
 // they are asserted here or they are asserted nowhere.
 test('both config files carry the same shape and no dead keys', async () => {
-	const staging = await Bun.file('./config.staging.json').json()
 	const production = await Bun.file('./config.production.json').json()
-	expect(Object.keys(staging).sort()).toEqual(['inboxAddress'])
-	expect(Object.keys(production).sort()).toEqual(Object.keys(staging).sort())
-	expect(() => configSchema.parse(staging)).not.toThrow()
+	expect(Object.keys(STAGING).sort()).toEqual([
+		'inboxAddress',
+		'ledgerApiBase',
+		'ledgerTenantId',
+		'ledgerTokenUrl',
+		'watchlistUrl',
+	])
+	expect(Object.keys(production).sort()).toEqual(Object.keys(STAGING).sort())
+	expect(() => configSchema.parse(STAGING)).not.toThrow()
 	expect(() => configSchema.parse(production)).not.toThrow()
+})
+
+// The tenant names the accounting organisation and authorises nothing on its own, which is why
+// it may live in configuration while the application's credentials live in the vault. A wrong
+// one is a 401 from a call that has already spent the token exchange.
+test('the ledger tenant is a uuid, not a credential', () => {
+	expect(STAGING.ledgerTenantId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/)
+})
+
+// `api.trade.gov` carries an expired TLS certificate and an enclave cannot accept a warning;
+// the static list is 33,752,788 bytes against a 100 KB response cap. Neither is reachable, so
+// the keyed endpoint on `data.trade.gov` is the only path, not a preference.
+test('no endpoint the enclave cannot reach', () => {
+	for (const url of [STAGING.ledgerTokenUrl, STAGING.ledgerApiBase, STAGING.watchlistUrl]) {
+		expect(url.startsWith('https://')).toBe(true)
+		expect(url).not.toContain('api.trade.gov')
+	}
 })
 
 // The quota is five calls per execution, and four later handlers will each want credentials.
@@ -93,4 +124,31 @@ test('every id the handler asks for is declared in the vault file', () => {
 test('nothing is declared that the handler never asks for', () => {
 	const declared = [...readFileSync('../secrets.yaml', 'utf8').matchAll(/^\s{2,}(\w+):$/gm)]
 	expect(declared.map((m) => m[1]).sort()).toEqual([...SECRET_IDS].sort())
+})
+
+// The handler's return value is the widest channel that is not obviously one. Two identifiers
+// that were already public in the log, plus five booleans. Nothing derived from a body — and
+// that includes a length, which distinguishes one invoice from another.
+test('the handler returns facts about the body, never the body', () => {
+	const source = readFileSync('./workflow.ts', 'utf8')
+	const returned = /return\s+`([^`]*)`/.exec(source)?.[1] ?? ''
+	expect(returned).not.toBe('')
+	expect(returned).not.toContain('json(')
+	expect(returned).not.toContain('length')
+	expect(returned.match(/\$\{/g) ?? []).toHaveLength(7)
+})
+
+// Anything logged leaves the enclave by Chainlink's own definition, and the ledger response is
+// the single most sensitive object the handler ever holds.
+test('the enclave never logs', () => {
+	const source = readFileSync('./workflow.ts', 'utf8') + readFileSync('./verify.ts', 'utf8')
+	expect(source).not.toMatch(/runtime\.log\(|console\./)
+})
+
+// Three calls cost the ledger a token exchange and the watchlist a query. A claim whose sealer
+// did not authorise its submitter is refused either way, so verifying it spends the quota for a
+// verdict that cannot change.
+test('an unauthorized submission is not verified', () => {
+	const source = readFileSync('./workflow.ts', 'utf8')
+	expect(source).toMatch(/authorized\s*\n?\s*\?\s*verifyExternally/)
 })

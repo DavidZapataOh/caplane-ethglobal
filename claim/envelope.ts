@@ -14,6 +14,10 @@ export const AUTHORIZED_SUBMITTER_BYTES = 20
 /**
  * Seals a claim to the enclave's public key, naming the address entitled to submit it.
  *
+ * `claim` is the JSON of the seven submitted fields, UTF-8 encoded — raw, as written, not the
+ * canonical text the commitment hashes. The enclave rejects a document short of any of them.
+ * Compact or pretty-printed makes no difference; only the bytes' length does.
+ *
  * The ciphertext is public in the calldata from the moment it is broadcast, so anyone can relay
  * it from their own address and obtain a verdict on somebody else's receivable. Naming the
  * authorized address inside the plaintext is what lets the enclave refuse that — and refuse it
