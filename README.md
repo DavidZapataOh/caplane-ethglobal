@@ -40,9 +40,16 @@ Pinned so a clean machine reproduces this build:
 | `CaplanePool` | [`0x4df4c8d722b3a9ebd18b9094c883b5ff83565d7c`](https://testnet.arcscan.app/address/0x4df4c8d722b3a9ebd18b9094c883b5ff83565d7c) |
 | `CaplaneEscrow` | [`0x2bc74ceb10287890fb9be43667a55b73e080db1f`](https://testnet.arcscan.app/address/0x2bc74ceb10287890fb9be43667a55b73e080db1f) |
 
-Source is verified, so the explorer's read tab works without an account: open the registry and
-call `isEncumbered(bytes32)` on any commitment. It answers from chain state — there is no server
-in the path, and nothing to ask permission from.
+Source is verified — full match, not partial — so the explorer's read tab works without an account:
+open the registry and call `statusOf(bytes32)` or `lienOf(bytes32)` on a lien id. It answers from
+chain state; there is no server in the path and nothing to ask permission from. The same tab reads
+the four immutables that pin who may write.
+
+⚠️ **A lien id is not derivable from the receivable.** The registry key is salted with a secret that
+never leaves the enclave, so holding the document tells you nothing. Ask about a lien id you were
+given, or enumerate by borrower address with `@caplane/sdk`. `isEncumbered` is also the wrong place
+to start looking: it is `status == 1` and nothing else, so a released lien and an id that was never
+written both answer `false`.
 
 Nobody can alter an entry, including us. The registry has no owner, no pause and no upgrade path,
 and its only writer is a DON-consensused report from an attested enclave:

@@ -2,19 +2,34 @@
 
 ## Two tiers, and who can compute each
 
-The lien id carries no pepper, so a browser, the SDK and any third party derive it from a claim
-they already hold. That is what makes the registry answerable without asking us.
+⚠️ **Corrected 2026-09-12.** This section said the lien id carries no pepper, and that a browser,
+the SDK or any third party derives it from a claim they hold. That was true and is not: the lien id
+was a pepper-free hash of the same seven components, published in `LienRecorded`, and it inverted by
+brute force in 71 ms against the seeded corpus — yielding the debtor, the invoice number, the due
+date and the amount bucket. Three of the seven carry no entropy at all, because currency, country
+and the issuer are constants of one ledger. The pepper that protects the component index has to
+protect the key derived from the same components.
 
-The per-component commitments carry a pepper that lives in the vault, so only the enclave can
-build the index they are looked up in. Without it the index would be brute-forceable: four of
-the seven components are low-entropy enough to enumerate.
+So there are three tiers, not two:
+
+The **claim id** carries no pepper. It is what the debtor's confirmation signs, in its own preimage
+space, and it has to be pepper-free because the signing tool runs on the debtor's side — giving it
+the pepper would take the pepper out of the enclave. It is safe there because it never leaves the
+sealed envelope.
+
+The **lien id** carries the pepper. It is the registry key. Nobody outside the enclave can derive
+it, so a third party consults a lien id the enclave gave them, or enumerates by borrower address.
+
+The **per-component commitments** carry the pepper too, so only the enclave can build the index they
+are looked up in. Without it the index would be brute-forceable.
 
 One function derives both. A second implementation is a second thing that can be wrong.
 
-The lender SDK reexports the lien id and nothing else. The package surface stays whole — the
-enclave consumes it entire — and the narrowing happens at the SDK, which is the layer a third
-party installs. A library that appeared able to build component commitments would be promising
-fuzzy queries it cannot answer.
+The lender SDK reexports **no derivation at all**. It observes and decodes: a lien id goes in and
+state comes out. It cannot go from a receivable to a lien id, it does not seal envelopes, and it
+never sees the pepper — so it has nothing to narrow. A library that appeared able to build
+component commitments, or to derive a key from a claim, would be promising queries it cannot
+answer.
 
 ## What cannot be changed after the first lien
 

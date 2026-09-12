@@ -116,9 +116,15 @@ jobs:
         working-directory: ${{ matrix.dir }}
       - run: npm run typecheck
         working-directory: ${{ matrix.dir }}
-      # Conditional on purpose: a bare `npm test` across the matrix would fire the bun suites
-      # in claim and sdk inside a job with no bun installed — red for an unrelated reason.
-      - if: matrix.dir == 'brand'
+      # Conditional on purpose: a bare `npm test` across the matrix would fire the bun suite in
+      # claim inside a job with no bun installed — red for an unrelated reason. `sdk` runs
+      # `node --test` over what it emits, so it needs no bun.
+      #
+      # NOT HERMETIC for `sdk`: its tests read the live registry over https://rpc.testnet.arc.io.
+      # The endpoint needs no credential but it does need the network and it rate-limits, so the
+      # suite runs its files one at a time. A red here can be the endpoint rather than the code,
+      # and saying so is the difference between a gate and a coin toss.
+      - if: matrix.dir == 'brand' || matrix.dir == 'sdk'
         run: npm test
         working-directory: ${{ matrix.dir }}
 

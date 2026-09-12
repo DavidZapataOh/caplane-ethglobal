@@ -34,3 +34,16 @@ test("keeps contract tests distinct from unit tests", () => {
 test("counts zero when a runner reports no tests", () => {
   expect(aggregate("{}", "0 pass\n0 fail\n", "abc1234").total).toBe(0);
 });
+
+// The SDK's suite runs under `node --test`, which reports `# pass N` — a different shape from bun's
+// `N pass`. Before this, a package on that runner was counted by neither arm and the total dropped
+// it silently, which is the failure that looks like success.
+test("counts a node --test runner as well as bun", () => {
+  const out = aggregate("{}", "12 pass\n0 fail\n", "abc1234", "# tests 26\n# pass 26\n# fail 0\n");
+  expect(out.unitTests).toBe(38);
+  expect(out.total).toBe(38);
+});
+
+test("a missing node runner leaves the count where it was", () => {
+  expect(aggregate("{}", "12 pass\n0 fail\n", "abc1234").unitTests).toBe(12);
+});

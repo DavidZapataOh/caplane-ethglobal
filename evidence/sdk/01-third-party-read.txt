@@ -1,0 +1,73 @@
+A third party reads a lien from their own machine, verified 2026-09-12. No account, no key, no
+service of ours in the path.
+
+The acceptance is not a green read: an implementation that answered `false` to everything would
+print the same `isEncumbered` twice below. What discriminates is `statusOf` and the seven fields of
+`lienOf`, and both ids are real — one lien the registry wrote, one submission it refused.
+
+registry    0xe7170ee0ce4cab4593970ef5c4ebf7d0d62ae19b
+endpoints   https://rpc.testnet.arc.io  https://rpc.drpc.testnet.arc.io
+identity    0x33396465656661623966 (frozen: 0x33396465656661623966)
+code bytes  5232
+
+--- divergence, same run, no account and no key -----------------------------
+recorded lien       0xebd60de9b8c99e6bde3ce7ad1894177e706e75c0120c192da71400a378ae7e4c
+  statusOf           2
+  isEncumbered       false
+  borrower           0x86Ec9f04485Db066CF155353f15eef356Ae90253
+  advanceUsdc6       8000000
+  rateBps            200
+  createdAt          1789191961
+  expiresAt          1801267200
+  submissionId       0xdb0577a4e0025f56d6b8e3f71871a42dccb2bc6447aa366685b42d33505752b3
+refused submission  0x9c22eff8f4efee07013d86feaf5f1a559053004f1f61915873690d57e5a08b29
+  statusOf           0
+  isEncumbered       false
+  borrower           0x0000000000000000000000000000000000000000
+  advanceUsdc6       0
+  rateBps            0
+  createdAt          0
+  expiresAt          0
+  submissionId       0x0000000000000000000000000000000000000000000000000000000000000000
+
+--- enumeration by borrower, the one question needing nothing handed over ---
+ 0xebd60de9b8c99e6bde3ce7ad1894177e706e75c0120c192da71400a378ae7e4c  block 61685965  expires 1801267200  status 2
+
+--- a registry that is not ours is refused -----------------------------------
+ refused: registry identity unreadable
+
+--- a disagreement is refused, not resolved ----------------------------------
+ refused: The contract function "statusOf" returned no data ("0x").
+
+--- what the two refusals above actually prove -------------------------------
+
+The identity refusal is ours: a call to an address with no code returns `0x`, which is
+indistinguishable from a registry holding nothing, so the frozen workflow name is read rather than
+assumed.
+
+The disagreement refusal is NOT ours — that message comes from viem, which rejects the foreign
+chain before the two answers are ever compared. It still proves both endpoints are asked, because
+a read using only the first would have succeeded. The comparison itself is exercised separately,
+in `client.test.ts`, by handing the seam a real function whose answer depends on which endpoint it
+received; and a second test pins that the comparison survives a bigint, because a lien carries
+three and the obvious comparator throws on the first real read.
+
+--- the package contacts nobody of ours -------------------------------------
+
+The only hosts in the run above are the two RPC endpoints, both the caller's to change. A test
+walks every module in `src/` for a hostname of ours and finds none; it assembles the needle from
+pieces rather than spelling it, because spelled out the needle is in the test file and the walk
+reports itself.
+
+Switching off api.caplane.xyz, mcp.caplane.xyz and registry.caplane.xyz therefore cannot change any
+line above. That run belongs to the rehearsal, which owns the outage window: the same process also
+carries debtor confirmation.
+
+--- reproduce it ------------------------------------------------------------
+
+  cd sdk && npm ci && npm test          # 26 tests, live endpoint, files run one at a time
+  npm pack && npm install ./caplane-sdk-0.1.0.tgz   # from any empty directory
+
+Measured: a clean consumer installs the tarball and reads the chain. The endpoint rate-limits at
+`-32005`, so the suite runs its files sequentially and the scan retries with backoff — a seven-page
+scan plus a quorum read is enough of a burst to trip it.

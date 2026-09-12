@@ -1,0 +1,55 @@
+Source verification of the four deployed contracts, 2026-09-12.
+
+Why this file exists: README.md claimed "Source is verified, so the explorer's read tab works
+without an account" while the registry — the one contract that sentence tells a reader to open —
+was not verified. The redeploy earlier the same day replaced it and nothing re-verified.
+
+--- before -------------------------------------------------------------------
+
+  registry  0xe7170ee0ce4cab4593970ef5c4ebf7d0d62ae19b   is_verified=False
+  inbox     0xc5218fd1b6eb7c91f905871301bf8620bc8baf91   is_verified=True
+  pool      0x4df4c8d722b3a9ebd18b9094c883b5ff83565d7c   is_verified=True
+  escrow    0x2bc74ceb10287890fb9be43667a55b73e080db1f   is_verified=True
+
+--- the submission -----------------------------------------------------------
+
+  $ arc-cast abi-encode "constructor(address,address,bytes10,uint64)" \
+      <forwarder> <workflowOwner> <workflowName> <chainSelector>
+
+  $ arc-forge verify-contract 0xe7170ee0ce4cab4593970ef5c4ebf7d0d62ae19b \
+      src/CaplaneRegistry.sol:CaplaneRegistry \
+      --verifier blockscout --verifier-url https://testnet.arcscan.app/api \
+      --constructor-args <encoded> --compiler-version 0.8.28 --watch
+
+  GUID     e7170ee0ce4cab4593970ef5c4ebf7d0d62ae19b6aa56ec1
+  Details  Pass - Verified
+
+The four arguments are read from contracts/abi/deployments.arc-testnet.json, not retyped. They are
+constructor arguments to immutables with no setter, so a wrong one here would not fail to verify —
+it would verify a contract that is not the one deployed.
+
+--- after --------------------------------------------------------------------
+
+  registry  is_verified=True   is_fully_verified=True   is_partially_verified=False
+  inbox     is_verified=True
+  pool      is_verified=True
+  escrow    is_verified=True
+
+  $ curl -s https://testnet.arcscan.app/api/v2/smart-contracts/<registry>
+  name                  CaplaneRegistry
+  compiler              v0.8.28+commit.7893614a
+  optimization          true, 200 runs
+  abi                   25 entries
+  view functions        CHAIN_SELECTOR  FORWARDER  WORKFLOW_NAME  WORKFLOW_OWNER
+                        isEncumbered    lienOf     matchesOf      statusOf
+
+Full match, not partial: the metadata hash agrees, so the bytecode on chain came from this source
+at these settings. That is what makes the explorer path reproducible rather than decorative — a
+stranger recompiles and compares, and reads the four immutables that pin who may write, by
+themselves.
+
+--- one measurement that was wrong, recorded so nobody repeats it ------------
+
+`/api/v2/smart-contracts/<addr>/methods-read` answers 404 on this Blockscout — v11.3.0 — for all
+four contracts, verified or not. It is the wrong route, not a broken read tab. What the tab is
+built from is the `abi` field above.

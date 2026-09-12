@@ -22,3 +22,5 @@ contracts/lib/
 # secrets.yaml is deliberately NOT ignored: it maps secret ids to env var names and holds
 # no values. workflow.yaml references it, so a clean clone cannot simulate without it.
 # The values live in .env, which is ignored above.
+# npm pack output: the tarball is how a consumer installs this, not something to track.
+*.tgz
