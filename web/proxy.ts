@@ -1,20 +1,28 @@
 import { NextResponse, type NextRequest } from 'next/server'
-
-// `/.well-known` must stay out: the certificate validation challenge travels through it, and
-// swallowing it means the domain resolves and never gets a certificate.
-export const config = { matcher: ['/((?!_next|\\.well-known).*)'] }
+import { modeFor } from './mode'
 
 /**
- * The mode is a property of the host, so it is resolved here and rewritten into the path.
+ * What the mode gets prepended to. Written as a literal because Next parses it at compile time and
+ * refuses anything it cannot read statically — not even an imported constant — which is why the
+ * test extracts it from this file rather than importing it.
+ *
+ * `/.well-known` must stay out: the certificate validation challenge travels through it, and
+ * swallowing it means the domain resolves and never gets a certificate.
+ *
+ * So must the metadata routes. They are emitted at the root of `app/`, outside `[mode]`, so each
+ * exists at exactly one path — prepending a mode to `/icon.svg` asks for `/dark/icon.svg`, which no
+ * route serves, and the favicon and the shared-link card 404 on a site whose pages all answer 200.
+ */
+export const config = {
+	matcher: ['/((?!_next|\\.well-known|icon\\.svg|favicon\\.ico|opengraph-image|robots\\.txt|sitemap\\.xml).*)'],
+}
+
+/**
  * Reading the host inside the layout instead would work and would opt every route out of
  * prerendering, because headers() is request-time API.
  */
 export function proxy(request: NextRequest) {
-  const host = request.headers.get('host') ?? ''
-  // Anything off a known host — preview URLs, *.vercel.app, the apex before DNS catches up —
-  // falls back to dark rather than rendering with no palette at all.
-  const mode = host.startsWith('registry.') ? 'paper' : 'dark'
-  const url = request.nextUrl.clone()
-  url.pathname = `/${mode}${url.pathname}`
-  return NextResponse.rewrite(url)
+	const url = request.nextUrl.clone()
+	url.pathname = `/${modeFor(request.headers.get('host') ?? '')}${url.pathname}`
+	return NextResponse.rewrite(url)
 }

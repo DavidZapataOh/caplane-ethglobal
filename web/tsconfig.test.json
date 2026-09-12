@@ -3,6 +3,7 @@
   "include": [
     "app/**/*.test.ts",
     "app/**/*.test.tsx",
+    "*.test.ts",
     "next-env.d.ts"
   ],
   "exclude": [

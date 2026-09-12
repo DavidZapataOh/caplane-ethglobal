@@ -65,3 +65,81 @@ they ever disagree the test goes red and the package wins.
 The selectors and topics are written literally to keep the bundle at nothing, so they are pinned by
 tests that derive them: a four-byte selector transcribed wrong returns empty bytes, they decode to
 zero, and the page reports "no record" about a lien that exists.
+
+--- the deployed site --------------------------------------------------------
+
+  https://app.caplane.xyz/           200   dark
+  https://app.caplane.xyz/registry   200
+  https://app.caplane.xyz/confirm    200
+  https://registry.caplane.xyz/      200   paper
+
+The mode is a property of the host, resolved in the proxy and rewritten into the path, so
+`/registry` is the route a visitor types and `/dark/registry` is an implementation detail
+that answers 404 from outside — the rewrite prepends the mode to whatever path arrives.
+
+Both endpoints the page depends on are baked into the client bundle at build time, which is
+the only place a NEXT_PUBLIC value can be checked after the fact:
+
+  chunks/2mofwtq327dak.js   https://api.caplane.xyz
+  chunks/0ribzlvdloj6j.js   https://rpc.testnet.arc.io
+
+Neither carries localhost. A missing NEXT_PUBLIC_API_URL would not fail the build — the code
+reads `?? ''` — it would ship a site whose confirmation page posts to its own origin.
+
+The page reads the chain from the visitor's browser with nothing of ours in the path, so the
+two CORS answers are load-bearing and are measured from the deployed origin, not from a
+developer machine:
+
+  OPTIONS https://api.caplane.xyz/confirm   Origin: https://app.caplane.xyz
+    204 | allow-origin: * | allow-methods: GET, POST, OPTIONS | allow-headers: content-type
+  POST   https://rpc.testnet.arc.io         Origin: https://app.caplane.xyz
+    access-control-allow-origin: https://app.caplane.xyz    <- reflected, as measured
+
+--- the lookup, as the page issues it ----------------------------------------
+
+The three calls of chain.ts, same selectors, pinned at one height, sent with the deployed
+site's Origin. Lien 0xebd60de9…7e4c, the only one on chain, released:
+
+  block         0x3af1ceb
+  isEncumbered  0x00…00                                    false
+  statusOf      0x00…02                                    Released
+  lienOf        0x…86ec9f04485db066cf155353f15eef356ae90253 borrower present
+
+  isEncumbered  0x00…00  for an id that was never written   false     <- the control
+  statusOf      0x00…00  for the same id                    Unset
+
+`isEncumbered` answers false twice and cannot tell the two apart: it is a lien-is-live
+question, and the only lien on chain is released. That is why the page reads `statusOf` and
+`lienOf` instead, and why the divergence is shown rather than hidden — the two falses above
+are the reason the criterion was moved off that function.
+
+--- what the deployment found ------------------------------------------------
+
+Every page answered 200 and two files did not:
+
+  https://app.caplane.xyz/icon.svg          404
+  https://app.caplane.xyz/opengraph-image   404
+
+Both are emitted at the root of `app/`, outside `[mode]`, so each exists at exactly one path.
+The proxy prepended the mode to everything that was not `_next` or `.well-known`, so the
+requests arrived as `/dark/icon.svg` and `/dark/opengraph-image`, which no route serves. The
+favicon and the card on every shared link were dead on a site whose pages were all healthy —
+and nothing caught it, because a rewrite to a path that does not exist is a 404, not an error.
+
+`metadataBase` is not the cause and is not missing: Next fills it from the deployment URL, and
+the tag it emitted was already absolute.
+
+  <meta property="og:image" content="https://app.caplane.xyz/opengraph-image?4d9e7c980cde76a9">
+
+The URL was right the whole time. What it pointed at was being rewritten out from under it.
+
+The matcher now excludes the metadata routes, and `proxy.test.ts` pins it. The matcher cannot
+be imported — Next parses it at compile time and rejects anything that is not a literal — so
+the test reads it out of `proxy.ts` instead of keeping a second copy that could drift. Removing
+the exclusions again fails the test by name:
+
+  AssertionError: /icon.svg must not be rewritten
+
+The test anchors the pattern before applying it. Unanchored it is worthless: `/_next/...` slips
+past the lookahead at the second slash and every path matches, so the suite would pass on a
+matcher that excludes nothing at all.
