@@ -152,8 +152,21 @@ jobs:
         working-directory: ${{ matrix.dir }}
       - run: npm run lint
         working-directory: ${{ matrix.dir }}
+      # NOT HERMETIC for `web`: the registry route's tests read the live registry over
+      # https://rpc.testnet.arc.io. The endpoint needs no credential but it does need the
+      # network and it rate-limits, so the files run one at a time.
+      - if: matrix.dir == 'web'
+        run: npm test
+        working-directory: ${{ matrix.dir }}
       - run: npm run build
         working-directory: ${{ matrix.dir }}
+      # Measured here rather than in the budgets job: that one is hermetic and never builds
+      # Next, so a number it reported would be a number nothing could fail on. The baseline is
+      # React and Next; what this route is answerable for is the delta, and the chain library
+      # it declined would have cost about 49 KB gzipped on its own.
+      - if: matrix.dir == 'web'
+        working-directory: ${{ matrix.dir }}
+        run: node ../scripts/budgets/first-load.mjs .next paper/registry --against paper --budget 8000
 
   workflow:
     runs-on: ubuntu-latest

@@ -71,7 +71,13 @@
       }
     }
   },
-  "web": { "firstLoadJsBytes": null, "lcpMs": null, "clsScore": null },
+  "web": {
+    "_registryDeltaGzipBytes": "What the public lookup route adds over the route that already existed, gzipped, measured from the prerendered HTML by scripts/budgets/first-load.mjs. The baseline is 173,508 B and is React and Next, not anything this route chose. The number that matters is the delta: the page reads the chain with no chain library, and the library it declined costs about 49 KB gzipped on its own.",
+    "registryDeltaGzipBytes": 8000,
+    "firstLoadJsBytes": null,
+    "lcpMs": null,
+    "clsScore": null
+  },
   "site": { "firstLoadJsBytes": null, "lcpMs": null, "clsScore": null },
   "services": {
     "_p95Ms": "Client-observed round trip against the deployed service. It lands with the deploy: writing a number here without evidence/measured.json carrying it is now a violation, not a pass.",

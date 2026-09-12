@@ -1,0 +1,67 @@
+The public lookup, read from a browser. Measured 2026-09-12.
+
+The acceptance is not a page that loads: one that answered "not encumbered" to everything would
+look identical today, because the only lien the registry holds is released. What discriminates is
+the status byte and the seven fields.
+
+--- what the page reads, for two real ids ------------------------------------
+
+    recorded   status 2  encumbered false  borrower 0x86ec9f04485db066cf155353f15eef356ae90253
+               advance 8000000  rate 200  submission 0xdb0577a4e0025f56d6b8e3f71871a42dccb2bc6447aa366685b42d33505752b3
+    refused    status 0  encumbered false  borrower 0x0000000000000000000000000000000000000000
+               explained from the logs: rejected:1
+    borrower   1 lien(s): 0xebd60de9b8c99e6bde3ce7ad1894177e706e75c0120c192da71400a378ae7e4c at block 61685965
+
+`isEncumbered` is false for both, and that is not hidden: it is status exactly active, so a released
+lien and an id nobody ever wrote are both not-active. The page shows the word, never the boolean.
+
+And the refusal is explained. Measured: `lienOf` returns seven zero words both for a submission the
+enclave refused and for an id the registry never saw — the contract cannot tell them apart, only
+the logs can. Calling a refusal "not found" would hide the most interesting thing the registry has
+to say. When the log read itself fails the status stands without a reason rather than the page
+inventing one.
+
+--- the receipt, replayed outside the browser --------------------------------
+  isEncumbered   same bytes  32 bytes
+  statusOf       same bytes  32 bytes
+  lienOf         same bytes  224 bytes
+  replayed with curl at the height the page names — the page hands these commands over,
+  copyable, so a visitor checks rather than believes.
+
+--- the property that survives every service of ours being switched off -------
+
+Instrumented: every fetch the page's modules make was recorded while reading both ids, explaining
+the refusal from the logs, and enumerating the borrower.
+
+    hosts contacted: rpc.testnet.arc.io
+    hosts of ours:   0
+
+One host, and it is not ours. The guarantee is a property of the code path rather than of a variable
+that happens to be unused: one Vercel project serves the app and the registry, so an API URL the app
+needs is present in the registry's deployment whether anyone intended it or not. A hygiene rule —
+`registry-reads-chain-only` — fails the build if anything under this route names our API host or
+either API variable, and every helper lives inside the route directory because the rule matches by
+path: one hoisted to web/components would escape it with nothing to say.
+
+Switching off api.caplane.xyz, mcp.caplane.xyz and the harness therefore cannot change a line above.
+Doing it on camera belongs to the rehearsal, which owns the window — the same process also carries
+debtor confirmation, so the outage costs two things.
+
+--- the bundle, and the library it declined ----------------------------------
+
+  route          paper/registry
+  chunks         7
+  gzipped        178,303 B
+  baseline       173,508 B  (the paper route, which is React and Next)
+  delta          4,795 B  against a budget of 8,000
+
+The baseline is not this route's doing. The delta is, and it is what the decision bought: measured
+separately, viem costs about 49 KB gzipped for this page's work — 17.9 KB of it elliptic curves, on
+a surface that never signs anything — against 552 bytes for three fixed selectors and seven
+static-width words. What declining it costs is the risk of two decoders drifting, and that is closed
+by a test that compares this one against the package's, field by field, against the live chain. If
+they ever disagree the test goes red and the package wins.
+
+The selectors and topics are written literally to keep the bundle at nothing, so they are pinned by
+tests that derive them: a four-byte selector transcribed wrong returns empty bytes, they decode to
+zero, and the page reports "no record" about a lien that exists.

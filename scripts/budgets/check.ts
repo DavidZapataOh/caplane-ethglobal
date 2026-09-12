@@ -84,6 +84,19 @@ export const violations = (
 ): string[] => {
   const found: string[] = [];
 
+  for (const [surface, entries] of Object.entries(b.web).sort()) {
+    if (surface.startsWith("_")) continue;
+    if (entries === null) continue;
+    const key = `web.${surface}`;
+    const seen = m[key];
+    if (typeof entries !== "number") continue;
+    if (seen === undefined) {
+      found.push(`${key} has no measurement behind it`);
+      continue;
+    }
+    if (seen > entries) found.push(`${key} ${seen} exceeds the budget of ${entries}`);
+  }
+
   for (const [service, entries] of Object.entries(b.services).sort()) {
     // Underscore-prefixed keys carry the reasoning inline, exactly as they do under `cre`. Iterated
     // as a service, one of them yields its characters as metrics — measured, 179 violations.

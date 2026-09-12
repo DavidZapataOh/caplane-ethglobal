@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --test --test-concurrency=1 --experimental-strip-types \"app/**/*.test.ts\""
   },
   "dependencies": {
     "@caplane/brand": "file:../brand",
@@ -16,6 +17,7 @@
     "react-dom": "19.2.8"
   },
   "devDependencies": {
+    "@caplane/sdk": "file:../sdk",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
@@ -23,6 +25,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.4",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "viem": "^2.34.0"
   }
 }

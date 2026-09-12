@@ -92,3 +92,25 @@ test("commentary keys under services are not budgets", () => {
   );
   expect(found.filter((line) => line.startsWith("services."))).toEqual([]);
 });
+
+// The web branch had the same problem the services branch did: a number nobody read. A route's
+// first load is not backed by any platform limit — there is no such thing in prod-limits.json and
+// inventing one there would corrupt a verbatim copy of the platform's contract — so it is tied to a
+// measurement taken from the built artifact.
+test("a web budget with no measurement behind it is a violation", () => {
+  const found = violations(
+    { ...budgets, web: { registryDeltaGzipBytes: 8000 } } as unknown as typeof budgets,
+    limits as Limits,
+    {},
+  );
+  expect(found.some((line) => line.includes("web.registryDeltaGzipBytes has no measurement behind it"))).toBe(true);
+});
+
+test("a route that grew past its budget is a violation", () => {
+  const found = violations(
+    { ...budgets, web: { registryDeltaGzipBytes: 8000 } } as unknown as typeof budgets,
+    limits as Limits,
+    { "web.registryDeltaGzipBytes": 51_000 },
+  );
+  expect(found.some((line) => line.includes("51000 exceeds the budget of 8000"))).toBe(true);
+});
