@@ -1,0 +1,134 @@
+A settled advance releases its lien. A defaulted one has no trigger, and that is said out loud.
+
+Two handlers now, one door. Routing is by position in the registration array: index 0 is the
+submission, index 1 the settlement.
+
+
+--- the release path, built and proven ---------------------------------------------
+
+Without this, a paid invoice stays encumbered for ever: the registry is only ever written by a
+signed report, and until now nothing emitted one for a closed lien. It was the largest gap the
+escrow work left behind.
+
+  topic0   0x2a20f8d2d0f487a3016d77037b3c5768216a3dc76401d33abf5dc381af7171cb
+           derived from `Settled(bytes32,uint256,uint256)` and confirmed against the deployed
+           escrow at 0x5de99d8be27468dd175738e1703259130eb703b5
+
+`lienId` is the only indexed parameter, so it arrives in `topics[1]` and the handler needs nothing
+from the data. It reads nothing, fetches nothing, holds no secret and spends no quota: the whole
+decision is the event.
+
+It does not check the lien's status before emitting. The registry checks it — `_close` demands an
+active lien and reverts otherwise — and checking here would cost a chain read, which is the second
+crossing this package exists to avoid. The escrow emits `Settled` at most once per lien and never
+again, so the handler needs no idempotence of its own.
+
+  release body   352 B    nine static words, one offset word, one length word, empty array
+  budget       5,011 B
+
+
+--- the registry decodes all four kinds, from the encoder's own bytes ----------------
+
+  test_Registry_RecordsFromTheEncodersOwnBytes        LienRecorded(0x11e, 0xb0110e1, 1799000000)
+  test_Registry_ReleasesFromTheEncodersOwnBytes       LienReleased(0x11e), status 1 → 2
+  test_Registry_RefusesADefaultBeforeExpiry           reverts LienNotActive(0x11e)
+  test_Registry_AcceptsADefaultAtExpiry               LienDefaulted(0x11e), status 1 → 3
+  test_Registry_RejectsWithTheReasonTheEncoderChose   SubmissionRejected(0x5ab, 6)
+
+Each of the four bodies carries its own nonce. The registry marks a nonce used *before* it looks at
+the kind, so reusing the record's body with a different kind reverts as a replay instead of closing
+the lien — this plan's own lesson applied to its own fixture. The kind is in the nonce preimage for
+exactly that reason: Release and Default land on the same lien.
+
+The `vm.warp` in the default test is the only thing standing between a proof and a demonstration.
+That the registry accepts a default at the right second is proven. That anyone fires one is not.
+
+
+--- one door, two handlers ------------------------------------------------------------
+
+  usingTheDons()   1    the crossing itself
+  .report(         1
+  submitReport(    2    the two call sites
+
+Two inline crossings would satisfy a count of two callers, which is why the crossing stays at one
+and the callers are counted separately. It lives in the encoder module, not beside the handlers:
+the settlement handler already imports the encoder, so the reverse would be an import cycle — the
+same shape the config module was extracted to break.
+
+Routing was checked by pointing the simulator at the wrong index:
+
+  --trigger-index 1, with an inbox log
+  ✗ log does not match registered filter for trigger trigger_reg_…_1:
+    log address 14f3bbf3b21b0411f798aa50edd05df06e72ae88 does not match any of the addresses
+
+That refusal is the evidence: subscription 1 exists, its filter is the escrow and not the inbox,
+and position is what selects it. Two subscriptions of a limit of ten, sharing one 10-per-6s event
+rate limit — this divides that budget rather than adding to it.
+
+
+--- NOT DONE: the release has never fired on a real Settled -----------------------------
+
+There is no `Settled` event on Arc to run against, and producing one needs the whole chain of
+work: a recorded lien, a funded pool, a disbursement, and a debtor payment. It is the last thing
+in the project that can run, and it has not run. What is proven here is the encoding, the routing
+and the registry's acceptance — not one real execution of this handler.
+
+
+--- NOT BUILDABLE: default detection is not autonomous ------------------------------------
+
+An overdue unpaid invoice produces nothing on its own. All three primitives CRE offers fail here,
+for three different reasons:
+
+  cron          the registry does not enumerate liens, and workflows keep no state between runs
+  log sweep     capped at 100 blocks per read and 15 reads per execution — about twelve minutes of
+                chain per execution, against a lien written millions of blocks ago. And
+                `filterLogs` needs the DON runtime, so it would be a second door
+  http trigger  its authorised-key list is precisely the keeper this project promises not to have
+
+The design that would work is named rather than hidden: a permissionless nudge through the inbox
+that already exists — anyone seals an envelope of a new kind naming the lien, and the enclave
+checks expiry against the block height the trigger already hands it. No new contract, no new
+subscription. What it costs is a new payload kind in the sealed plaintext, which touches work
+already written.
+
+And it would not be demonstrable anyway: the two invoices in the corpus fall due in 2027, and the
+pool refuses to disburse at or past expiry.
+
+A debtor who pays late is given no path, deliberately. Once a default lands the state is terminal,
+`pay` reverts, and there is no exit transition. Money already deposited is not trapped — it leaves
+through `refund`, which opens as soon as the write-down puts the principal at zero.
+
+Nobody is paid for calling `settle`. The release depends on someone firing it, and the incentive
+belongs to the business, which wants its receivable free to finance again.
+
+
+--- MEASURED HERE, AND IT BELONGS TO THE WHOLE PROJECT: the build is not reproducible -------
+
+Building the same source twice gives different binaries.
+
+  cre workflow build, 8 runs    8670954f23c9babe ×7    6ca92afafd7fff8d ×1
+  cre workflow hash, 5 runs     8a2e18072f0dc8ac ×4    5c3a506eca49fda9 ×1
+
+The config hash is stable across every run. The binary is not — and neither, therefore, is the
+**workflow hash**, which the CLI's own help describes as using "the same algorithm as the on-chain
+workflow ID":
+
+  00a4fd6067f193ba43f0a3e2985032d293d16557be6e4261d425ce1d0069d48e   ×4
+  003809f9170bab6e87d2bb52165216f6aa81a4f3dc1ceba9e3f687572e237ea6   ×1
+
+The two binaries differ by 113 bytes of length. The first differing byte is a single LEB128 i32
+constant — `0xb2 0xba 0xe9 0x00` against `0xb1 0xba 0xe9 0x00` — which is a data-section offset
+shifting because the embedded data differs in size. The bytes that differ are high-entropy, so
+this is not a timestamp or a path.
+
+Two consequences, and both are larger than this file:
+
+  · Every evidence file in this repository quotes a binary hash as the artifact's identity. Those
+    hashes identify one build, not the source. They are still true — each was read from the build
+    that produced the result beside it — but they are not reproducible, and nothing said so.
+  · A deployment registers a workflow ID derived from the binary. Two deployments of identical
+    source can register different identities.
+
+This is not diagnosed further here: it is the subject of the determinism audit, and it is recorded
+now because it was found now and because it changes how every hash in this directory should be
+read.

@@ -151,8 +151,11 @@ export const noPlanningVocabulary = (s: Snapshot): Finding[] =>
 const FORBIDDEN_IN_WORKFLOW = ["ConfidentialHTTPClient", "vaultDonSecrets"];
 const NODE_BUILTIN_PACKAGES = ["ethers", "axios", "node-fetch", "ws", "dotenv"];
 
-const TEE_LITERAL = /\btee:\s*"([^"]+)"/g;
-const REGIONS_LITERAL = /\bregions:\s*\[\s*"([^"]+)"/g;
+// Either quote style. These matched only double quotes while the workflow package is written in
+// single quotes throughout, so the rule saw nothing in the one file it exists to guard: an
+// illegal region produced zero findings, measured.
+const TEE_LITERAL = /\btee:\s*["']([^"']+)["']/g;
+const REGIONS_LITERAL = /\bregions:\s*\[\s*["']([^"']+)["']/g;
 
 // Deliberately narrow. A generic entropy scanner would fire on every commitment,
 // keccak vector, forwarder address and transaction hash in evidence/.

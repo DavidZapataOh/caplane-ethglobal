@@ -67,6 +67,7 @@ test('both config files carry the same shape and no dead keys', async () => {
 	const production = await Bun.file('./config.production.json').json()
 	expect(Object.keys(STAGING).sort()).toEqual([
 		'advanceRateBps',
+		'escrowAddress',
 		'feeRateBps',
 		'graceSeconds',
 		'inboxAddress',
@@ -192,11 +193,27 @@ test('the enclave never logs', () => {
 
 // The door is not a filter: what crosses is exactly what the payload carries. One crossing, one
 // report, both pinned across the whole package — a second one anywhere is how confidentiality ends
-// with nothing failing.
-test('the enclave crosses the door exactly once', () => {
+// with nothing failing. Two handlers now share it: two inline crossings would also satisfy a count
+// of two callers, which is why the crossing itself stays at one.
+test('both handlers report through the same crossing', () => {
 	const sources = enclaveSources()
 	expect(sources.match(/usingTheDons\(\)/g) ?? []).toHaveLength(1)
 	expect(sources.match(/\.report\(/g) ?? []).toHaveLength(1)
+	// The definition reads `submitReport = (`, so it does not match. These are the two call sites.
+	expect(sources.match(/submitReport\(/g) ?? []).toHaveLength(2)
+})
+
+// Routing is by array position, and the settlement handler is index 1 — the index `simulate` is
+// pointed at with `--trigger-index 1`. The comparison is inside the registration array: comparing
+// raw file offsets would compare an import against a definition.
+test('the workflow registers two handlers, settlement second', () => {
+	const source = readFileSync('./workflow.ts', 'utf8')
+	const registrations = /return \[([\s\S]*?)\n\t\]/.exec(source)?.[1] ?? ''
+	expect(registrations.match(/handlerInTee\(/g) ?? []).toHaveLength(2)
+	expect(registrations.indexOf('onClaimSubmitted')).toBeGreaterThanOrEqual(0)
+	expect(registrations.indexOf('onClaimSubmitted')).toBeLessThan(
+		registrations.indexOf('onAdvanceSettled'),
+	)
 })
 
 // The borrower is the address the chain says submitted, never one the plaintext asserts. This is

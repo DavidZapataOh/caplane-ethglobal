@@ -20,6 +20,8 @@ export const configSchema = z.object({
 	ledgerTenantId: z.string().regex(/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/),
 	watchlistUrl: z.string().regex(/^https:\/\//),
 	registryAddress: z.string().regex(/^0x[0-9a-fA-F]{40}$/),
+	/** Emits `Settled` once per lien and never again, which is what makes it safe as a trigger. */
+	escrowAddress: z.string().regex(/^0x[0-9a-fA-F]{40}$/),
 	/**
 	 * Read by raw JSON-RPC rather than by the EVM capability: every method on that capability
 	 * takes the ordinary runtime, and obtaining one inside a TEE handler means going back through

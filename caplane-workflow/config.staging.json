@@ -9,5 +9,6 @@
   "advanceRateBps": "8000",
   "feeRateBps": "200",
   "settlementBaseUsdc6": "10000000",
-  "graceSeconds": "2592000"
+  "graceSeconds": "2592000",
+  "escrowAddress": "0x5de99d8be27468dd175738e1703259130eb703b5"
 }

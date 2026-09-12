@@ -152,20 +152,33 @@ test("flags a node-builtin dependency reaching the workflow", () => {
   expect(found[0].detail).toContain("ethers");
 });
 
-test("flags a tee region other than us-west-2", () => {
-  const s = snap({
-    files: [{ path: "caplane-workflow/main.ts", content: 'regions: ["eu-west-1"]' }],
-  });
-  expect(onlyApprovedTeeConstraint(s)).toHaveLength(1);
+// Both quote styles. The fixtures here were double-quoted while the workflow package is written
+// in single quotes, so the rule and its test agreed with each other and with nothing else.
+test("flags a tee region other than us-west-2, in either quote style", () => {
+  for (const content of ['regions: ["eu-west-1"]', "regions: ['eu-west-1']"]) {
+    expect(onlyApprovedTeeConstraint(snap({
+      files: [{ path: "caplane-workflow/main.ts", content }],
+    }))).toHaveLength(1);
+  }
+});
+
+test("flags a tee other than nitro, in either quote style", () => {
+  for (const content of ['tee: "sev"', "tee: 'sev'"]) {
+    expect(onlyApprovedTeeConstraint(snap({
+      files: [{ path: "caplane-workflow/main.ts", content }],
+    }))).toHaveLength(1);
+  }
 });
 
 test("accepts the verified nitro us-west-2 constraint", () => {
-  const s = snap({
-    files: [
-      { path: "caplane-workflow/main.ts", content: '[{ tee: "nitro", regions: ["us-west-2"] }]' },
-    ],
-  });
-  expect(onlyApprovedTeeConstraint(s)).toEqual([]);
+  for (const content of [
+    '[{ tee: "nitro", regions: ["us-west-2"] }]',
+    "[{ tee: 'nitro', regions: ['us-west-2'] }]",
+  ]) {
+    expect(onlyApprovedTeeConstraint(snap({
+      files: [{ path: "caplane-workflow/main.ts", content }],
+    }))).toEqual([]);
+  }
 });
 
 test("flags a tracked dotenv file", () => {

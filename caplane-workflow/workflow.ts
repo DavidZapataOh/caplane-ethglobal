@@ -8,7 +8,8 @@ import { open } from './envelope'
 import { lienIdOf } from '../claim/commit'
 import { toComponents } from '../claim/index'
 import { ClaimType, RejectReason, ReportKind } from './abi/frozen'
-import { encodeReportBody, nonceFor, reportPayload, underwrite } from './report'
+import { nonceFor, submitReport, underwrite } from './report'
+import { SETTLED_TOPIC, onAdvanceSettled } from './settlement'
 import { decodeClaim } from './ledger'
 import { readRegistry, verdictOf } from './registry'
 import { UNVERIFIED, verifyExternally } from './verify'
@@ -173,19 +174,29 @@ export const onClaimSubmitted = (runtime: TeeRuntime<Config>, log: EVMLog): stri
 		componentCommitments: decision.kind === ReportKind.Record ? registryRead.commitments : [],
 	}
 
-	// The single crossing. Nothing the enclave read goes through it — ten derived fields, and the
-	// commitments are peppered hashes whose pepper stays behind. The door is not a filter: it
-	// carries exactly what the payload carries, which is why this is pinned by a test rather than
-	// asserted in a comment.
-	const donRuntime = runtime.usingTheDons()
-	const report = donRuntime.report(reportPayload(body)).result()
-	new cre.capabilities.EVMClient(CHAIN.arcTestnet.chainSelector)
-		.writeReport(donRuntime, { receiver: config.registryAddress as Hex, report })
-		.result()
+	// The single crossing, shared with the settlement handler. Nothing the enclave read goes
+	// through it — ten derived fields, and the commitments are peppered hashes whose pepper stays
+	// behind. The door is not a filter: it carries exactly what the payload carries, which is why
+	// this is pinned by a test rather than asserted in a comment.
+	submitReport(runtime, body)
 
 	return `${claim.submissionId} ${claim.submitter} ${authorized} ${verified.exists} ${verified.unpaid} ${verified.matches} ${verified.screened} ${collision.status} ${confirmed} ${decision.kind}`
 }
 
+/**
+ * One approved constraint, written once. Typed as a mutable tuple rather than `as const`: the
+ * SDK's parameter is mutable and a readonly tuple is not assignable to it.
+ */
+const TEE: [{ tee: 'nitro'; regions: ['us-west-2'] }] = [{ tee: 'nitro', regions: ['us-west-2'] }]
+
+/**
+ * Two subscriptions of a limit of ten, and routing is by POSITION in this array — index 0 is the
+ * submission, index 1 the settlement, which is what `--trigger-index` selects. Two triggers rather
+ * than one carrying both addresses: a filter with several addresses and several signatures takes
+ * the cross product, not the pairing.
+ *
+ * The 10-events-per-6s rate limit is shared between them, so this divides that budget.
+ */
 export function initWorkflow(config: Config) {
 	const evm = new cre.capabilities.EVMClient(CHAIN.arcTestnet.chainSelector)
 	return [
@@ -193,8 +204,6 @@ export function initWorkflow(config: Config) {
 			evm.logTrigger(
 				logTriggerConfig({
 					addresses: [config.inboxAddress as Hex],
-					// One address, one signature. A filter carrying several of either takes the
-					// cross product, so a second event gets its own trigger and its own handler.
 					topics: [[CLAIM_SUBMITTED_TOPIC]],
 					// Deliberate, not defaulted: a lien is a permanent record, so the workflow
 					// waits for the block to be beyond reorg rather than reacting to the tip.
@@ -202,7 +211,19 @@ export function initWorkflow(config: Config) {
 				}),
 			),
 			onClaimSubmitted,
-			[{ tee: 'nitro', regions: ['us-west-2'] }],
+			TEE,
+		),
+		cre.handlerInTee(
+			evm.logTrigger(
+				logTriggerConfig({
+					addresses: [config.escrowAddress as Hex],
+					topics: [[SETTLED_TOPIC]],
+					// Same reason as the first: a release is permanent too.
+					confidence: 'FINALIZED',
+				}),
+			),
+			onAdvanceSettled,
+			TEE,
 		),
 	]
 }

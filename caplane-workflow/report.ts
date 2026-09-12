@@ -1,7 +1,7 @@
-import { prepareReportRequest } from '@chainlink/cre-sdk'
-import type { ReportRequestJson } from '@chainlink/cre-sdk'
+import { cre, prepareReportRequest } from '@chainlink/cre-sdk'
+import type { ReportRequestJson, TeeRuntime } from '@chainlink/cre-sdk'
 import { type Hex, encodeAbiParameters, encodePacked, keccak256, parseAbiParameters } from 'viem'
-import { RejectReason, ReportKind } from './abi/frozen'
+import { CHAIN, RejectReason, ReportKind } from './abi/frozen'
 import type { Config } from './config'
 import type { Verdict } from './registry'
 import type { Verification } from './verify'
@@ -137,3 +137,20 @@ export const encodeReportBody = (body: ReportBody): Hex =>
 /** Their helper, not ours: it applies `evm`/`ecdsa`/`keccak256` and does the hex-to-base64 step. */
 export const reportPayload = (body: ReportBody): ReportRequestJson =>
 	prepareReportRequest(encodeReportBody(body))
+
+/**
+ * The only place in this package that leaves the enclave. Both handlers come through here, so the
+ * crossing is one line to audit rather than one per report kind, and a test pins the count at one
+ * while the callers are two.
+ *
+ * It lives beside the encoder rather than beside the handlers because the settlement handler
+ * already imports this module; putting it in the handler file would make that a cycle — the same
+ * shape the config module was extracted to break.
+ */
+export const submitReport = (runtime: TeeRuntime<Config>, body: ReportBody): void => {
+	const donRuntime = runtime.usingTheDons()
+	const report = donRuntime.report(reportPayload(body)).result()
+	new cre.capabilities.EVMClient(CHAIN.arcTestnet.chainSelector)
+		.writeReport(donRuntime, { receiver: runtime.config.registryAddress as Hex, report })
+		.result()
+}

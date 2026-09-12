@@ -9,7 +9,10 @@
     "reportPayloadBytes": 5120,
     "_report": "5120 and 5000 are both real limits and both stay. What a report body is actually checked against is neither: 5011 is ChainWrite.EVM.ReportSizeLimit minus the forwarder's 109-byte header. 5000 is LogTrigger.EventSizeLimit, a different limit on a different object.",
     "report": { "bodyBytes": 576, "rejectBodyBytes": 352, "bodyBudgetBytes": 5011 },
-    "logTriggerEventBytes": 5000
+    "logTriggerEventBytes": 5000,
+    "_triggerSubscriptions": "Two: the inbox and the escrow. The 10-events-per-6s rate limit is SHARED between them, so a second subscription divides that budget rather than adding to it.",
+    "triggerSubscriptions": 2,
+    "triggerSubscriptionLimit": 10
   },
   "data": {
     "accounting": {
