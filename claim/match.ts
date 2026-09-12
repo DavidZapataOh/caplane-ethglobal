@@ -1,3 +1,4 @@
+import { instrumentOf } from './instrument'
 import { COMPONENT_ORDER, type ClaimComponents } from './schema'
 
 /**
@@ -37,8 +38,27 @@ export const agreement = (a: ClaimComponents, b: ClaimComponents): number =>
  */
 export const THRESHOLD = 6
 
-export const isCollision = (a: ClaimComponents, b: ClaimComponents): boolean =>
-  agreement(a, b) >= THRESHOLD
+/**
+ * The threshold is a property of the instrument, not of the registry.
+ *
+ * Six is measured, against 903 pairs of real invoices from one ledger. It does not transfer: two
+ * unrelated invoices from one book agree on three — the three the ledger fixes — while two vehicles
+ * financed by the same creditor to the same obligor on the same terms agree on **six**, differing
+ * only in the vin. Inheriting six would refuse the second truck of a fleet as a double pledge of
+ * the first.
+ *
+ * For that type the threshold is seven, exactly, and that is safe for a structural reason rather
+ * than a measured one: a vin is seventeen fixed characters with a check digit, and canonicalisation
+ * — upper case, strip anything that is not a letter or a number — loses nothing, so the legitimate
+ * reformatting that forced six down for invoices does not exist here.
+ *
+ * It is compared in the enclave and never on chain, which is why a threshold per type costs a
+ * configuration entry and not a redeploy.
+ */
+export const thresholdFor = (claimType: number): number => instrumentOf(claimType).threshold
+
+export const isCollision = (claimType: number, a: ClaimComponents, b: ClaimComponents): boolean =>
+  agreement(a, b) >= thresholdFor(claimType)
 
 export type MatchResult = { lienId: string; matched: number }
 export type Verdict = { collision: true; lienId: string } | { collision: false }
@@ -54,10 +74,12 @@ export const NO_LIEN = `0x${'0'.repeat(64)}`
  * count with no candidate is either a wrong endpoint or a malformed response, and the verdict
  * this produces crosses the one-way door — so it refuses rather than guesses.
  */
-export const decide = ({ lienId, matched }: MatchResult): Verdict => {
+export const decide = (claimType: number, { lienId, matched }: MatchResult): Verdict => {
   const hasCandidate = lienId !== NO_LIEN
   if (!hasCandidate && matched > 0) {
     throw new Error(`inconsistent match: ${matched} components matched with no lien`)
   }
-  return hasCandidate && matched >= THRESHOLD ? { collision: true, lienId } : { collision: false }
+  return hasCandidate && matched >= thresholdFor(claimType)
+    ? { collision: true, lienId }
+    : { collision: false }
 }

@@ -13,7 +13,7 @@ const INPUT: ClaimInput = {
   issuerTaxId: 'e1218a28-7437-47ec-bfb5-252092825083',
   country: 'AU',
 }
-const claim = (over: Partial<ClaimInput> = {}): ClaimComponents => toComponents({ ...INPUT, ...over })
+const claim = (over: Partial<ClaimInput> = {}): ClaimComponents => toComponents(ClaimType.Invoice, { ...INPUT, ...over })
 const PEPPER = new Uint8Array(32).fill(7)
 
 test('the lien id is thirty-two bytes and pepper-free', () => {

@@ -1,4 +1,5 @@
 import { expect, test } from 'bun:test'
+import { ClaimType } from './abi/frozen'
 import { COMPONENT_ORDER, type ClaimInput } from './schema'
 import { toComponents } from './index'
 
@@ -11,9 +12,9 @@ const corpus = (await Bun.file(
   new URL('../evidence/data/02-invoice-corpus.json', import.meta.url),
 ).json()) as Corpus
 
-const canonical = toComponents(corpus.canonical)
+const canonical = toComponents(ClaimType.Invoice, corpus.canonical)
 const agree = (variant: Partial<ClaimInput>) => {
-  const other = toComponents({ ...corpus.canonical, ...variant })
+  const other = toComponents(ClaimType.Invoice, { ...corpus.canonical, ...variant })
   return COMPONENT_ORDER.filter((name) => canonical[name] === other[name]).length
 }
 
@@ -24,7 +25,7 @@ test('every component of the canonical claim canonicalises to something', () => 
 // An empty component compares equal to any other empty one on-chain, so a claim made of
 // punctuation would match another on every component at once. It is refused at the door.
 test('a claim with a component that canonicalises to nothing is refused', () => {
-  expect(() => toComponents({ ...corpus.canonical, invoiceNumber: '---' })).toThrow(/nothing/)
+  expect(() => toComponents(ClaimType.Invoice, { ...corpus.canonical, invoiceNumber: '---' })).toThrow(/nothing/)
 })
 
 // Six of seven is what the worst real reformatting costs: dropping the invoice number's

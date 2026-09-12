@@ -1,4 +1,5 @@
 import { CONFIRMATION_FIELDS, type DebtorConfirmation } from '../claim/attestation'
+import { ClaimType } from './abi/frozen'
 import { EXPONENT } from '../claim/canonical'
 
 /**
@@ -23,6 +24,8 @@ export type SubmittedClaim = {
 	country: string
 	confirmation: DebtorConfirmation
 	signature: string
+	/** Which instrument this is. Absent in envelopes sealed before it existed: defaults to invoice. */
+	claimType: number
 }
 
 const FIELDS = [
@@ -59,8 +62,15 @@ export const decodeClaim = (bytes: Uint8Array): SubmittedClaim => {
 		if (typeof fields[field] !== 'string') throw new Error(`confirmation is missing ${field}`)
 	}
 
+	// The instrument type, defaulted rather than required: every envelope sealed before this existed
+	// carries no such field, and refusing those would invalidate work already done. An unsupported
+	// value is refused downstream by the derivation, which is where a wrong preimage space would do
+	// the damage.
+	const claimType = typeof parsed.claimType === 'number' ? parsed.claimType : ClaimType.Invoice
+
 	return {
 		...(parsed as unknown as SubmittedClaim),
+		claimType,
 		confirmation: {
 			...(confirmation as unknown as DebtorConfirmation),
 			amountMinor: BigInt(fields.amountMinor as string),

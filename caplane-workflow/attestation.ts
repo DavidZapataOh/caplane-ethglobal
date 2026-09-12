@@ -99,7 +99,7 @@ export const confirmationBinds = (
 		same(confirmation.creditor, submitter) &&
 		same(confirmation.debtor, recovered) &&
 		!same(confirmation.debtor, submitter) &&
-		confirmation.claimId === claimIdOf(ClaimType.Invoice, toComponents(claim)) &&
+		confirmation.claimId === claimIdOf(claim.claimType, toComponents(claim.claimType, claim)) &&
 		confirmation.debtorRef === keccakOf(invoice.Contact?.ContactID ?? '') &&
 		confirmation.invoiceNumber === claim.invoiceNumber &&
 		confirmation.currency === claim.currency &&

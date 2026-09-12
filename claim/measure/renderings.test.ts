@@ -1,3 +1,4 @@
+import { ClaimType } from '../abi/frozen'
 import { expect, test } from 'bun:test'
 import { toComponents } from '../index'
 import { agreement, THRESHOLD } from '../match'
@@ -28,8 +29,8 @@ export const RENDERINGS: Rendering[] = [
   { label: 'the net line instead of the taxed total', author: 'ledger', over: { amountMinor: '25000000' } },
 ]
 
-const base = toComponents(SEEDED)
-const score = (over: Partial<ClaimInput>) => agreement(base, toComponents({ ...SEEDED, ...over }))
+const base = toComponents(ClaimType.Invoice, SEEDED)
+const score = (over: Partial<ClaimInput>) => agreement(base, toComponents(ClaimType.Invoice, { ...SEEDED, ...over }))
 
 test('every documented rendering survives the threshold', () => {
   const below = RENDERINGS.filter((r) => score(r.over) < THRESHOLD).map((r) => r.label)

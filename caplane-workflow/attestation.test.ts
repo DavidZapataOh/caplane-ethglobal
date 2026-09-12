@@ -18,6 +18,10 @@ const OTHER_REGISTRY = '0x000000000000000000000000000000000000dEaD' as const
 const BLOCK = 61_626_829n
 
 const CLAIM = {
+	// The fixture carries it explicitly. decodeClaim defaults it for envelopes sealed before the
+	// field existed, but a claim assembled in a test bypasses that and must say which instrument it
+	// is — an absent type is a refusal, not an invoice.
+	claimType: ClaimType.Invoice,
 	debtorTaxId: 'Bayside Club',
 	invoiceNumber: 'ORC1043',
 	amountMinor: '27500000',
@@ -33,7 +37,7 @@ const INVOICE = {
 const confirmationFor = (creditor: Hex, debtor: Hex): DebtorConfirmation => ({
 	creditor,
 	debtor,
-	claimId: lienIdOf(ClaimType.Invoice, toComponents(CLAIM)),
+	claimId: lienIdOf(ClaimType.Invoice, toComponents(ClaimType.Invoice, CLAIM)),
 	invoiceNumber: 'ORC1043',
 	currency: 'AUD',
 	amountMinor: 27_500_000n,

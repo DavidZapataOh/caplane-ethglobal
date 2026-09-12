@@ -25,6 +25,13 @@ export const configSchema = z.object({
 	 */
 	ledgerCountry: z.string().regex(/^[A-Z]{2}$/),
 	watchlistUrl: z.string().regex(/^https:\/\//),
+	/**
+	 * The public vehicle register. Two hosts because they are two services: the decoder and the
+	 * recall list. Neither needs a credential, which is what lets a second instrument exist at all —
+	 * the secret ring is at a documented ceiling of five with no room for a sixth.
+	 */
+	vinApiBase: z.string().regex(/^https:\/\//),
+	recallsApiBase: z.string().regex(/^https:\/\//),
 	registryAddress: z.string().regex(/^0x[0-9a-fA-F]{40}$/),
 	/** Emits `Settled` once per lien and never again, which is what makes it safe as a trigger. */
 	escrowAddress: z.string().regex(/^0x[0-9a-fA-F]{40}$/),

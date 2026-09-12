@@ -1,4 +1,5 @@
 import { expect, test } from 'bun:test'
+import { ClaimType } from './abi/frozen'
 import { toComponents } from './index'
 import { COMPONENT_ORDER, type ClaimComponents, type ClaimInput } from './schema'
 import { agreement } from './match'
@@ -14,7 +15,7 @@ const INPUT: ClaimInput = {
 }
 
 const components = (over: Partial<ClaimInput> = {}): ClaimComponents =>
-  toComponents({ ...INPUT, ...over })
+  toComponents(ClaimType.Invoice, { ...INPUT, ...over })
 
 test('a claim agrees with itself on every component', () => {
   expect(agreement(components(), components())).toBe(7)
@@ -45,12 +46,12 @@ test('the threshold is six of seven', () => {
 // Seven would reject this, and it is a legitimate reformatting: dropping the invoice number's
 // prefix is the one thing canonicalisation cannot absorb.
 test('a claim that lost one component is still a collision', () => {
-  expect(isCollision(components(), components({ invoiceNumber: '1043' }))).toBe(true)
+  expect(isCollision(ClaimType.Invoice, components(), components({ invoiceNumber: '1043' }))).toBe(true)
 })
 
 test('a claim that lost two components is not', () => {
   expect(
-    isCollision(components(), components({ invoiceNumber: '1043', dueDate: '2027-06-30' })),
+    isCollision(ClaimType.Invoice, components(), components({ invoiceNumber: '1043', dueDate: '2027-06-30' })),
   ).toBe(false)
 })
 
@@ -64,7 +65,7 @@ test('a second real invoice from the same ledger is not a collision', () => {
     dueDate: '2027-06-30',
   })
   expect(agreement(components(), other)).toBe(3)
-  expect(isCollision(components(), other)).toBe(false)
+  expect(isCollision(ClaimType.Invoice, components(), other)).toBe(false)
 })
 
 // An amount either side of a power of two loses its bucket, and that costs one component —
@@ -74,14 +75,14 @@ test('an amount across a bucket boundary is still a collision', () => {
   const justBelow = components({ amountMinor: '16700000' })
   const justAbove = components({ amountMinor: '16800000' })
   expect(agreement(justBelow, justAbove)).toBe(6)
-  expect(isCollision(justBelow, justAbove)).toBe(true)
+  expect(isCollision(ClaimType.Invoice, justBelow, justAbove)).toBe(true)
 })
 
 // And the pair that does defeat it, so the limitation is recorded rather than implied.
 test('a boundary amount plus one other reformatting is not a collision', () => {
   const a = components({ amountMinor: '16700000' })
   const b = components({ amountMinor: '16800000', invoiceNumber: '1043' })
-  expect(isCollision(a, b)).toBe(false)
+  expect(isCollision(ClaimType.Invoice, a, b)).toBe(false)
 })
 
 import { decide } from './match'
@@ -89,20 +90,20 @@ import { decide } from './match'
 const ZERO = `0x${'0'.repeat(64)}`
 
 test('no candidate is clear', () => {
-  expect(decide({ lienId: ZERO, matched: 0 })).toEqual({ collision: false })
+  expect(decide(ClaimType.Invoice, { lienId: ZERO, matched: 0 })).toEqual({ collision: false })
 })
 
 test('a candidate at the threshold is a collision, and names the lien', () => {
-  expect(decide({ lienId: '0xabc', matched: 6 })).toEqual({ collision: true, lienId: '0xabc' })
+  expect(decide(ClaimType.Invoice, { lienId: '0xabc', matched: 6 })).toEqual({ collision: true, lienId: '0xabc' })
 })
 
 test('a candidate below the threshold is clear', () => {
-  expect(decide({ lienId: '0xabc', matched: 5 })).toEqual({ collision: false })
+  expect(decide(ClaimType.Invoice, { lienId: '0xabc', matched: 5 })).toEqual({ collision: false })
 })
 
 // This input is decoded from a raw JSON-RPC response to an endpoint named in configuration,
 // not from a typed contract call. A count with no candidate is a wrong endpoint or a malformed
 // response, and the verdict it produces crosses the one-way door.
 test('a count with no lien is refused rather than interpreted', () => {
-  expect(() => decide({ lienId: ZERO, matched: 6 })).toThrow(/inconsistent/)
+  expect(() => decide(ClaimType.Invoice, { lienId: ZERO, matched: 6 })).toThrow(/inconsistent/)
 })

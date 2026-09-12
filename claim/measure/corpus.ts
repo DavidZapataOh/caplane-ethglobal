@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+import { ClaimType } from '../abi/frozen'
 import { debtorIdentity, type IdentitySource } from '../identity'
 import { toComponents } from '../index'
 import type { ClaimComponents } from '../schema'
@@ -49,7 +50,7 @@ export const buildCorpus = (
 
     out.push({
       invoiceNumber: number,
-      components: toComponents({
+      components: toComponents(ClaimType.Invoice, {
         debtorTaxId: identity.value,
         invoiceNumber: number,
         amountMinor: minorUnits(invoice.Total ?? 0),

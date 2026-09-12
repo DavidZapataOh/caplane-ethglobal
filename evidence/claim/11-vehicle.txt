@@ -1,0 +1,77 @@
+The second instrument, verified against the public vehicle register. Measured 2026-09-12.
+
+Why a vehicle and not a lease: the rule is that every external call hits a real service, and
+four measured limits closed every other door. The ledger's token is scoped to invoices — asking
+it for anything else answers invalid_scope. The secret ring is at a documented ceiling of five
+with no room for a sixth. The enclave spends four of five http calls. And verify.ts is pinned by
+its own tests to exactly three requests.
+
+These two services need no credential at all, which is what makes them fit.
+
+--- the decoder, and what a refusal looks like -------------------------------
+  GET decodevinvalues/$V   http 200  3921 B  0.391313s
+    ErrorCode   '0'
+    VIN         '1HGCM82633A004352'   echoed back, and compared against the claim
+    Make        'HONDA'
+    Model       'Accord'
+    ModelYear   '2003'
+    VehicleType 'PASSENGER CAR'
+    Manufacturer'AMERICAN HONDA MOTOR CO., INC.'
+    PlantCountry'UNITED STATES (USA)'
+    non-empty fields 45 of 154
+  a malformed number answers 200, not an error:
+    ErrorCode   '6,7,400'
+    Make        ''   so the status code proves nothing and ErrorCode is the discriminator
+
+--- the condition signal, and its negative control --------------------------
+  GET recallsByVehicle           http 200  36156 B  0.690429s
+    Count       24   open safety campaigns
+      19V182000  AIR BAGS:FRONTAL:DRIVER SIDE:INFLATOR MODULE
+      19E068000  VEHICLE SPEED CONTROL:ACCELERATOR PEDAL
+  a vehicle that does not exist:
+    Count       0   and an absent count is not zero — undefined fails the check
+
+--- the finding that justifies the plan: the threshold does not transfer ----
+  two identical trucks, one vin apart
+    agreement                 6 of 7
+    threshold for a vehicle   7
+    threshold for an invoice  6   (measured: 903 pairs, one false match)
+    collision at 7            false   correct: two vehicles, two liens
+    collision at 6            true    the false refusal an inherited threshold would have produced
+
+  the same seven texts under two instrument types
+    components identical      true
+    lienId as equipment       0xbeb8d2d051baec49b0ad64d76b146eda97afada93664f9a6ab2081a897509dc3
+    lienId as invoice         0xc2901eaf644da70c4dd60f4e64b424270d63d7b8cd196581342fc13a84ab672a
+    claimId as equipment      0x0090bbf711ce11f22a53fbeca1bde24872cd6e946af38e7ec1c005cede898a40
+    claimId as invoice        0xa1e7d1501629c8c3ab710d39f9f9e1069583b405e4f15542c66a09fd318ae5fe
+
+Six of seven is measured — brute-forced against 903 pairs of real invoices from one ledger, one
+false match. It does not transfer. Two unrelated invoices from one book agree on three, the three
+the ledger fixes; two vehicles financed by the same creditor to the same obligor on the same terms
+agree on SIX, differing only in the number. Inheriting six would have refused the second truck of a
+fleet as a double pledge of the first, and the borrower would have experienced an unexplained no.
+
+Seven is safe here for a structural reason rather than a measured one, and the difference is stated
+rather than blurred: a vin is seventeen fixed characters with a check digit, and canonicalisation —
+upper case, strip anything that is not a letter or a number — loses nothing. The legitimate
+reformatting that forced six down for invoices does not exist for this type. Six renderings of one
+vehicle were checked and every one still agrees on seven.
+
+There is no measured false-match rate for vehicles, and this does not borrow the invoices' number.
+
+--- what cost nothing -------------------------------------------------------
+
+  frozen artifacts changed     0   ClaimType.Equipment already existed; five vendored copies still
+                                   hash identically
+  Solidity changed             0   the registry stores seven opaque bytes32 and never learns the type
+  redeploys                    0   the threshold is compared in the enclave, not on chain
+  new secrets                  0   both registers are public
+  http calls per execution     3   the same three, dispatched by type: the count cannot depend on
+                                   the sealed content or it tells a node operator the instrument
+
+--- what is not measured here -----------------------------------------------
+
+A vehicle lien on chain. That needs the enclave running this code, and the deploy is not mine. The
+derivation, the threshold and the two registers are exercised; the end-to-end record is what turns
+this from a table and some tests into the thing the project's own definition of done asks for.

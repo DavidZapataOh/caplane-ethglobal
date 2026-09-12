@@ -4,6 +4,8 @@
   "ledgerApiBase": "https://api.xero.com/api.xro/2.0",
   "ledgerTenantId": "e1218a28-7437-47ec-bfb5-252092825083",
   "watchlistUrl": "https://data.trade.gov/consolidated_screening_list/v1/search",
+  "vinApiBase": "https://vpic.nhtsa.dot.gov/api/vehicles",
+  "recallsApiBase": "https://api.nhtsa.gov/recalls/recallsByVehicle",
   "registryAddress": "0xe7170ee0ce4cab4593970ef5c4ebf7d0d62ae19b",
   "rpcUrl": "https://rpc.testnet.arc.io",
   "advanceRateBps": "8000",

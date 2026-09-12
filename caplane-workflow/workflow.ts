@@ -144,11 +144,11 @@ export const onClaimSubmitted = (runtime: TeeRuntime<Config>, log: EVMLog): stri
 			if (blockNumber === undefined) throw new Error('trigger carried no block height')
 			if (submitted !== undefined) {
 				const read = readRegistry(runtime, secrets, submitted, blockNumber)
-				collision = verdictOf(read.read)
+				collision = verdictOf(submitted.claimType, read.read)
 				commitments = read.commitments
 				lienId = lienIdOf(
-					ClaimType.Invoice,
-					toComponents(submitted),
+					submitted.claimType,
+					toComponents(submitted.claimType, submitted),
 					secretBytes('COMMITMENT_PEPPER', secrets.COMMITMENT_PEPPER.value),
 				)
 				// Inside the guard too: this derives the claim id, which canonicalises every

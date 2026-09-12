@@ -42,7 +42,7 @@ const confirmation = {
 	debtor: account.address,
 	// The pepper-free claim id, not the registry key. This tool runs on the debtor's side and must
 	// never hold the pepper — and this value never leaves the sealed envelope.
-	claimId: claimIdOf(ClaimType.Invoice, toComponents(claim)),
+	claimId: claimIdOf(ClaimType.Invoice, toComponents(ClaimType.Invoice, claim)),
 	invoiceNumber: claim.invoiceNumber,
 	currency: claim.currency,
 	amountMinor: BigInt(claim.amountMinor),

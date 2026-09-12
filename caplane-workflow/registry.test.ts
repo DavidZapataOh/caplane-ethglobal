@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import { ClaimType } from './abi/frozen'
 import { expect, test } from 'bun:test'
 import type { Hex } from 'viem'
 import { NO_LIEN } from '../claim/match'
@@ -21,14 +22,14 @@ const CLAIM = {
 // Seven, always: the view returns zeros for any other length, which is indistinguishable from
 // "no collision". A derivation that silently produced six would read as a clean registry.
 test('the derivation produces exactly seven commitments', () => {
-	expect(commitmentsOf(CLAIM, PEPPER)).toHaveLength(7)
+	expect(commitmentsOf(ClaimType.Invoice, CLAIM, PEPPER)).toHaveLength(7)
 })
 
 // The pepper is what makes the index unguessable: currency, country, due date and amount bucket
 // are low-entropy enough to enumerate exhaustively.
 test('a different pepper produces different commitments', () => {
-	const other = commitmentsOf(CLAIM, new Uint8Array(32).fill(9))
-	for (const [i, c] of commitmentsOf(CLAIM, PEPPER).entries()) expect(c).not.toBe(other[i])
+	const other = commitmentsOf(ClaimType.Invoice, CLAIM, new Uint8Array(32).fill(9))
+	for (const [i, c] of commitmentsOf(ClaimType.Invoice, CLAIM, PEPPER).entries()) expect(c).not.toBe(other[i])
 })
 
 // An empty registry, a wrong-length array and a wrong address all look like "no collision".
@@ -36,7 +37,7 @@ test('a different pepper produces different commitments', () => {
 // cannot have come from any of the three.
 test('the batch carries a discriminating second call', () => {
 	const body = JSON.parse(
-		Buffer.from(batchBody(commitmentsOf(CLAIM, PEPPER), '0xabc', 61_668_574n), 'base64').toString(),
+		Buffer.from(batchBody(commitmentsOf(ClaimType.Invoice, CLAIM, PEPPER), '0xabc', 61_668_574n), 'base64').toString(),
 	)
 	expect(body).toHaveLength(2)
 	expect(body[1].params[0].data).toBe('0x007271ce')
@@ -47,7 +48,7 @@ test('the batch carries a discriminating second call', () => {
 // both of which land because their nonces differ by kind.
 test('the read is pinned to the trigger block, not the tip', () => {
 	const body = JSON.parse(
-		Buffer.from(batchBody(commitmentsOf(CLAIM, PEPPER), '0xabc', 61_668_574n), 'base64').toString(),
+		Buffer.from(batchBody(commitmentsOf(ClaimType.Invoice, CLAIM, PEPPER), '0xabc', 61_668_574n), 'base64').toString(),
 	)
 	for (const call of body) expect(call.params[1]).toBe('0x3acfcde')
 	expect(JSON.stringify(body)).not.toContain('latest')
@@ -56,7 +57,7 @@ test('the read is pinned to the trigger block, not the tip', () => {
 // `now()` exists on the runtime and the envelope's `id` is exactly where a timestamp would land.
 test('the request carries no clock', () => {
 	const body = JSON.parse(
-		Buffer.from(batchBody(commitmentsOf(CLAIM, PEPPER), '0xabc', 61_668_574n), 'base64').toString(),
+		Buffer.from(batchBody(commitmentsOf(ClaimType.Invoice, CLAIM, PEPPER), '0xabc', 61_668_574n), 'base64').toString(),
 	)
 	expect(body.map((c: { id: number }) => c.id)).toEqual([1, 2])
 })
@@ -129,30 +130,30 @@ test('nothing about the query is cached', () => {
 // the node's gas cap. Collapsing it into "clear" is how a registry that cannot answer becomes a
 // registry that says yes.
 test('an unanswerable read is undecidable, never clear', () => {
-	expect(verdictOf({ kind: 'error', reason: 'out of gas' }).status).toBe('undecidable')
-	expect(verdictOf({ kind: 'ok', lienId: NO_LIEN as Hex, matched: 0 }).status).toBe('clear')
-	expect(verdictOf({ kind: 'ok', lienId: SOME_LIEN, matched: 6 }).status).toBe('collision')
+	expect(verdictOf(ClaimType.Invoice, { kind: 'error', reason: 'out of gas' }).status).toBe('undecidable')
+	expect(verdictOf(ClaimType.Invoice, { kind: 'ok', lienId: NO_LIEN as Hex, matched: 0 }).status).toBe('clear')
+	expect(verdictOf(ClaimType.Invoice, { kind: 'ok', lienId: SOME_LIEN, matched: 6 }).status).toBe('collision')
 })
 
 // Below threshold is genuinely clear: the count is a real measurement, not a failure.
 test('a candidate under the threshold is clear', () => {
-	expect(verdictOf({ kind: 'ok', lienId: SOME_LIEN, matched: 5 }).status).toBe('clear')
+	expect(verdictOf(ClaimType.Invoice, { kind: 'ok', lienId: SOME_LIEN, matched: 5 }).status).toBe('clear')
 })
 
 // A count with no candidate is a malformed response, not a near miss. The shared decision throws
 // on it, and that throw must become the third verdict rather than escape the handler.
 test('an inconsistent response is undecidable', () => {
-	expect(verdictOf({ kind: 'ok', lienId: NO_LIEN as Hex, matched: 4 }).status).toBe('undecidable')
+	expect(verdictOf(ClaimType.Invoice, { kind: 'ok', lienId: NO_LIEN as Hex, matched: 4 }).status).toBe('undecidable')
 })
 
 // The point of three verdicts is that they are three. A test that only ever saw "clear" would
 // pass against an implementation that returned "clear" unconditionally.
 test('the four inputs produce three distinct verdicts', () => {
 	const statuses = [
-		verdictOf({ kind: 'error', reason: 'out of gas' }).status,
-		verdictOf({ kind: 'ok', lienId: NO_LIEN as Hex, matched: 0 }).status,
-		verdictOf({ kind: 'ok', lienId: SOME_LIEN, matched: 5 }).status,
-		verdictOf({ kind: 'ok', lienId: SOME_LIEN, matched: 6 }).status,
+		verdictOf(ClaimType.Invoice, { kind: 'error', reason: 'out of gas' }).status,
+		verdictOf(ClaimType.Invoice, { kind: 'ok', lienId: NO_LIEN as Hex, matched: 0 }).status,
+		verdictOf(ClaimType.Invoice, { kind: 'ok', lienId: SOME_LIEN, matched: 5 }).status,
+		verdictOf(ClaimType.Invoice, { kind: 'ok', lienId: SOME_LIEN, matched: 6 }).status,
 	]
 	expect(new Set(statuses)).toEqual(new Set(['undecidable', 'clear', 'collision']))
 })

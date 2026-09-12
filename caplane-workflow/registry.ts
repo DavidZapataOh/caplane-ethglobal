@@ -36,8 +36,8 @@ export type BatchRead =
 
 type RpcResponse = { id: number; result?: string; error?: { code: number; message: string } }
 
-export const commitmentsOf = (claim: SubmittedClaim, pepper: Uint8Array): Hex[] =>
-	componentCommitments(ClaimType.Invoice, toComponents(claim), pepper)
+export const commitmentsOf = (claimType: number, claim: SubmittedClaim, pepper: Uint8Array): Hex[] =>
+	componentCommitments(claimType, toComponents(claimType, claim), pepper)
 
 /**
  * Two calls in one POST. The second reads a value known offline, so a response carrying it cannot
@@ -117,7 +117,7 @@ export const readRegistry = (
 	// Hex, not raw text: the two produce different commitments, and the first execution fixes the
 	// index format for good — the pepper never rotates and there is no reindex.
 	const pepper = secretBytes('COMMITMENT_PEPPER', secrets.COMMITMENT_PEPPER.value)
-	const commitments = commitmentsOf(claim, pepper)
+	const commitments = commitmentsOf(claim.claimType, claim, pepper)
 
 	const response = http
 		.sendRequest(runtime, {
@@ -157,10 +157,10 @@ export type Verdict =
  * a hard failure into a silent double-pledge machine. So past a certain density the node refuses
  * the call, and that refusal has to have somewhere to land.
  */
-export const verdictOf = (read: BatchRead): Verdict => {
+export const verdictOf = (claimType: number, read: BatchRead): Verdict => {
 	if (read.kind === 'error') return { status: 'undecidable', reason: read.reason }
 	try {
-		const verdict = decide({ lienId: read.lienId, matched: read.matched })
+		const verdict = decide(claimType, { lienId: read.lienId, matched: read.matched })
 		return verdict.collision
 			? { status: 'collision', lienId: verdict.lienId as Hex }
 			: { status: 'clear' }

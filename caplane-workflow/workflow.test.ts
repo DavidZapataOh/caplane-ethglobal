@@ -78,9 +78,11 @@ test('both config files carry the same shape and no dead keys', async () => {
 		'ledgerCountry',
 		'ledgerTenantId',
 		'ledgerTokenUrl',
+		'recallsApiBase',
 		'registryAddress',
 		'rpcUrl',
 		'settlementBaseUsdc6',
+		'vinApiBase',
 		'watchlistUrl',
 	])
 	expect(Object.keys(production).sort()).toEqual(Object.keys(STAGING).sort())
