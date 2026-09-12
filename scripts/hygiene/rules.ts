@@ -289,12 +289,27 @@ export const frozenArtifactsAreIdentical = (s: Snapshot): Finding[] => {
 };
 
 const GET_SECRET_ID = /getSecrets?\(\s*\[?\s*\{\s*id:\s*["']([A-Z0-9_]+)["']/g;
-const SECRETS_YAML_ENTRY = /^\s{2,}([A-Z0-9_]+):\s*$\n\s+-\s*([A-Z0-9_]+)\s*$/gm;
+const SECRET_IDS_ARRAY = /SECRET_IDS\s*=\s*\[([^\]]*)\]/;
+const SECRET_ID_LITERAL = /["']([A-Z0-9_]+)["']/g;
+
+/**
+ * Ids reach the batch through a constant, not through a literal call, so matching only the call
+ * shape leaves this rule matching nothing at all — which passes, for ever, for the wrong reason.
+ */
+const declaredIds = (content: string): string[] => {
+  const block = SECRET_IDS_ARRAY.exec(content);
+  const fromArray = block ? [...block[1]!.matchAll(SECRET_ID_LITERAL)].map((m) => m[1]!) : [];
+  const fromCalls = [...content.matchAll(GET_SECRET_ID)].map((m) => m[1]!);
+  return [...fromArray, ...fromCalls];
+};
 
 /**
  * One registry of secret names across four surfaces — local .env, GitHub Actions, the CRE Vault
  * and the platform env vars. Inconsistent names across files is rubric violation 10.
- * The substring ban is not style: the CLI fails to resolve overlapping id/env-var pairs.
+ *
+ * This once also banned an id that was a substring of its variable. Measured against the CLI,
+ * that restriction does not exist — an identical pair resolves — so the branch was deleted
+ * rather than left passing for a reason nobody could reproduce.
  */
 export const secretNamesAreRegistered = (s: Snapshot): Finding[] => {
   const envExample = s.files.find((f) => f.path.endsWith(".env.example"))?.content ?? "";
@@ -308,25 +323,14 @@ export const secretNamesAreRegistered = (s: Snapshot): Finding[] => {
   const findings: Finding[] = [];
 
   for (const f of s.files.filter(isFirstPartySource)) {
-    for (const [, id] of f.content.matchAll(GET_SECRET_ID)) {
-      if (!registered.has(id!)) {
+    for (const id of declaredIds(f.content)) {
+      if (!registered.has(id)) {
         findings.push({
           rule: "secret-names-registered",
           where: f.path,
           detail: `${id} is not a key in .env.example`,
         });
       }
-    }
-  }
-
-  const secretsYaml = s.files.find((f) => f.path.endsWith("secrets.yaml"))?.content ?? "";
-  for (const [, id, envVar] of secretsYaml.matchAll(SECRETS_YAML_ENTRY)) {
-    if (envVar!.includes(id!) || id!.includes(envVar!)) {
-      findings.push({
-        rule: "secret-names-registered",
-        where: "secrets.yaml",
-        detail: `${envVar} is a substring of ${id}; the CLI fails to resolve overlapping names`,
-      });
     }
   }
 
@@ -449,6 +453,51 @@ export const enclaveSafeJavaScript = (s: Snapshot): Finding[] =>
       })),
     );
 
+const WORKFLOW_PACKAGE = /^caplane-workflow\/.*\.ts$/;
+const isEnclaveSource = (f: SourceFile) =>
+  isScannable(f) && WORKFLOW_PACKAGE.test(f.path) && !f.path.endsWith(".test.ts");
+
+/**
+ * The secrets quota is five calls per execution and a batch of any size spends one, so the
+ * enclave reads its ring once. Nothing enforces that on the platform: a second call is a silent
+ * quarter of the budget, and the plans that add one will not be reading this file.
+ */
+export const secretsAreReadOnce = (s: Snapshot): Finding[] => {
+  const calls = s.files
+    .filter(isEnclaveSource)
+    .flatMap((f) => [...f.content.matchAll(/getSecrets?\(/g)].map(() => f.path));
+  if (calls.length <= 1) return [];
+  return calls.map((where) => ({
+    rule: "secrets-are-read-once",
+    where,
+    detail: `${calls.length} secrets calls in the workflow package; the batch must be one`,
+  }));
+};
+
+const SECRET_VALUE = /\bsecrets\.[A-Z0-9_]+\.value\b/;
+
+/**
+ * The third of rubric violation 15, and the only one that compiles. `ConfidentialHTTPClient` and
+ * `vaultDonSecrets` are rejected by the type system inside a TEE handler; passing a secret's
+ * value through `usingTheDons()` or `reportFromDon` type-checks, runs, and leaves the enclave.
+ *
+ * Narrow on purpose: it reads one statement, not the flow of a variable across functions. It
+ * catches the slip, not a decided exfiltration, and claiming otherwise would be worse than not
+ * having it.
+ */
+export const noSecretThroughTheDoor = (s: Snapshot): Finding[] =>
+  s.files.filter(isEnclaveSource).flatMap((f) =>
+    f.content
+      .split("\n")
+      .map((line, i) => ({ line, i }))
+      .filter(({ line }) => /usingTheDons\(\)|reportFromDon\(/.test(line) && SECRET_VALUE.test(line))
+      .map(({ i }) => ({
+        rule: "no-secret-through-the-door",
+        where: `${f.path}:${i + 1}`,
+        detail: "a secret value crosses the one-way door; only derived facts may",
+      })),
+  );
+
 export const ALL_RULES = [
   noMockDependencies,
   noMockCallSites,
@@ -466,4 +515,6 @@ export const ALL_RULES = [
   registryReadsChainOnly,
   enclaveSafeJavaScript,
   contractsHaveNoGovernance,
+  secretsAreReadOnce,
+  noSecretThroughTheDoor,
 ];

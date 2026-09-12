@@ -16,7 +16,9 @@ import {
   noCommittedCredentials,
   noTemplateScaffolding,
   frozenArtifactsAreIdentical,
+  noSecretThroughTheDoor,
   secretNamesAreRegistered,
+  secretsAreReadOnce,
   ALL_RULES,
 } from "./rules";
 
@@ -220,7 +222,7 @@ test("flags a workflow directory still named my-workflow", () => {
 });
 
 test("every rule is registered in ALL_RULES", () => {
-  expect(ALL_RULES).toHaveLength(16);
+  expect(ALL_RULES).toHaveLength(18);
 });
 
 test("does not flag the rule engine's own definitions and fixtures", () => {
@@ -303,15 +305,17 @@ test("accepts a secret id that is registered", () => {
   expect(secretNamesAreRegistered(s)).toEqual([]);
 });
 
-test("flags an env var name that collides with its secret id", () => {
+// Measured against the real CLI: an identical id and variable resolve, and so does the pair this
+// repository used to call forbidden. The branch that flagged them was deleted, and this pins the
+// corrected behaviour so nobody reintroduces a rule nothing enforces.
+test("does not flag an env var name that overlaps its secret id", () => {
   const s = snap({
     files: [
       { path: "secrets.yaml", content: "secretsNames:\n  API_TOKEN:\n    - SECRET_API_TOKEN\n" },
+      { path: "secrets.yaml", content: "secretsNames:\n  SAME:\n    - SAME\n" },
     ],
   });
-  const found = secretNamesAreRegistered(s);
-  expect(found).toHaveLength(1);
-  expect(found[0].detail).toContain("substring");
+  expect(secretNamesAreRegistered(s)).toEqual([]);
 });
 
 test("accepts non-overlapping secret id and env var names", () => {
@@ -463,4 +467,74 @@ test("a contract with no governance surface passes", () => {
     ],
   });
   expect(contractsHaveNoGovernance(s)).toHaveLength(0);
+});
+
+// The rules under test live in scripts/hygiene, which `isScannable` excludes, so these fixtures
+// are never scanned by the engine they exercise.
+
+test("flags a second secrets call in the workflow", () => {
+  const s = snap({
+    files: [
+      {
+        path: "caplane-workflow/workflow.ts",
+        content: "runtime.getSecrets([a]).result()\nruntime.getSecrets([b]).result()",
+      },
+    ],
+  });
+  expect(secretsAreReadOnce(s)).toHaveLength(2);
+});
+
+test("allows exactly one", () => {
+  const s = snap({
+    files: [
+      {
+        path: "caplane-workflow/workflow.ts",
+        content: "runtime.getSecrets(SECRET_IDS.map((id) => ({ id }))).result()",
+      },
+    ],
+  });
+  expect(secretsAreReadOnce(s)).toEqual([]);
+});
+
+// The third of rubric 15, and the only one that compiles.
+test("flags a secret value crossing the one-way door", () => {
+  const s = snap({
+    files: [
+      {
+        path: "caplane-workflow/workflow.ts",
+        content: "runtime.usingTheDons().report({ token: secrets.LEDGER_APP_ID.value })",
+      },
+    ],
+  });
+  expect(noSecretThroughTheDoor(s)).toHaveLength(1);
+});
+
+// A length is a derived, non-sensitive fact. That is the whole allowed shape.
+test("allows a derived fact", () => {
+  const s = snap({
+    files: [
+      {
+        path: "caplane-workflow/workflow.ts",
+        content: "runtime.usingTheDons().report({ proof: `len=${token.length}` })",
+      },
+    ],
+  });
+  expect(noSecretThroughTheDoor(s)).toEqual([]);
+});
+
+// The ids moved into a constant, which the literal-only pattern cannot see. Without this repair
+// the registry rule matches nothing in the whole repository and passes for ever.
+test("sees secret ids declared in a constant, not just in a literal call", () => {
+  const s = snap({
+    files: [
+      { path: ".env.example", content: "OTHER=\n" },
+      {
+        path: "caplane-workflow/workflow.ts",
+        content: "export const SECRET_IDS = ['ENCLAVE_ENVELOPE_KEY'] as const",
+      },
+    ],
+  });
+  const found = secretNamesAreRegistered(s);
+  expect(found).toHaveLength(1);
+  expect(found[0].detail).toContain("ENCLAVE_ENVELOPE_KEY");
 });

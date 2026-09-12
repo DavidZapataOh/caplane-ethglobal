@@ -1,6 +1,7 @@
+import { readFileSync, readdirSync } from 'node:fs'
 import { expect, test } from 'bun:test'
 import { type Hex, hexToBytes } from 'viem'
-import { CLAIM_SUBMITTED_TOPIC, configSchema, decodeClaimSubmitted } from './workflow'
+import { CLAIM_SUBMITTED_TOPIC, SECRET_IDS, configSchema, decodeClaimSubmitted } from './workflow'
 
 const ID = '0x5ab0000000000000000000000000000000000000000000000000000000000001'
 const SUBMITTER = '0x86Ec9f04485Db066CF155353f15eef356Ae90253'
@@ -60,4 +61,36 @@ test('both config files carry the same shape and no dead keys', async () => {
 	expect(Object.keys(production).sort()).toEqual(Object.keys(staging).sort())
 	expect(() => configSchema.parse(staging)).not.toThrow()
 	expect(() => configSchema.parse(production)).not.toThrow()
+})
+
+// The quota is five calls per execution, and four later handlers will each want credentials.
+// One call is the design; this is what keeps it one.
+test('the workflow asks for its secrets exactly once', () => {
+	const sources = readdirSync('.')
+		.filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))
+		.map((f) => readFileSync(f, 'utf8'))
+		.join('\n')
+	expect(sources.match(/getSecrets?\(/g) ?? []).toHaveLength(1)
+})
+
+// A batch with a repeated id is rejected client-side before any host call, because the response
+// is keyed by id — so a duplicate is a silent way to lose a secret.
+test('no id is asked for twice', () => {
+	expect(new Set(SECRET_IDS).size).toBe(SECRET_IDS.length)
+})
+
+// Every id must exist in secrets.yaml, or the handler aborts at `.result()` with nothing after
+// it running. The failure is total and it happens in production, not here.
+test('every id the handler asks for is declared in the vault file', () => {
+	const declared = new Set(
+		[...readFileSync('../secrets.yaml', 'utf8').matchAll(/^\s{2,}(\w+):$/gm)].map((m) => m[1]),
+	)
+	for (const id of SECRET_IDS) expect(declared).toContain(id)
+})
+
+// And the converse: an id declared and never asked for is a name to keep synchronised for
+// nothing, and an env var every simulate in the repository will demand.
+test('nothing is declared that the handler never asks for', () => {
+	const declared = [...readFileSync('../secrets.yaml', 'utf8').matchAll(/^\s{2,}(\w+):$/gm)]
+	expect(declared.map((m) => m[1]).sort()).toEqual([...SECRET_IDS].sort())
 })

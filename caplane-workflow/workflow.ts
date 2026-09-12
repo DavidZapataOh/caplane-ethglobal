@@ -18,6 +18,23 @@ type Config = z.infer<typeof configSchema>
  */
 export const CLAIM_SUBMITTED_TOPIC = toEventSelector('ClaimSubmitted(bytes32,address,bytes)')
 
+/**
+ * Every secret the enclave needs, fetched in one call. The quota is five calls per execution and
+ * a batch of any size spends one of them — the SDK issues a single host call carrying all the
+ * requests — so the ring is read once, at the top, and never again.
+ *
+ * `namespace` is omitted: `main` is the SDK's default and the only namespace the CLI can write.
+ * Four of these have no reader yet; they are fetched anyway because a missing id aborts the whole
+ * handler, and one upload before this ships is cheaper than four.
+ */
+export const SECRET_IDS = [
+	'ENCLAVE_ENVELOPE_KEY',
+	'COMMITMENT_PEPPER',
+	'LEDGER_APP_ID',
+	'LEDGER_APP_PASSPHRASE',
+	'WATCHLIST_SUBSCRIPTION',
+] as const
+
 export type Claim = {
 	submissionId: Hex
 	submitter: Hex
@@ -62,10 +79,7 @@ export const decodeClaimSubmitted = (log: {
 export const onClaimSubmitted = (runtime: TeeRuntime<Config>, log: EVMLog): string => {
 	const claim = decodeClaimSubmitted(log)
 
-	// One batch call spends one unit against the five-per-execution secrets quota. The value
-	// arrives as a string, so the key travels as hex and is decoded here. `namespace` is omitted:
-	// `main` is the SDK's default and the only namespace the CLI can write.
-	const secrets = runtime.getSecrets([{ id: 'ENCLAVE_ENVELOPE_KEY' }]).result()
+	const secrets = runtime.getSecrets(SECRET_IDS.map((id) => ({ id }))).result()
 	const opened = open(
 		hexToBytes(claim.envelope),
 		hexToBytes(secrets.ENCLAVE_ENVELOPE_KEY.value as Hex),
