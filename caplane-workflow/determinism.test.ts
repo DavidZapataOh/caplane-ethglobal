@@ -59,8 +59,10 @@ test('the gate catches unsorted key iteration', () => {
 
 // `Math.random()` is deliberately NOT flagged, and that is the SDK's call, not an oversight: the
 // javy plugin replaces it with a seeded ChaCha8 that is deterministic in node mode. Pinned here so
-// nobody 'fixes' the gate by adding it — and the repository's own hygiene rule covers what this
-// validator does not look at (Intl, toLocaleString, the RegExp v flag) without overlapping.
+// nobody 'fixes' the gate by adding it. What this validator does not look at — locale-aware
+// formatting and the newer regular-expression flag — is covered by the repository's own hygiene
+// rule instead, without overlapping. Those identifiers are not spelled out here: that rule reads
+// text, and it scans this directory.
 test('the seeded random is not treated as non-determinism', () => {
 	const original = readFileSync('./report.ts', 'utf8')
 	try {

@@ -38,21 +38,33 @@ contract RegistryInvariantsTest is RegistryFixture {
     targetSender(ACTOR_B);
   }
 
-  /// @dev The registry is a permanent record or it is a mutable row. Status is monotonic:
-  ///      none(0) to active(1) to a terminal released(2) or defaulted(3), never back.
-  function invariant_StatusNeverGoesBackwards() public view {
+  /// @dev Default is the one terminal state, and it is terminal for ever. A written-down lien
+  ///      must never become active again: the pool has already taken the loss against it.
+  ///
+  ///      Status is deliberately NOT monotonic any more. It used to be, and that was the defect:
+  ///      the record guard was `status != 0`, so a RELEASED lien kept its key for ever — and the
+  ///      key is deterministic over the claim, so a paid invoice could never be financed again.
+  ///      Releasing exists precisely to give the receivable back, so `2 -> 1` is the transition
+  ///      the system is for.
+  function invariant_DefaultIsTerminal() public view {
     for (uint256 i; i < ghosts.allLienIdsLength(); ++i) {
       bytes32 id = ghosts.allLienIds(i);
-      assertGe(registry.statusOf(id), ghosts.lastSeenStatus(id));
+      if (ghosts.everDefaulted(id)) assertEq(uint256(registry.statusOf(id)), 3, "default reopened");
     }
   }
 
-  /// @dev `active` is entered once per id, ever. Released and defaulted are terminal, so an id
-  ///      can never be reused — which is why the registry's guard is `status != 0`, not
-  ///      `status == 1`.
-  function invariant_ActiveIsEnteredAtMostOnce() public view {
+  /// @dev A lien may become active more than once, but every re-entry has to be paid for by a
+  ///      release. One entry is free — the first record — and each one after it must be preceded
+  ///      by the receivable being handed back.
+  ///
+  ///      Note this deliberately does NOT say "a defaulted lien was never re-entered": a lien can
+  ///      legitimately be recorded, released, recorded again, and only then default. What makes a
+  ///      default unreopenable is `invariant_DefaultIsTerminal`, plus the record guard refusing
+  ///      status 3 — not a count.
+  function invariant_ActiveIsEarnedByRelease() public view {
     for (uint256 i; i < ghosts.allLienIdsLength(); ++i) {
-      assertLe(ghosts.enteredActiveCount(ghosts.allLienIds(i)), 1);
+      bytes32 id = ghosts.allLienIds(i);
+      assertLe(ghosts.enteredActiveCount(id), ghosts.releaseCount(id) + 1, "active without a release");
     }
   }
 
@@ -85,12 +97,22 @@ contract RegistryInvariantsTest is RegistryFixture {
     CaplaneRegistry mirror = new CaplaneRegistry(address(f), OWNER, NAME, SELECTOR);
     uint256 nonce;
 
+    // Backwards, and each lien once. A lien can now be recorded more than once — record, release,
+    // record — because releasing gives the receivable back, so replaying the raw history would
+    // ask the mirror to record an already-active lien and it would rightly refuse. What this is
+    // checking is that the ANSWER does not depend on insertion order, so the mirror is built from
+    // the final population, not from the sequence that produced it.
     for (uint256 i = n; i > 0; --i) {
+      bytes32 id = handler.recordedLien(i - 1);
+      if (mirror.statusOf(id) != 0) continue;
       _mirror(mirror, f, ++nonce, 1, handler.recordedSeeds(i - 1));
     }
     for (uint256 i; i < n; ++i) {
-      uint8 status = registry.statusOf(handler.recordedLien(i));
-      if (status == 2 || status == 3) _mirror(mirror, f, ++nonce, status, handler.recordedSeeds(i));
+      bytes32 id = handler.recordedLien(i);
+      uint8 status = registry.statusOf(id);
+      if ((status == 2 || status == 3) && mirror.statusOf(id) == 1) {
+        _mirror(mirror, f, ++nonce, status, handler.recordedSeeds(i));
+      }
     }
 
     for (uint256 i; i < n && i < 8; ++i) {

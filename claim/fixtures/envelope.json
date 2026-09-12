@@ -9,6 +9,7 @@
     "submitterTopic": "0x00000000000000000000000086ec9f04485db066cf155353f15eef356ae90253",
     "plaintext": "caplane envelope vector v1",
     "realisticClaim": "{\"debtorTaxId\":\"Bayside Club\",\"invoiceNumber\":\"ORC1043\",\"amountMinor\":\"27500000\",\"currency\":\"AUD\",\"dueDate\":\"2026-12-31\",\"issuerTaxId\":\"e1218a28-7437-47ec-bfb5-252092825083\",\"country\":\"AU\"}",
-    "envelope": "0x010113be4feaeaf204c7fd3358fc9c00721881d174278128227ec674f37f7fe97b6d090909090909090909090909090909090909090909090909610f38e5af2ac5c64cc33a97a6c216107217a251de05167df4d9b29ae4c2628a46b3422160a9eaa666607b4f262b4c70d37a37c1659a035161424221930f"
+    "envelope": "0x010113be4feaeaf204c7fd3358fc9c00721881d174278128227ec674f37f7fe97b6d090909090909090909090909090909090909090909090909c89f016a58b0d3330dfbb265f957fdd74a64d9b695d49c9973922849e5bdaa2a2ef6a878a251abcade689decd859f1b52d8aec968874bc1f8406820dc753",
+    "_envelopeNote": "Regenerated when the AEAD key moved from the raw X25519 output to HKDF-SHA256 over the shared secret, the version and algorithm bytes, and both public keys. Every envelope sealed under the previous format is permanently unopenable, which is the point: the header bytes were unauthenticated and nothing read them."
   }
 }

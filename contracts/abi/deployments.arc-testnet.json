@@ -1,15 +1,15 @@
 {
   "network": "arc-testnet",
   "chainId": 5042002,
-  "registry": "0xf2de8798750ea3bcb0faca049fc7581a118ef1f6",
-  "inbox": "0x14f3bbf3b21b0411f798aa50edd05df06e72ae88",
-  "pool": "0xa7ec42984bfc9f0024ca0873721e8b1166c2b0ee",
-  "escrow": "0x5de99d8be27468dd175738e1703259130eb703b5",
+  "registry": "0xe7170ee0ce4cab4593970ef5c4ebf7d0d62ae19b",
+  "inbox": "0xc5218fd1b6eb7c91f905871301bf8620bc8baf91",
+  "pool": "0x4df4c8d722b3a9ebd18b9094c883b5ff83565d7c",
+  "escrow": "0x2bc74ceb10287890fb9be43667a55b73e080db1f",
   "forwarder": "0x76c9cf548b4179F8901cda1f8623568b58215E62",
   "chainSelector": "3034092155422581607",
-  "workflowId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "workflowId": "0x00e0a9b9fdf8cd903d396d24f0b56ddd19ef9748ee34c75a194c2c91f20b2a22",
   "workflowOwner": "0xd5557A1d0806323caD77bC4049ccaca0EaDAaf06",
   "workflowName": "0x33396465656661623966",
   "enclavePublicKey": "0xb749f4fb4b8c526c8a3ff6a224eee9e6bbeeefaecc6f43979c6b9077bda99504",
-  "blockNumber": 61604203
+  "blockNumber": 61681981
 }

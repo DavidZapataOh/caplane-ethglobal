@@ -1,0 +1,81 @@
+The collision check fired against a real lien, and refused the second submission by name.
+
+  block 61,685,965   LienRecorded         lien 0xebd60de9b8c99e6bde3ce7ad1894177e706e75c0120c192da71400a378ae7e4c
+  block 61,686,810   SubmissionRejected   submissionId 0x9c22eff8f4efee07013d86feaf5f1a559053004f1f61915873690d57e5a08b29
+                                          reason 1 — AlreadyEncumbered
+
+This is the arm that could not be demonstrated until now. The registry is only ever written by a
+DON-signed report, there is no seeding function, and staging carries a workflow name the contract
+refuses — so until the first lien existed a few minutes earlier, there was nothing to collide with.
+
+
+--- what the second submission was --------------------------------------------------
+
+The same claim, sealed again. A fresh ephemeral key gives a different ciphertext and therefore a
+different `submissionId`, so the inbox accepted it without complaint — its duplicate guard is keyed
+on `keccak(sender ‖ ciphertext)` and saw a value it had never seen.
+
+  first  submissionId  0xdb0577a4e0025f56d6b8e3f71871a42dccb2bc6447aa366685b42d33505752b3  → recorded
+  second submissionId  0x9c22eff8f4efee07013d86feaf5f1a559053004f1f61915873690d57e5a08b29  → rejected
+
+So the refusal is the enclave's, not the inbox's. That distinction is the whole point: the chain
+cannot tell two sealed claims apart, and the enclave can.
+
+  execution     121041ffcaa2ffe0db3eab9c82f39d95c88125ded4f59a6326cd3a20053ebf7c
+                05:53:05 to 05:53:17 UTC — 12 seconds
+  events        trigger · 4 × SendRequest · Report · WriteReport, all success
+  forwarder     ReportProcessed receiver 0xe7170ee0…ae19b  success TRUE
+
+A Reject is a report like any other. It is signed, transmitted and accepted, and it lands as an
+event the submitter can read. It is not a silence.
+
+
+--- the reason code is the evidence, not the rejection ------------------------------
+
+`reason 1` is `AlreadyEncumbered`. A rejection for an expired credential, a missing debtor
+confirmation or an unverifiable invoice would have looked identical from outside — a red
+submission — and would have proven nothing about the collision index. The code names which check
+refused, and this one names only that check.
+
+
+--- WHAT THIS IS NOT: it is 7 of 7, not 6 of 7 ---------------------------------------
+
+Stated plainly because the distinction is the product's actual claim.
+
+The registry's fuzzy tier fires at six of seven peppered component commitments. What fired here is
+**seven of seven** — the identical claim — so the two liens share a `lienId` and the submission
+would have been caught by exact-key equality as well. This demonstrates that the check runs and
+refuses; it does not isolate the fuzzy tier from the exact one.
+
+Six of seven is not demonstrable against this ledger, and the reason is a direct consequence of
+the fix that closed a much worse problem. Three of the seven components — the debtor, the issuer
+and the jurisdiction — used to be read straight from the submitter's document and checked against
+nothing, so editing any two of them dropped agreement to five, read as `clear`, and recorded a
+second lien on the same receivable. They are now bound: the debtor comes from the contact the
+ledger returned, the issuer from the credential the enclave used, the jurisdiction from config.
+
+That leaves the submitter in control of the invoice number, the amount and the due date — and all
+three are compared against the real invoice. Two different invoices cannot share a number, so a
+genuine six-of-seven needs two real invoices agreeing on both amount bucket and due date.
+
+Measured across all fourteen live receivables in the tenant, every pair:
+
+  5/7   ORC1038 vs ORC1032    Marine Systems / Cube Land
+  5/7   ORC1033 vs ORC1041    DIISR - Small Business Services / itself, twice
+  5/7   ORC1034 vs ORC1040    Pinnacle Management / Bayside Club
+
+Nothing reaches six. That is a good result for false positives — the threshold is not manufacturing
+collisions on real data — and it means the fuzzy tier has no natural subject here. The case it was
+calibrated for is a receivable re-entered under a different number with the same amount and date,
+which this ledger does not contain, and the accounting connection holds read-only scope on
+invoices so one cannot be seeded.
+
+The six-of-seven predicate itself is measured off-chain against a real corpus and recorded
+separately. What remains unproven is the two meeting: the on-chain index answering six for a claim
+that is not byte-identical.
+
+
+--- the pool has not moved -----------------------------------------------------------
+
+16,000,000 base units, unchanged. Recording a lien commits an advance; it does not pay one.
+`disburse` is a separate permissionless call and nobody has made it.

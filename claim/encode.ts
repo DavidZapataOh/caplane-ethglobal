@@ -9,7 +9,7 @@ const PEPPER_BYTES = 32
  * which is a property of the inputs rather than of the construction. One byte makes it a
  * property of the construction.
  */
-export const DOMAIN = { digest: 1, commitment: 2, tuple: 3 } as const
+export const DOMAIN = { digest: 1, commitment: 2, tuple: 3, lien: 4 } as const
 
 const byte = (name: string, value: number): number => {
   if (!Number.isInteger(value) || value < 0 || value > 255) {
@@ -63,10 +63,23 @@ export const encodeComponentPreimage = (
  * The tuple is seven digests, not seven strings. A digest is thirty-two bytes always, so the
  * boundaries stop depending on the content and a shifted character stops being expressible.
  */
-export const encodeTuplePreimage = (claimType: number, digests: readonly Uint8Array[]): Uint8Array =>
-  concat([
-    Uint8Array.of(DOMAIN.tuple, byte('version', COMMITMENT.version), byte('claim type', claimType)),
+export const encodeTuplePreimage = (
+  claimType: number,
+  digests: readonly Uint8Array[],
+  pepper?: Uint8Array,
+): Uint8Array => {
+  if (pepper && pepper.length !== PEPPER_BYTES) {
+    throw new RangeError(`pepper must be ${PEPPER_BYTES} bytes, got ${pepper.length}`)
+  }
+  return concat([
+    Uint8Array.of(
+      pepper ? DOMAIN.lien : DOMAIN.tuple,
+      byte('version', COMMITMENT.version),
+      byte('claim type', claimType),
+    ),
     ...digests,
+    ...(pepper ? [pepper] : []),
   ])
+}
 
 export { ClaimType }

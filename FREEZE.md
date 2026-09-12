@@ -8,8 +8,25 @@ vendored copies are pinned by the `hygiene` CI job.
 
 | Mode | Who can run it | How |
 |---|---|---|
-| **Exact identity** | Anyone, no account, from a block explorer | `isEncumbered(lienId)`, `lienOf(lienId)` |
+| **Exact identity** | Anyone, from a block explorer — but only with a `lienId` the enclave gave them | `isEncumbered(lienId)`, `lienOf(lienId)` |
 | **Fuzzy membership** | Anyone, permissionlessly, by transaction | Submit to `CaplaneInbox`; the enclave matches k-of-N against peppered component commitments via `matchesOf` |
+
+⚠️ **The `lienId` is peppered too, and it did not used to be.** It was a pepper-free hash of the
+same seven components, published in `LienRecorded` and accepted by every public view — so the key
+inverted by brute force. Measured against the seeded corpus: a real lien recovered in **71 ms**,
+yielding the debtor, the invoice number, the due date and the amount bucket. Three of the seven
+components carry no entropy at all, since currency, country and the issuer are constants of one
+ledger. The pepper that protects the component index has to protect the key derived from the same
+components.
+
+What that costs is the property this table used to promise: a third party holding a claim can no
+longer derive its `lienId` and look it up unaided. Restoring it needs an enclave-side lookup, not
+a pepper-free key.
+
+The value the debtor's confirmation signs is a **separate, pepper-free `claimId`** over the same
+seven digests, in its own preimage space. That one has to be pepper-free — the signing tool runs
+on the debtor's side and giving it the pepper would take the pepper out of the enclave — and it is
+safe there because it never leaves the sealed envelope.
 
 Component commitments are peppered with a Vault secret. Without the pepper the index would be
 brute-forceable — currency, country, due date and amount bucket are low-entropy — and the
@@ -73,6 +90,23 @@ That budget is `EventSizeLimit = Size(5 * config.KByte)` and their `KByte` is 1,
 The 5,120 this file carried until now is `ChainWrite.EVM.ReportSizeLimit`, which really is 5,120
 and is a different limit; the two were conflated.
 The enclave's public key is published in `deployments.<network>.json`.
+
+⚠️ **The AEAD key is derived, and the first two bytes are authenticated.** They were not. The raw
+X25519 output was used directly as the ChaCha20 key, which RFC 7748 §6.1 forbids — and more to the
+point left the construction nowhere to bind anything. The version and algorithm bytes sat outside
+the AEAD and **nothing read them**: flipping either produced a different `submissionId` for the
+same claim, making the inbox's duplicate guard decorative, and at the first version bump any
+dispatch on them would have been an unauthenticated downgrade.
+
+    key = HKDF-SHA256(ikm = sharedSecret,
+                      info = "caplane-envelope-v1" ‖ version ‖ algorithm ‖ ephPub ‖ recipPub)
+
+Binding both public keys closes the same question for the keys, and a shared secret forced to a
+value an attacker knows is no longer a key they know — which matters because the low-order-point
+rejection this relies on is the curve library's promise, not this construction's.
+
+**Every envelope sealed before this change is permanently unopenable.** That is the point, not a
+side effect.
 
 The plaintext inside that ciphertext begins with the twenty raw bytes of the address entitled to
 submit it — lowercase, unprefixed — followed by the claim. This is an addition to what this
@@ -166,9 +200,12 @@ Every scalar is one byte; the one variable field sits between fixed widths.
 
     componentDigest i     = keccak256(0x01 ‖ version:u8 ‖ claimType:u8 ‖ i:u8 ‖ utf8(component))
     componentCommitment i = keccak256(0x02 ‖ version:u8 ‖ claimType:u8 ‖ i:u8 ‖ utf8(component) ‖ pepper:32)
-    lienId                = keccak256(0x03 ‖ version:u8 ‖ claimType:u8 ‖ digest[0] ‖ … ‖ digest[6])
+    claimId               = keccak256(0x03 ‖ version:u8 ‖ claimType:u8 ‖ digest[0] ‖ … ‖ digest[6])
+    lienId                = keccak256(0x04 ‖ version:u8 ‖ claimType:u8 ‖ digest[0] ‖ … ‖ digest[6] ‖ pepper:32)
 
-The leading byte separates the three preimage spaces. Without it a digest preimage can equal a
+The leading byte separates the four preimage spaces. `claimId` is what the debtor's confirmation
+signs and never leaves the envelope; `lienId` is the registry key and is public, which is why one
+carries the pepper and the other cannot. Without it a digest preimage can equal a
 commitment preimage whenever a component ends in the pepper's bytes — unreachable today only
 because canonical text is letters and digits and the pepper is random binary, which is a
 property of the inputs rather than of the construction.

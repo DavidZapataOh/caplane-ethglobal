@@ -1,0 +1,120 @@
+Redeployed, because two defects in the registry were immutable and the window to fix them was
+about to close.
+
+An eight-agent audit of the workflow, run before the first production deployment, found two
+problems that live in the contract rather than in the enclave. Both were unfixable after the first
+lien existed, and free to fix before it — the registry held zero liens, so there was nothing to
+orphan. That asymmetry is the whole reason this happened now.
+
+  block          61,681,981 on Arc Testnet (5042002)
+  cost           0.21 USDC
+  previous       registry deployed at 61,604,203, zero LienRecorded events, ever
+
+  CaplaneInbox      0xc5218fd1b6eb7c91f905871301bf8620bc8baf91     828 bytes
+  CaplaneRegistry   0xe7170ee0ce4cab4593970ef5c4ebf7d0d62ae19b   5,232 bytes
+  CaplanePool       0x4df4c8d722b3a9ebd18b9094c883b5ff83565d7c   6,871 bytes
+  CaplaneEscrow     0x2bc74ceb10287890fb9be43667a55b73e080db1f   3,500 bytes
+
+All four, not just the registry: the pool and the escrow hold the registry address as a
+constructor immutable, so redeploying one alone leaves two contracts pointing at the old one.
+Verified after the fact — both read back 0xE7170EE0.
+
+
+--- defect 1: a paid invoice could never be financed again ------------------------
+
+`_recordLien` refused any lien whose status was not zero. Released is status 2, and the lien id is
+deterministic over the claim, so releasing a lien permanently burned the receivable it named.
+
+That is the exact opposite of what releasing is for. The settlement handler's own docblock says it
+"closes the lien so the receivable can be financed again", and it could not.
+
+Worse, the two sides disagreed silently: `matchesOf` skips non-active liens, so the enclave would
+read `clear`, emit a Record, and the report would revert inside `onReport`. The submitter sees a
+mined submission and then nothing from the registry.
+
+The gate now refuses **active and defaulted**, and allows none and released. Default stays terminal
+— the pool has already taken the loss against it, and freeing a receivable is what settlement earns,
+not what a write-down earns.
+
+  test_Registry_ARereleasedLienCanBeRecordedAgain     record -> release -> record
+  test_Registry_ADefaultedLienStaysClosed             default is still terminal
+  test_Registry_AnActiveLienIsStillRefused            the gate still gates
+
+
+--- defect 2: the fuzzy index degraded and could never be reclaimed ----------------
+
+Closing a lien flipped its status and left its three posting-list entries in place. `matchesOf`
+walks those lists, so the walk grew with every lien ever recorded rather than with the live ones.
+Measured by the audit: 1,467,987 gas for 200 liens after all 200 were released. Monotonic for the
+life of the registry. Past the node's call cap every claim against that debtor returns
+`undecidable` and is refused, permanently.
+
+Closing now removes the entries, swap-and-pop against a position remembered at record time, so it
+is O(1) and cannot itself become the ceiling it removes.
+
+  test_Registry_ClosingALienReclaimsItsPostings   the walk after closing costs under a fifth
+
+
+--- what that cost, and why the cheaper option was worse ---------------------------
+
+Recording went from 428,571 to 495,743 gas — three extra slots holding each lien's position in its
+three posting lists. The budget said 470,000, and the house rule is that exceeding a budget is
+justified in writing or reverted. This is the justification.
+
+The alternative was a linear scan at close time, keeping recording cheap. That moves the cost
+rather than removing it, and moves it the wrong way: `matchesOf` is a view reached by `eth_call`,
+bounded by a node cap and paid by nobody, while `_close` is a real transaction bounded by
+10,000,000. Three lists of a thousand liens scan to roughly 6,300,000 gas — so closing would start
+failing before querying did, and a lien that cannot be closed is permanently encumbered, which is
+defect 1 reintroduced by the fix for defect 2.
+
+A fixed 5% of the transaction budget to remove an unbounded term is the right trade.
+
+
+--- identity: unchanged, and that is not luck --------------------------------------
+
+  WORKFLOW_OWNER   0xd5557A1d0806323caD77bC4049ccaca0EaDAaf06
+  WORKFLOW_NAME    0x33396465656661623966
+  CHAIN_SELECTOR   3034092155422581607
+  FORWARDER        0x76c9cf548b4179F8901cda1f8623568b58215E62   the real one, not the mock
+  supportsInterface(0x805f2132)   true
+
+The name derives from the string `caplane-registry`, not from the deployment, so the irreversible
+check that was made before the first deploy attempt still holds. The deploy script derives it
+independently and refuses to broadcast unless the derivation matches what the environment declares
+— two derivations that must agree, which is the only defence against a mistake the chain accepts
+without complaint.
+
+
+--- nothing was trapped -------------------------------------------------------------
+
+The old pool held 16 USDC across two holders. Both redeemed before anything was redeployed —
+10 USDC to the deployer, 6 to the investor — and both redeposited into the new pool, which reads
+16,000,000 base units again. No value was stranded in a contract nobody can reach.
+
+
+--- the path still works, end to end ------------------------------------------------
+
+A claim sealed to the enclave key, with a debtor confirmation re-signed against the new registry,
+submitted to the new inbox:
+
+  tx 0x08eeae82616d1287521ee03a3cace98c9e5615645094a766d70de9b5bb23a293
+  "0xad949ad3…e5eb 0x86Ec9f04485Db066CF155353f15eef356Ae90253 1"
+
+Decision 1 is Record. The confirmation had to be re-signed because the EIP-712 domain separator
+binds `verifyingContract` — which is deployment separation doing exactly what it is for.
+
+
+--- what this does not establish -----------------------------------------------------
+
+Zero liens exist. `LienRecorded` has never been emitted by this registry or the previous one, and
+the report path from a DON-signed report through the production forwarder into `onReport` has
+still never executed anywhere. The interop tests prove the registry decodes the encoder's bytes;
+they run against a test forwarder with its own workflow identity.
+
+The remaining audit finding in this contract is not fixed and is declared instead: the fuzzy
+collision check runs in the enclave, not on chain, so a hostile RPC endpoint could answer `clear`
+to every query. Putting `matchesOf` inside `_recordLien` would make every write scale with debtor
+density against the transaction gas limit — the same ceiling, moved onto the path where failure is
+worse. The enclave read is pinned to the trigger's own block, which closes the race; the hostile
+endpoint remains inside the declared trust base.

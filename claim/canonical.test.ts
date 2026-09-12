@@ -98,3 +98,25 @@ test('separators in the integer part do not change the amount', () => {
 test('an amount past the safe integer range still buckets exactly', () => {
   expect(canonicalAmountBucket('9007199254740993', 'AUD')).toBe('53')
 })
+
+// A ClaimError's message becomes the execution failure reason, and that crosses out of the enclave
+// to the DON. Interpolating the offending value published the submitter's exact amount, due date
+// or currency to node operators — the parties the sealed envelope exists to defend against. The
+// component name is kept, because it is a fixed vocabulary; the value is not.
+test('a claim error names the component and never the value', () => {
+  const secrets = ['27500000.5', '31/12/2026', 'AUDD', 'Bayside Club Ltd', '!!!']
+  for (const value of secrets) {
+    for (const build of [
+      () => canonicalCurrency(value),
+      () => canonicalCountry(value),
+      () => canonicalDate(value),
+      () => canonicalAmountBucket(value, 'AUD'),
+    ]) {
+      try {
+        build()
+      } catch (error) {
+        expect((error as Error).message).not.toContain(value)
+      }
+    }
+  }
+})

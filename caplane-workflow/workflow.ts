@@ -1,5 +1,5 @@
 import { type EVMLog, type TeeRuntime, cre, logTriggerConfig } from '@chainlink/cre-sdk'
-import { type Hex, bytesToHex, decodeEventLog, hexToBytes, toEventSelector } from 'viem'
+import { type Hex, bytesToHex, decodeEventLog, hexToBytes, toEventSelector, zeroHash } from 'viem'
 import { inboxAbi } from './abi'
 import { CHAIN } from './abi/frozen'
 import type { Config } from './config'
@@ -8,10 +8,11 @@ import { open } from './envelope'
 import { lienIdOf } from '../claim/commit'
 import { toComponents } from '../claim/index'
 import { ClaimType, RejectReason, ReportKind } from './abi/frozen'
-import { nonceFor, submitReport, underwrite } from './report'
+import { type Decision, nonceFor, submitReport, underwrite } from './report'
 import { SETTLED_TOPIC, onAdvanceSettled } from './settlement'
-import { decodeClaim } from './ledger'
-import { readRegistry, verdictOf } from './registry'
+import { type SubmittedClaim, bindToLedger, decodeClaim } from './ledger'
+import { secretBytes } from './secrets'
+import { type Verdict, readRegistry, verdictOf } from './registry'
 import { UNVERIFIED, verifyExternally } from './verify'
 
 /**
@@ -85,82 +86,114 @@ export const onClaimSubmitted = (runtime: TeeRuntime<Config>, log: EVMLog): stri
 	const { config } = runtime
 	const claim = decodeClaimSubmitted(log)
 
+	const blockNumber = blockNumberOf(log)
 	const secrets = runtime.getSecrets(SECRET_IDS.map((id) => ({ id }))).result()
-	const opened = open(
-		hexToBytes(claim.envelope),
-		hexToBytes(secrets.ENCLAVE_ENVELOPE_KEY.value as Hex),
-	)
-
-	// The event's submitter is the address that paid for the transaction; the envelope names the
-	// address its sealer authorised. A relay of somebody else's ciphertext differs here, and this
-	// is the only place in the system that can tell.
-	const authorized =
-		bytesToHex(opened.authorizedSubmitter).toLowerCase() === claim.submitter.toLowerCase()
+	// The envelope is opened inside the guard too. It is the one input nobody controls: the inbox
+	// is permissionless, so any bytes at all reach here, and a sealer using a stale enclave key
+	// produces the same failure by accident. An uncaught throw would emit no report.
+	let opened: { authorizedSubmitter: Uint8Array; claim: Uint8Array } | undefined
+	let authorized = false
+	try {
+		opened = open(
+			hexToBytes(claim.envelope),
+			secretBytes('ENCLAVE_ENVELOPE_KEY', secrets.ENCLAVE_ENVELOPE_KEY.value),
+		)
+		// The event's submitter is the address that paid for the transaction; the envelope names
+		// the address its sealer authorised. A relay of somebody else's ciphertext differs here,
+		// and this is the only place in the system that can tell.
+		authorized =
+			bytesToHex(opened.authorizedSubmitter).toLowerCase() === claim.submitter.toLowerCase()
+	} catch {
+		opened = undefined
+	}
 
 	// Three calls cost a token exchange and two queries. A claim whose sealer did not authorise
 	// this submitter is refused whatever the ledger says, so verifying it buys nothing and
 	// spends the quota the collision check still needs.
-	const submitted = authorized ? decodeClaim(opened.claim) : undefined
-	const verified = submitted ? verifyExternally(runtime, secrets, submitted) : UNVERIFIED
-
-	// Asked whenever the envelope opened, and never conditioned on what the ledger answered: the
-	// count and timing of outbound calls are observable from outside, so branching on a
-	// confidential result would leak by metadata what the encryption protects.
+	// Everything a submitter controls is decoded, canonicalised and verified inside this guard.
 	//
-	// The seven commitments come back with the verdict. They are derived once, here, from a pepper
-	// that never rotates; deriving them again in the report encoder would be two paths to the same
-	// bytes, and the day they disagreed nothing would say so.
-	const registryRead = submitted
-		? readRegistry(runtime, secrets, submitted)
-		: { read: { kind: 'error', reason: 'not authorized' } as const, commitments: [] }
-	const collision = verdictOf(registryRead.read)
+	// Each of these steps used to throw straight out of the handler, and an uncaught throw emits no
+	// report at all: the submitter paid gas, the inbox permanently consumed their submission id,
+	// and nothing on chain recorded that the claim was ever seen. The rule was already written
+	// down where the signature is recovered — "a malformed signature must be a refusal" — and
+	// honoured in that one place out of eight. This is the rest of it.
+	//
+	// The two reasons are distinguishable because the remediations are: a malformed document is
+	// the submitter's to fix, an unreachable ledger is nobody's. Neither is "already pledged",
+	// which is what an RPC outage used to publish.
+	let submitted: SubmittedClaim | undefined
+	let verified = UNVERIFIED
+	let collision: Verdict = { status: 'undecidable', reason: 'not evaluated' }
+	let commitments: Hex[] = []
+	let confirmed = false
+	let lienId: Hex = zeroHash
+	let failure: number | undefined
 
-	// The debtor's own signature, recovered here and nowhere else. What it proves is bounded and
-	// worth stating: somebody holding a key signed a structure naming this submitter as creditor,
-	// over this claim and these exact amounts, pointing at the contact the ledger holds. That the
-	// key belongs to that contact is established off chain, by the channel that delivered the
-	// request — the ledger stores no chain address, so the enclave has nothing to anchor it to.
-	const confirmed =
-		submitted !== undefined &&
-		confirmationBinds(
-			submitted.confirmation,
-			recoverConfirmer(
-				submitted.confirmation,
-				// Both casts are on unvalidated input, and both are safe: recovery returns
-				// undefined for anything that is not a 65-byte signature, and the address came
-				// through the config schema's own twenty-byte check.
-				submitted.signature as Hex,
-				config.registryAddress as Hex,
-			),
-			submitted,
-			verified.invoice ?? {},
-			claim.submitter,
-			blockNumberOf(log),
-		)
+	if (opened === undefined) {
+		failure = RejectReason.MalformedEnvelope
+	} else if (authorized) {
+		try {
+			const declared = decodeClaim(opened.claim)
+			verified = verifyExternally(runtime, secrets, declared)
+			// Bound to what the enclave knows before anything is derived from it.
+			submitted = verified.invoice
+				? bindToLedger(declared, verified.invoice, config.ledgerTenantId, config.ledgerCountry)
+				: undefined
+			// A trigger with no block height cannot pin the registry read, and an unpinned read is
+			// the race this guard exists to remove. Refuse rather than fall back to the tip.
+			if (blockNumber === undefined) throw new Error('trigger carried no block height')
+			if (submitted !== undefined) {
+				const read = readRegistry(runtime, secrets, submitted, blockNumber)
+				collision = verdictOf(read.read)
+				commitments = read.commitments
+				lienId = lienIdOf(
+					ClaimType.Invoice,
+					toComponents(submitted),
+					secretBytes('COMMITMENT_PEPPER', secrets.COMMITMENT_PEPPER.value),
+				)
+				// Inside the guard too: this derives the claim id, which canonicalises every
+				// component and throws on any the submitter malformed.
+				confirmed = confirmationBinds(
+					submitted.confirmation,
+					recoverConfirmer(
+						submitted.confirmation,
+						submitted.signature as Hex,
+						config.registryAddress as Hex,
+					),
+					submitted,
+					verified.invoice ?? {},
+					claim.submitter,
+					blockNumber,
+				)
+			}
+		} catch (error) {
+			// A ClaimError names the component and nothing else; anything else is infrastructure.
+			failure =
+				(error as Error).name === 'ClaimError'
+					? RejectReason.MalformedClaim
+					: RejectReason.VerificationUnavailable
+		}
+	} else {
+		failure = RejectReason.UnauthorizedSubmitter
+	}
 
-	// Derived facts only. This return value is the one thing that crosses, and the plaintext's
-	// length used to be in it: that was safe while nothing confidential distinguished one claim
-	// from another, and stopped being safe the moment the ledger's answer did. A length is the
-	// body too — it tells one invoice from another — so it is gone and the verdicts replace it.
-	const decision = underwrite(
-		{
-			authorized,
-			confirmed,
-			verified,
-			collision,
-			dueDate: submitted?.dueDate ?? '1970-01-01',
-		},
-		config,
-	)
+	const decision: Decision =
+		failure !== undefined
+			? { kind: ReportKind.Reject, reason: failure }
+			: underwrite(
+					{ authorized, confirmed, verified, collision, dueDate: submitted?.dueDate ?? '1970-01-01' },
+					config,
+					BigInt(Math.floor(runtime.now().getTime() / 1000)),
+				)
 
 	const body = {
 		kind: decision.kind,
 		chainSelector: CHAIN.arcTestnet.chainSelector,
 		nonce: nonceFor(claim.submissionId, decision.kind),
-		lienId:
-			submitted === undefined
-				? (`0x${'00'.repeat(32)}` as Hex)
-				: lienIdOf(ClaimType.Invoice, toComponents(submitted)),
+		// Only on a Record. The registry's reject branch never reads this field, and the value is
+		// an unpeppered, offline-derivable fingerprint of the claim — published beside the reason
+		// it was refused, which for a compliance hit names a third party.
+		lienId: decision.kind === ReportKind.Record ? lienId : zeroHash,
 		submissionId: claim.submissionId,
 		// The chain's word, never the plaintext's. This is the custody guard: a copyist relaying
 		// somebody else's ciphertext would land the lien on their own address, not the victim's.
@@ -171,7 +204,7 @@ export const onClaimSubmitted = (runtime: TeeRuntime<Config>, log: EVMLog): stri
 		// uint8 before it can be chosen.
 		rateBps: decision.kind === ReportKind.Record ? decision.rateBps : decision.reason,
 		expiresAt: decision.kind === ReportKind.Record ? decision.expiresAt : 0n,
-		componentCommitments: decision.kind === ReportKind.Record ? registryRead.commitments : [],
+		componentCommitments: decision.kind === ReportKind.Record ? commitments : [],
 	}
 
 	// The single crossing, shared with the settlement handler. Nothing the enclave read goes
@@ -180,7 +213,13 @@ export const onClaimSubmitted = (runtime: TeeRuntime<Config>, log: EVMLog): stri
 	// this is pinned by a test rather than asserted in a comment.
 	submitReport(runtime, body)
 
-	return `${claim.submissionId} ${claim.submitter} ${authorized} ${verified.exists} ${verified.unpaid} ${verified.matches} ${verified.screened} ${collision.status} ${confirmed} ${decision.kind}`
+	// Two identifiers already public in the log, and the decision the report carries anyway.
+	//
+	// This used to carry all six verdicts independently. `refusalOf` is ordered so only the
+	// earliest failure reaches the chain, and `SourceUnverified` deliberately merges three of
+	// them — the return value defeated both, publishing whether the debtor was sanctioned and
+	// whether the receivable was already pledged for every claim, including rejected ones.
+	return `${claim.submissionId} ${claim.submitter} ${decision.kind}`
 }
 
 /**

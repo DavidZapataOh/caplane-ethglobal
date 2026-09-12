@@ -205,7 +205,19 @@ contract RegistryIndexTest is RegistryFixture {
     _record(LIEN_A, 250_000_000, 150, EXPIRES);
     uint256 spent = before - gasleft();
     emit log_named_uint("onReport Record", spent);
-    assertLt(spent, 470_000, "record cost regressed");
+    // Raised from 470,000 when closing became O(1). Recording now writes three extra slots — the
+    // position of the lien inside each of its three posting lists — which costs about 67,000 gas
+    // and buys the removal of an unbounded term.
+    //
+    // The alternative was to scan each posting list at close time and keep recording cheap. That
+    // moves the cost, it does not remove it, and it moves it the wrong way: `matchesOf` is a view
+    // reached by `eth_call`, bounded by a node cap and paid by nobody, while `_close` is a real
+    // transaction bounded by 10,000,000. A linear scan over three lists of a thousand liens is
+    // roughly 6,300,000 gas, so closing would start failing before querying did — and a lien that
+    // cannot be closed is permanently encumbered, which is the defect this whole change exists to
+    // remove. A fixed 5% of the transaction budget in exchange for that is the right trade, and it
+    // is written here rather than argued in a commit message.
+    assertLt(spent, 520_000, "record cost regressed");
     assertLt(spent, 4_800_000, "past the transaction budget");
   }
 }

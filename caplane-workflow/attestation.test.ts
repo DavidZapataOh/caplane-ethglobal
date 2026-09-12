@@ -10,7 +10,10 @@ import { blockNumberOf, confirmationBinds, keccakOf, recoverConfirmer } from './
 
 const DEBTOR = privateKeyToAccount(`0x${'03'.repeat(32)}`)
 const SUBMITTER = privateKeyToAccount(`0x${'04'.repeat(32)}`)
-const REGISTRY = '0xf2de8798750ea3bcb0faca049fc7581a118ef1f6' as const
+// The deployed registry, read rather than retyped: it is the domain separator's
+// `verifyingContract`, so a stale copy here would test a domain nothing signs against.
+const REGISTRY = (await Bun.file('../contracts/abi/deployments.arc-testnet.json').json())
+	.registry as Hex
 const OTHER_REGISTRY = '0x000000000000000000000000000000000000dEaD' as const
 const BLOCK = 61_626_829n
 

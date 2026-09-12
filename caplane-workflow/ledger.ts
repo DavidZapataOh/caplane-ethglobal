@@ -1,4 +1,5 @@
 import { CONFIRMATION_FIELDS, type DebtorConfirmation } from '../claim/attestation'
+import { EXPONENT } from '../claim/canonical'
 
 /**
  * What the sealed plaintext holds, after the twenty bytes naming the authorized submitter: the
@@ -86,6 +87,8 @@ export const invoiceQuery = (number: string): string => {
  */
 export type Invoice = {
 	InvoiceNumber?: string
+	/** `ACCREC` is a receivable; `ACCPAY` is a bill the organisation owes. Only the first is financeable. */
+	Type?: string
 	Status?: string
 	AmountDue?: number
 	CurrencyCode?: string
@@ -99,9 +102,18 @@ export type Invoice = {
 /** A missing invoice is a 200 with an empty array. The status code says nothing about existence. */
 export const invoiceOf = (body: { Invoices?: Invoice[] }): Invoice | undefined => body.Invoices?.[0]
 
-/** Owed and outstanding. AUTHORISED is approved and awaiting payment; DRAFT is not owed yet. */
+/**
+ * Owed TO the organisation and outstanding. AUTHORISED is approved and awaiting payment; DRAFT is
+ * not owed yet.
+ *
+ * `Type` is the half that was missing and it is not cosmetic: an `ACCPAY` bill — money the
+ * organisation owes a supplier — carries a contact, a due date and a live `AmountDue`, so it
+ * satisfies every other check identically. Measured against the live tenant, eleven authorised
+ * unpaid bills sit in the same book this reads. Financing one advances cash against a liability
+ * that no debtor will ever pay into the escrow.
+ */
 export const isUnpaid = (invoice: Invoice): boolean =>
-	invoice.Status === 'AUTHORISED' && (invoice.AmountDue ?? 0) > 0
+	invoice.Type === 'ACCREC' && invoice.Status === 'AUTHORISED' && (invoice.AmountDue ?? 0) > 0
 
 /**
  * That the ledger holds *an* invoice under this number is not what is being attested; that it
@@ -117,15 +129,44 @@ export const isUnpaid = (invoice: Invoice): boolean =>
  * commitment hashes them.
  */
 export const matchesClaim = (invoice: Invoice, claim: SubmittedClaim): boolean =>
-	Math.round((invoice.AmountDue ?? 0) * 100).toString() === claim.amountMinor &&
+	minorUnitsOf(invoice.AmountDue, claim.currency) === claim.amountMinor &&
 	invoice.CurrencyCode === claim.currency &&
 	(invoice.DueDateString ?? '').slice(0, 10) === claim.dueDate
+
+/**
+ * The ledger's amount is a JSON double; the claim's is a decimal string of minor units. Scaling
+ * by a hardcoded 100 was wrong twice.
+ *
+ * The exponent is the currency's, not two: JPY, KRW, CLP, ISK and VND have none, and KWD, BHD,
+ * JOD and TND have three. A correct JPY claim would never have matched a correct JPY invoice, and
+ * the rejection would have read `SourceUnverified` — a statement about the ledger that was false.
+ *
+ * And the arithmetic is on the decimal text, not on the double. Past 2^53 a double cannot hold
+ * the value it was parsed from: 90071992547409.93 becomes …94, so a claim one minor unit LARGER
+ * than the ledger holds would have been attested as matching.
+ */
+export const minorUnitsOf = (amount: number | undefined, currency: string): string | undefined => {
+	if (amount === undefined || !Number.isFinite(amount)) return undefined
+	const exponent = EXPONENT[currency] ?? 2
+	// `toFixed` renders the double's decimal form; the shift is then exact integer text.
+	const [whole, fraction = ''] = amount.toFixed(exponent).split('.')
+	return (BigInt(whole) * 10n ** BigInt(exponent) + BigInt(fraction.padEnd(exponent, '0') || '0')).toString()
+}
 
 /** The screening envelope, as returned: a match count, the lists consulted, and one page. */
 export type ScreeningResponse = { total?: number; results?: unknown[] }
 
-/** The count, never the page: `size` caps `results`, and a clean page is not a clean name. */
-export const hasSanctionsHit = (response: ScreeningResponse): boolean => (response.total ?? 0) > 0
+/**
+ * The count, never the page: `size` caps `results`, and a clean page is not a clean name.
+ *
+ * Fails CLOSED. `total ?? 0` treated a missing count as zero, so any 200 that was not the shape
+ * expected — a schema change, a quota envelope, `{}` — screened the debtor clean and the claim
+ * could be recorded. Every other unanswerable read in this system refuses; this was the one that
+ * approved, and it is the one where the consequence is a compliance failure rather than a credit
+ * one. `undefined` now means unscreened, which the caller must treat as a hit.
+ */
+export const hasSanctionsHit = (response: ScreeningResponse): boolean | undefined =>
+	typeof response.total === 'number' ? response.total > 0 : undefined
 
 /**
  * `btoa` is declared in the SDK's global types and is undefined at runtime: `prepareRuntime`
@@ -134,3 +175,36 @@ export const hasSanctionsHit = (response: ScreeningResponse): boolean => (respon
  */
 export const basicAuth = (id: string, secret: string): string =>
 	`Basic ${Buffer.from(`${id}:${secret}`).toString('base64')}`
+
+/**
+ * Replaces the claim fields the enclave can derive with the values it actually knows, and refuses
+ * the claim outright when it cannot derive them.
+ *
+ * Three of the seven commitment components were taken from the submitter's JSON and checked
+ * against nothing: `issuerTaxId`, `country` and `debtorTaxId`. Since the collision threshold is
+ * six of seven, editing any two of them dropped agreement to five, the index read `clear`, and a
+ * second lien landed on the same receivable — the double pledge the whole peppered index exists
+ * to prevent, defeated by two characters. The claim package already described this control:
+ * `issuerTaxId` "comes from the organisation making the submission, which the enclave already
+ * knows from the credential it used to read the ledger." It was never implemented.
+ *
+ * `debtorTaxId` becomes the ledger's own name for the counterparty — the same value the screening
+ * call uses, and the one the debtor confirmation's `debtorRef` already commits to.
+ *
+ * Returns undefined when the invoice carries no contact. That case must not fall back to an empty
+ * string: an empty name screens clean on the watchlist and hashes to a publicly known `debtorRef`,
+ * so one missing field would have bypassed the sanctions check and the debtor check at once.
+ */
+export const bindToLedger = (
+	claim: SubmittedClaim,
+	invoice: Invoice,
+	tenantId: string,
+	country: string,
+): SubmittedClaim | undefined => {
+	const contactId = invoice.Contact?.ContactID
+	const contactName = invoice.Contact?.Name
+	if (contactId === undefined || contactName === undefined || contactName === '') return undefined
+	// The country is a property of the organisation, not of the claim, and the invoice does not
+	// carry one — so it comes from configuration beside the tenant it describes.
+	return { ...claim, debtorTaxId: contactName, issuerTaxId: tenantId, country }
+}

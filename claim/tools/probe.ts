@@ -1,5 +1,5 @@
 import { ClaimType } from '../abi/frozen'
-import { componentCommitments, lienIdOf } from '../commit'
+import { claimIdOf, componentCommitments } from '../commit'
 import { seal } from '../envelope'
 import envelopeVector from '../fixtures/envelope.json'
 import type { ClaimComponents } from '../schema'
@@ -17,7 +17,7 @@ const v = envelopeVector.canonical
 
 console.log(
   JSON.stringify({
-    lienId: lienIdOf(ClaimType.Invoice, components),
+    claimId: claimIdOf(ClaimType.Invoice, components),
     commitments: componentCommitments(ClaimType.Invoice, components, new Uint8Array(VECTORS.testPepper)),
     envelope: hex(
       seal(

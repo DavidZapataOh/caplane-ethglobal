@@ -1,12 +1,15 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import { expect, test } from 'bun:test'
 import { type Hex, hexToBytes } from 'viem'
+import { RejectReason } from './abi/frozen'
 import { configSchema } from './config'
 import { CLAIM_SUBMITTED_TOPIC, SECRET_IDS, decodeClaimSubmitted } from './workflow'
 
 const ID = '0x5ab0000000000000000000000000000000000000000000000000000000000001'
 const SUBMITTER = '0x86Ec9f04485Db066CF155353f15eef356Ae90253'
-const INBOX = '0x14f3bbf3b21b0411f798aa50edd05df06e72ae88'
+// Read, never retyped. A hardcoded copy goes stale the first time a contract is redeployed, and
+// it goes stale silently on the one value the trigger filter is built from.
+const INBOX = (await Bun.file('../contracts/abi/deployments.arc-testnet.json').json()).inbox
 
 // The event's two indexed fields arrive as raw 32-byte topics, and an address is
 // left-padded. Reading topics[2] as-is yields a 32-byte string that is not an address.
@@ -72,6 +75,7 @@ test('both config files carry the same shape and no dead keys', async () => {
 		'graceSeconds',
 		'inboxAddress',
 		'ledgerApiBase',
+		'ledgerCountry',
 		'ledgerTenantId',
 		'ledgerTokenUrl',
 		'registryAddress',
@@ -157,16 +161,15 @@ test('the handler returns facts about the body, never the body', () => {
 	expect(returned).not.toContain('length')
 	// Seven became eight when the collision verdict joined. Pinned, because the return value is
 	// the widest channel out of the enclave that does not look like one.
-	// Eight became nine when the debtor confirmation joined.
-	expect(returned.match(/\$\{/g) ?? []).toHaveLength(10)
-	expect(returned).toContain('collision.status')
-	expect(returned).toContain('confirmed')
-	// The signature is the debtor's and it stays sealed; only the verdict crosses.
-	expect(returned).not.toContain('signature')
-	// The commitments are the query itself; the lien id is registry state the enclave was told.
-	// Neither is a fact about this claim that anyone outside is entitled to.
-	expect(returned).not.toContain('commitments')
-	expect(returned).not.toContain('lienId')
+	// Three: two identifiers already public in the log, and the decision the report carries.
+	// It carried ten. The extra seven were the individual verdicts — whether the debtor was
+	// sanctioned, whether the receivable was already pledged, whether the signature bound — which
+	// the on-chain reason code deliberately collapses. Publishing them here defeated that.
+	expect(returned.match(/\$\{/g) ?? []).toHaveLength(3)
+	expect(returned).toContain('decision.kind')
+	for (const withheld of ['verified.', 'collision.', 'confirmed', 'signature', 'commitments', 'lienId']) {
+		expect(returned).not.toContain(withheld)
+	}
 })
 
 // The number and timing of outbound calls are observable from outside the enclave. Branching the
@@ -174,7 +177,7 @@ test('the handler returns facts about the body, never the body', () => {
 test('the registry is asked whenever the envelope opened', () => {
 	const source = readFileSync('./workflow.ts', 'utf8')
 	expect(source).not.toMatch(/verified\.\w+\s*(\?|&&)[^\n]*readRegistry/)
-	expect(source).toMatch(/submitted\s*\n?\s*\?\s*readRegistry/)
+	expect(source).toMatch(/readRegistry\(runtime, secrets, submitted, blockNumber\)/)
 })
 
 const enclaveSources = () =>
@@ -228,10 +231,11 @@ test('a record never names a borrower the event did not', () => {
 // envelope — never anything a third party answered.
 test('an unauthorized submission reaches no external service', () => {
 	const source = readFileSync('./workflow.ts', 'utf8')
-	const guards = [...source.matchAll(/(\w+)\s*\n?\s*\?\s*(verifyExternally|readRegistry)\(/g)]
-	expect(guards).toHaveLength(2)
-	expect(new Set(guards.map((g) => g[1])).size).toBe(1)
-	expect(source).toMatch(/const submitted = authorized \?/)
+	// Both outbound paths sit inside one guard whose only gate is `authorized` — a fact about the
+	// envelope, never anything a third party answered. Branching either on a verification result
+	// would make the call count depend on confidential content, which is observable from outside.
+	expect(source).toMatch(/if \(authorized\) \{/)
+	expect(source).not.toMatch(/verified\.\w+\s*(\?|&&)[^\n]*(verifyExternally|readRegistry)\(/)
 })
 
 // The underwriting policy is configuration, not a secret. The ring sits exactly at the documented
@@ -251,4 +255,100 @@ test('the configured advance fits what the pool holds', () => {
 	const advance =
 		(BigInt(STAGING.settlementBaseUsdc6) * BigInt(STAGING.advanceRateBps)) / 10_000n
 	expect(advance).toBeLessThanOrEqual(16_000_000n)
+})
+
+// --- the values that cannot be corrected after deployment ------------------------
+
+// The production workflow name is the one irreversible string in the project: the registry has it
+// as an immutable, checks every report against it, and has no setter. A name differing by one
+// character is not an error — the DON signs, the forwarder transmits, and `onReport` rejects for
+// ever. Nothing guarded it until this test.
+test('the production workflow name derives to what the registry has frozen', async () => {
+	const yaml = readFileSync('./workflow.yaml', 'utf8')
+	const production = yaml.slice(yaml.indexOf('production-settings:'))
+	const name = /workflow-name:\s*"([^"]+)"/.exec(production)?.[1]
+	expect(name).toBe('caplane-registry')
+
+	const deployments = await Bun.file('../contracts/abi/deployments.arc-testnet.json').json()
+	// bytes10 of the first ten hex characters of the digest, taken as ASCII — which is what the
+	// forwarder packs and what the contract compares.
+	const digest = new Bun.CryptoHasher('sha256').update(name as string).digest('hex')
+	const derived = `0x${Buffer.from(digest.slice(0, 10), 'ascii').toString('hex')}`
+	expect(derived).toBe(deployments.workflowName)
+})
+
+// Staging must NOT derive to the production identity, or a staging deploy writes to the real
+// registry. This is the only thing separating the two environments.
+test('the staging workflow name cannot write to the production registry', async () => {
+	const yaml = readFileSync('./workflow.yaml', 'utf8')
+	const staging = yaml.slice(yaml.indexOf('staging-settings:'), yaml.indexOf('production-settings:'))
+	const name = /workflow-name:\s*"([^"]+)"/.exec(staging)?.[1]
+	const deployments = await Bun.file('../contracts/abi/deployments.arc-testnet.json').json()
+	const digest = new Bun.CryptoHasher('sha256').update(name as string).digest('hex')
+	const derived = `0x${Buffer.from(digest.slice(0, 10), 'ascii').toString('hex')}`
+	expect(derived).not.toBe(deployments.workflowName)
+})
+
+// The addresses were compared between the two config files and never against the deployment
+// record, so two identical wrong files passed.
+test('every configured address is the deployed one', async () => {
+	const deployments = await Bun.file('../contracts/abi/deployments.arc-testnet.json').json()
+	for (const config of [STAGING, await Bun.file('./config.production.json').json()]) {
+		expect(config.inboxAddress.toLowerCase()).toBe(deployments.inbox.toLowerCase())
+		expect(config.registryAddress.toLowerCase()).toBe(deployments.registry.toLowerCase())
+		expect(config.escrowAddress.toLowerCase()).toBe(deployments.escrow.toLowerCase())
+	}
+})
+
+// viem's hexToBytes puts the WHOLE input string into its error message, and that message leaves
+// the enclave as the execution failure reason. Two call sites hand it raw vault content: the
+// X25519 private key and the pepper. A secret uploaded as text rather than hex would print the
+// key node operators are not supposed to have — and neither secret can be rotated.
+test('a secret is checked before it is decoded, and never echoed', () => {
+	const sources = enclaveSources()
+	expect(sources).not.toMatch(/hexToBytes\(\s*secrets\./)
+	expect(sources).toMatch(/secretBytes\(/)
+})
+
+// A reject carries no lien id. The registry's reject branch never reads it, and it is an
+// offline-derivable fingerprint of the claim — published next to the reason it was refused.
+test('a rejected claim publishes no lien id', () => {
+	const source = readFileSync('./workflow.ts', 'utf8')
+	expect(source).toMatch(/lienId:[\s\S]{0,120}decision\.kind === ReportKind\.Record/)
+	expect(source).toContain('zeroHash')
+})
+
+// Every submitter-controlled parse and canonicalisation used to throw straight out of the handler.
+// An uncaught throw emits no report at all: the submitter paid gas, the inbox permanently consumed
+// their submission id, and nothing on chain recorded the claim was ever seen. The codebase already
+// stated the rule — `recoverConfirmer` returns undefined rather than throwing, for exactly this
+// reason — and honoured it in one place out of eight.
+test('no submitter input can abort the handler without a report', () => {
+	const source = readFileSync('./workflow.ts', 'utf8')
+	// The whole decision region is guarded, and the guard produces a decision rather than rethrowing.
+	expect(source).toMatch(/try \{/)
+	expect(source).toMatch(/catch[\s\S]{0,200}MalformedClaim|catch[\s\S]{0,200}VerificationUnavailable/)
+	// And the crossing is outside the guard, so a report is emitted on every path.
+	const afterCatch = source.slice(source.lastIndexOf('}'))
+	expect(source.indexOf('submitReport(')).toBeGreaterThan(source.indexOf('catch'))
+})
+
+// The reasons must be distinguishable on chain. A malformed claim and an unreachable ledger are
+// different remediations, and neither is "your receivable is already pledged".
+test('every reject reason fits the uint8 that carries it', () => {
+	const values = Object.values(RejectReason)
+	expect(Math.max(...values)).toBeLessThanOrEqual(255)
+	expect(new Set(values).size).toBe(values.length)
+})
+
+// `open()` sits before the decision guard, so an envelope that cannot be opened used to abort the
+// handler with no report — the same disappearance the guard exists to remove, on the one input
+// nobody controls: the inbox is permissionless, so anyone can submit arbitrary bytes for the price
+// of gas, and a sealer using a stale enclave key produces the same outcome by accident.
+test('an envelope that does not open is refused, not dropped', () => {
+	const source = readFileSync('./workflow.ts', 'utf8')
+	const opened = source.indexOf('open(')
+	const firstTry = source.indexOf('try {')
+	expect(firstTry).toBeLessThan(opened)
+	expect(source).toContain('MalformedEnvelope')
 })

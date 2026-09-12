@@ -46,3 +46,9 @@ test('no url is built with a global the enclave does not have', () => {
 		expect(source()).not.toContain(absent)
 	}
 })
+
+// The registry query sets `store: false` and explains why: a cached query is a persisted record
+// of what was asked. The same reasoning covers a bearer token, an invoice body and a debtor name.
+test('no request is cached, including the three that carry the claim', () => {
+	expect(source().match(/store: false/g) ?? []).toHaveLength(3)
+})

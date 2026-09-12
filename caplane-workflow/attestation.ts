@@ -6,7 +6,7 @@ import {
 	type DebtorConfirmation,
 	confirmationDomain,
 } from '../claim/attestation'
-import { lienIdOf } from '../claim/commit'
+import { claimIdOf } from '../claim/commit'
 import { toComponents } from '../claim/index'
 import { ClaimType } from './abi/frozen'
 import type { Invoice, SubmittedClaim } from './ledger'
@@ -99,7 +99,7 @@ export const confirmationBinds = (
 		same(confirmation.creditor, submitter) &&
 		same(confirmation.debtor, recovered) &&
 		!same(confirmation.debtor, submitter) &&
-		confirmation.claimId === lienIdOf(ClaimType.Invoice, toComponents(claim)) &&
+		confirmation.claimId === claimIdOf(ClaimType.Invoice, toComponents(claim)) &&
 		confirmation.debtorRef === keccakOf(invoice.Contact?.ContactID ?? '') &&
 		confirmation.invoiceNumber === claim.invoiceNumber &&
 		confirmation.currency === claim.currency &&

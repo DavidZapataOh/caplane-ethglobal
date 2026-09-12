@@ -1,0 +1,106 @@
+The first lien. Written by an attested enclave, from a claim nobody but that enclave could read.
+
+  lienId        0xebd60de9b8c99e6bde3ce7ad1894177e706e75c0120c192da71400a378ae7e4c
+  borrower      0x86Ec9f04485Db066CF155353f15eef356Ae90253
+  advanceUsdc6  8000000            8.00 USDC
+  rateBps       200                2.00%
+  createdAt     1789191961
+  expiresAt     1801267200
+  status        1                  active · isEncumbered() true
+  submissionId  0xdb0577a4e0025f56d6b8e3f71871a42dccb2bc6447aa366685b42d33505752b3
+
+  registry      0xe7170ee0ce4cab4593970ef5c4ebf7d0d62ae19b
+  tx            0x734146512b4b2b1cfbd562a6ce080183e87fbb7f0c0542b9bf17478b029f0092
+  block         61,685,965
+
+
+--- the whole chain, in one execution -------------------------------------------------
+
+  workflow      caplane-registry
+  workflow id   00e0a9b9fdf8cd903d396d24f0b56ddd19ef9748ee34c75a194c2c91f20b2a22
+  owner         d5557a1d0806323cad77bc4049ccaca0eadaaf06
+  execution     d01347d4c43699e5a7c06c452ff232d4541ea20963d91bc2ddb1b434af5ad201
+                05:45:50 to 05:46:02 UTC — 12 seconds
+
+  1. trigger                                      success
+  2. http-actions  SendRequest                    success   accounting token
+  3. http-actions  SendRequest                    success   the claimed invoice
+  4. http-actions  SendRequest                    success   watchlist screen
+  5. http-actions  SendRequest                    success   collision, pinned to the trigger block
+  6. consensus     Report                         success   the DON signed
+  7. evm           WriteReport                    success   the forwarder transmitted
+
+  ReportProcessed  receiver 0xe7170ee0…ae19b   success TRUE
+
+That last line is what staging could not produce. There, the same chain ran and the forwarder
+reported `success FALSE` six times, because `onReport` refused the workflow name. Here the name
+matches the immutable the registry carries and the report landed.
+
+  $ cre execution logs d01347d4…
+  ! No logs found
+
+Nothing left the enclave. The claim, the ledger's answer, the debtor's identity and the signature
+are all in an execution whose only visible output is a lien id and an amount.
+
+
+--- what a submission costs, measured -------------------------------------------------
+
+  sealed plaintext         742 B     seven claim fields + confirmation + signature
+  envelope                 836 B     + 20 submitter + 58 header + 16 tag; cap is 4,096
+  submit gas            68,097
+  execution                 12 s     against a 300-second budget
+  http calls                   4     of 5; the fifth is still the reserve
+  secrets calls                1     one batch of five ids
+  report body              576 B     of 5,011
+
+
+--- the subscription window loses events, measured twice ------------------------------
+
+Registering a workflow opens its log subscription forward in time, and there is a window after
+registration during which events are not seen. Not delayed — not seen.
+
+  production registered   05:38:09
+  submission #1           05:39:55   1m46s later    never executed
+  submission #2           05:45:47   7m38s later    executed at 05:45:50
+
+Three seconds, once the subscription is live. The lien carries #2's submissionId, which is how the
+two cases are told apart: the execution at 05:45:50 was #2 arriving instantly, not #1 arriving
+late. The same shape appeared in staging, where a submission 11 seconds after registration was
+never executed and one six minutes later fired within twenty seconds.
+
+A lost submission has no symptom anywhere. No CLI error, no chain event, no log — a TEE trigger
+emits none. The only trace is a `ClaimSubmitted` with no answer, and the submitter has paid gas and
+permanently consumed that submission id in the inbox.
+
+  · For a product: submissions have to be reconciled against responses. Nothing in this repository
+    does that today.
+  · For a deployment: register first, submit with minutes of margin.
+
+The other half of the same finding is good news, and it closes an open question from the
+deployment audit: **historical events are not replayed.** Five `ClaimSubmitted` events sit on this
+inbox; production has executed exactly one. The three that predate it — one from before the
+redeploy, two from the staging exercise — were never picked up and never will be. The risk that
+activating production would replay an old approval and commit pool funds with nobody deciding to
+does not exist.
+
+
+--- what this establishes, and what it does not ---------------------------------------
+
+Established, and none of it had been before today:
+
+  · The Vault DON releases five secrets into an attested enclave. Every green run before the
+    staging pre-flight read them from a file on disk.
+  · Four live calls to two third-party services execute from inside the enclave.
+  · A report signed by the DON reaches the production forwarder and is accepted by a contract that
+    checks the workflow name against an immutable.
+  · A lien exists that no one can alter. The registry has no owner, no pause and no proxy.
+
+Not established:
+
+  · Attestation is verified by the DON before the execution completes; nothing in this repository
+    reads that verification.
+  · The advance is committed, not paid. `disburse` is a separate permissionless call and the pool
+    still holds 16,000,000 base units.
+  · The collision check has still never fired against a real lien — there was nothing to collide
+    with until this moment. That is now possible for the first time.
+  · Release and default have never run on chain.

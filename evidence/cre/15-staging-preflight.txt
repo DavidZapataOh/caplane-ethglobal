@@ -1,0 +1,112 @@
+The whole system ran inside a real enclave, end to end, for the first time.
+
+Every green run before this one read its secrets from a file on disk. `cre workflow simulate`
+resolves them through its own `-e` flag and never consults the vault — established by four
+experiments and recorded in the secret-ring evidence. So the three claims this project rests on
+had never been exercised anywhere: that the vault releases into an attested enclave, that a
+DON-signed report reaches the production forwarder, and that nothing leaves the TEE.
+
+This is the pre-flight that exercises all three without being able to write anything.
+
+  workflow      caplane-registry-staging
+  workflow id   00262d4e2d446d74bc030cf4dbb1e9f48a0f3fa2862c951f3cae4e1fca2493ea
+  owner         d5557a1d0806323cad77bc4049ccaca0eadaaf06
+  registered    2026-09-12 05:20:58 UTC, DON family zone-a
+  execution     79ecd6c1dc997bd2d352a4ad9f63013f7d034ebd4d828abe70667ea5e618a91b
+  submission    tx 0xd525e514b4703c59352be67e6c61edaadb614724a025e579153e0f39f276fdd3
+
+
+--- the chain of events ------------------------------------------------------------
+
+  1. trigger                                        success
+  2. http-actions@1.0.0-alpha  SendRequest          success
+  3. http-actions@1.0.0-alpha  SendRequest          success
+  4. http-actions@1.0.0-alpha  SendRequest          success
+  5. http-actions@1.0.0-alpha  SendRequest          success
+  6. consensus@1.0.0-alpha     Report               success
+  7. evm:...3034092155422581607  WriteReport        success
+
+  SUCCESS, 05:27:28 to 05:27:50 UTC — 22 seconds against a 300-second budget.
+
+
+--- what the four calls prove, in order ---------------------------------------------
+
+They prove it by chaining, which is why the count matters more than any one of them:
+
+  the envelope key   if the vault's copy were not the one the browser seals to, `open` throws
+                     `invalid tag` and the execution dies before call one. It did not.
+  the ledger creds   call one is the token exchange. A wrong id or passphrase is a 401 and the
+                     handler refuses. It did not.
+  the ledger itself  call two reads the claimed invoice under that token.
+  the watchlist key  call three screens the debtor's name from the ledger's own record.
+  the pepper         call four derives seven peppered commitments first. A pepper that was not
+                     32 hex bytes is now refused by name before it is decoded, so reaching this
+                     call at all is the check.
+
+Four HTTP calls against a limit of five, one secrets call in a batch of five ids, one chain
+write. The fifth HTTP call is still the reserve.
+
+
+--- and it wrote nothing, which is the point -----------------------------------------
+
+`WriteReport: success` means the forwarder transmitted, not that the registry accepted. The
+forwarder calls the receiver with a raw `call`, ignores the result, and reports the outcome:
+
+  ReportProcessed  topic0    0x3617b009e9785c42daebadb6d3fb553243a4bf586d07ea72d65d80013ce116b5
+                   receiver  0xe7170ee0ce4cab4593970ef5c4ebf7d0d62ae19b   the real registry
+                   success   FALSE
+
+  LienRecorded in the registry        0
+  SubmissionRejected in the registry  0
+
+`onReport` refused it on the workflow name and nothing reached storage. `sha256` of
+`caplane-registry-staging` gives `ad26985f94`; the registry holds `39deefab9f` as an immutable and
+compares every report against it. That single string is the whole separation between the two
+environments — the configs are otherwise identical, both pointing at the same live contracts — and
+this is the first time it has been observed doing its job rather than asserted.
+
+**Six transmissions, blocks 61,683,802 through 61,683,815.** The DON retried. `KeystoneForwarder`
+marks a transmission permanently attempted only when it succeeded or the receiver failed the
+ERC-165 probe, so a receiver that reverts is retried. Worth knowing before production: a report
+carrying wrong data is not transmitted once.
+
+
+--- nothing left the enclave ---------------------------------------------------------
+
+  $ cre execution logs 79ecd6c1…
+  ! No logs found
+
+The CLI's own banner says user logs for a TEE trigger are not visible and do not leave the TEE.
+That has been quoted in this repository for weeks and never observed on a deployed execution.
+
+
+--- the log trigger does not backfill, measured by accident ---------------------------
+
+The first submission was made 11 seconds after the workflow was registered:
+
+  registered  05:20:58 UTC
+  submitted   05:21:09 UTC, block 61,683,039
+  result      never executed
+
+The second, six minutes later, fired within about twenty seconds. So registration opens a
+subscription forward in time and there is a window after it during which events are missed with no
+error and no trace.
+
+Two consequences, and they point in opposite directions:
+
+  · Good: the six `ClaimSubmitted` events already on chain will NOT replay when production is
+    activated. One of them is a full approval and would have committed 8 of the pool's 16 USDC
+    with nobody deciding to. This was an open question in the deployment audit.
+  · Bad: a submission that lands inside that window is lost silently. Production must register
+    first and submit after, with margin.
+
+
+--- what this still does not establish ------------------------------------------------
+
+No lien exists. `LienRecorded` has never been emitted by any deployment of this registry, and the
+accepting path — a report whose workflow name matches — has by construction not been exercised
+here. What is now established is everything up to that comparison: the enclave, the vault, the
+four live calls, the DON signature, and the forwarder transmit.
+
+Attestation itself is still not verified by anything in this repository. The DON verifies it
+before the execution completes; nothing here reads that verification.

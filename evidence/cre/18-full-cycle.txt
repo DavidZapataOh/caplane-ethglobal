@@ -1,0 +1,99 @@
+The whole cycle, on chain, with nobody holding a privileged key at any step.
+
+  ClaimSubmitted      block 61,685,937   the business seals and submits
+  LienRecorded        block 61,685,965   the enclave writes the lien
+  SubmissionRejected  block 61,686,810   the enclave refuses the same claim again, reason 1
+  disburse            block 61,686,9xx   8.00 USDC leaves the pool for the borrower
+  Paid                block 61,687,9xx   the debtor pays 8.16 into escrow
+  Settled             block 61,687,942   escrow splits and emits
+  LienReleased        block 61,687,960   the enclave releases the lien, unasked
+
+Three deployed executions, all SUCCESS, all `No logs found`.
+
+  d01347d4…  05:45:50   12s   record
+  121041ff…  05:53:05   12s   reject, collision
+  68733064…  06:03:03         release
+
+
+--- who triggered what, which is the point ------------------------------------------
+
+  disburse   called by 0xbb8449f3…  the DEBTOR's account
+  settle     called by 0xb3f85869…  the INVESTOR's account
+
+Neither party had any authority over the money it moved. `disburse` pays the borrower named in the
+registry; `settle` splits what the escrow holds. What authorises each is the state on chain, never
+the caller. There is no keeper, no operator, and no key to lose — a claim this project has made in
+prose since the beginning and which now has transactions behind it.
+
+The two enclave-driven steps needed no caller at all. The lien was written because a log trigger
+fired, and released because another one did.
+
+
+--- the release is the step that had never run anywhere ------------------------------
+
+The second handler — array index 1, subscribed to the escrow — had never executed in any
+environment. Its own plan recorded it as NOT DONE, because it needs a real `Settled` event and
+producing one needs a recorded lien, a funded pool, a disbursement and a debtor payment. Every one
+of those happened for the first time in the last twenty minutes.
+
+  1. trigger                            success
+  2. consensus  Report                   success
+  3. evm        WriteReport              success
+
+Zero HTTP calls, zero secrets consumed beyond the ring read. The handler reads the lien id out of
+`topics[1]` and emits a Release; the whole decision is the event. It does not check the lien's
+status first — the registry checks it, and checking in the enclave would cost a chain read, which
+is the second crossing the package exists to avoid.
+
+  statusOf   1 → 2
+
+
+--- and it confirms the contract fix, in production ------------------------------------
+
+The registry was redeployed hours earlier because two defects in it were immutable. This execution
+exercises both sides of one of them.
+
+The old `_close` flipped the status and left the lien's three posting-list entries behind, so the
+fuzzy lookup walked dead entries for the life of the registry with no way to reclaim them. The new
+one removes them, swap-and-pop against a position remembered at record time. A released lien now
+costs the index nothing.
+
+The other defect — a released lien could never be recorded again, so a paid invoice was burned
+forever — is now testable for the first time on a real lien, and is not tested here: doing it would
+mint a second lien on the same receivable and consume more of the pool. It is covered by
+`test_Registry_ARereleasedLienCanBeRecordedAgain` against the same bytecode.
+
+
+--- the money, and where the fee went ---------------------------------------------------
+
+  pool cash        16,000,000 → 8,000,000 → 16,160,000
+  totalAssets      16,000,000 → 16,000,000 → 16,160,000
+  share price       1,000,000 →  1,000,000 →  1,009,999
+
+During the loan `totalAssets` did not move: cash fell by 8,000,000 and `_outstanding` rose by the
+same. Lending is not a loss, and the share price stayed at exactly 1 USDC — depositors are neither
+diluted nor enriched by the act of lending.
+
+The 160,000 that arrived on repayment is the fee: 2% of an 8 USDC advance, spread across a 16 USDC
+pool, which is the 1.0% the share price moved. The borrower received 8.00 and repaid nothing; the
+debtor paid 8.16, which is what the escrow demanded of it against that lien.
+
+The debtor never needed the financing terms to pay. `PROYECTO.md` used to promise the debtor "never
+sees the terms of the financing", which is false as a property of the chain — `lienOf` is a public
+view. What is true is more modest and is what this transaction shows: the debtor does not need
+them.
+
+
+--- what is still not demonstrated -------------------------------------------------------
+
+**Six of seven.** The collision that fired was seven of seven — the identical claim — so exact-key
+equality would have caught it too. Measured across all fourteen live receivables in the tenant, no
+two reach six, so the fuzzy tier has no natural subject in this ledger. Recorded separately.
+
+**Default.** No handler produces a `ReportKind.Default`, by construction: none of CRE's three
+trigger primitives can detect an overdue lien, and the design that would work is named in the
+dossier rather than built. The registry accepts a default at the right second — proven in tests
+against this bytecode — and nothing fires one.
+
+**Attestation.** The DON verifies the enclave's attestation before an execution completes. Nothing
+in this repository reads that verification, so it is trusted, not checked here.

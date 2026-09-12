@@ -36,16 +36,27 @@ test('a different pepper produces different commitments', () => {
 // cannot have come from any of the three.
 test('the batch carries a discriminating second call', () => {
 	const body = JSON.parse(
-		Buffer.from(batchBody(commitmentsOf(CLAIM, PEPPER), '0xabc'), 'base64').toString(),
+		Buffer.from(batchBody(commitmentsOf(CLAIM, PEPPER), '0xabc', 61_668_574n), 'base64').toString(),
 	)
 	expect(body).toHaveLength(2)
 	expect(body[1].params[0].data).toBe('0x007271ce')
 })
 
+// The read is pinned to the trigger's own block, never to the tip: an unpinned read is a race in
+// which two deliveries of one event observe different registries and emit contradictory reports,
+// both of which land because their nonces differ by kind.
+test('the read is pinned to the trigger block, not the tip', () => {
+	const body = JSON.parse(
+		Buffer.from(batchBody(commitmentsOf(CLAIM, PEPPER), '0xabc', 61_668_574n), 'base64').toString(),
+	)
+	for (const call of body) expect(call.params[1]).toBe('0x3acfcde')
+	expect(JSON.stringify(body)).not.toContain('latest')
+})
+
 // `now()` exists on the runtime and the envelope's `id` is exactly where a timestamp would land.
 test('the request carries no clock', () => {
 	const body = JSON.parse(
-		Buffer.from(batchBody(commitmentsOf(CLAIM, PEPPER), '0xabc'), 'base64').toString(),
+		Buffer.from(batchBody(commitmentsOf(CLAIM, PEPPER), '0xabc', 61_668_574n), 'base64').toString(),
 	)
 	expect(body.map((c: { id: number }) => c.id)).toEqual([1, 2])
 })

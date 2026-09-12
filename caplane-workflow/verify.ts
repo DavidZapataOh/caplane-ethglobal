@@ -70,6 +70,8 @@ export const verifyExternally = (
 				},
 				'Content-Type': { values: ['application/x-www-form-urlencoded'] },
 			},
+			// The bearer token, cached, is a live credential sitting in a host-side store.
+			cacheSettings: { store: false },
 		})
 		.result()
 	if (!ok(tokenResponse)) throw new Error(`token ${tokenResponse.statusCode}`)
@@ -87,6 +89,9 @@ export const verifyExternally = (
 				'Xero-tenant-id': { values: [config.ledgerTenantId] },
 				Accept: { values: ['application/json'] },
 			},
+			// The URL carries the invoice number and the body carries the debtor, the amount and
+			// the due date — the confidential payload, persisted for ten minutes by default.
+			cacheSettings: { store: false },
 		})
 		.result()
 	if (!ok(invoiceResponse)) throw new Error(`ledger ${invoiceResponse.statusCode}`)
@@ -104,6 +109,8 @@ export const verifyExternally = (
 			url: `${config.watchlistUrl}?name=${encodeURIComponent(debtorName)}&size=${SCREENING_PAGE}`,
 			method: 'GET',
 			multiHeaders: { 'subscription-key': { values: [secrets.WATCHLIST_SUBSCRIPTION.value] } },
+			// The URL carries the debtor's name.
+			cacheSettings: { store: false },
 		})
 		.result()
 	if (!ok(screeningResponse)) throw new Error(`watchlist ${screeningResponse.statusCode}`)
@@ -112,7 +119,8 @@ export const verifyExternally = (
 		exists: invoice !== undefined,
 		unpaid: invoice !== undefined && isUnpaid(invoice),
 		matches: invoice !== undefined && matchesClaim(invoice, claim),
-		screened: !hasSanctionsHit(json(screeningResponse) as ScreeningResponse),
+		// An unanswerable screen is not a clean screen.
+		screened: hasSanctionsHit(json(screeningResponse) as ScreeningResponse) === false,
 		invoice,
 	}
 }

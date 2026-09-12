@@ -20,6 +20,7 @@ const POLICY: Policy = {
 	settlementBaseUsdc6: '10000000',
 	graceSeconds: '2592000',
 }
+const NOW = 1_700_000_000n
 const CLEAN = {
 	authorized: true,
 	confirmed: true,
@@ -44,7 +45,7 @@ test('each failure rejects with its own reason', () => {
 		],
 	] as const
 	for (const [facts, reason] of cases) {
-		const decision = underwrite(facts, POLICY)
+		const decision = underwrite(facts, POLICY, NOW)
 		expect(decision.kind).toBe(ReportKind.Reject)
 		expect(decision.kind === ReportKind.Reject && decision.reason).toBe(reason)
 	}
@@ -61,7 +62,7 @@ test('an undecidable collision never approves', () => {
 })
 
 test('a clean claim records', () => {
-	expect(underwrite(CLEAN, POLICY).kind).toBe(ReportKind.Record)
+	expect(underwrite(CLEAN, POLICY, NOW).kind).toBe(ReportKind.Record)
 })
 
 // The reason must be a uint8: it travels in `rateBps`, which the registry reads as the reason for
@@ -74,7 +75,7 @@ test('every reject reason fits the field that carries it', () => {
 // those are different currencies with different scales and nothing here converts between them.
 // A claim whose amount changes must not move the advance by a single unit.
 test('the advance comes from the settlement base, not the claim', () => {
-	const base = underwrite(CLEAN, POLICY)
+	const base = underwrite(CLEAN, POLICY, NOW)
 	const other = underwrite({ ...CLEAN, amountMinor: '1' } as never, POLICY)
 	expect(base.kind === ReportKind.Record && base.advanceUsdc6).toBe(8_000_000n)
 	expect(other.kind === ReportKind.Record && other.advanceUsdc6).toBe(8_000_000n)
@@ -83,7 +84,7 @@ test('the advance comes from the settlement base, not the claim', () => {
 // The pool holds sixteen USDC. An advance it cannot fund reverts inside SafeERC20 with no named
 // error, so the base times the rate has to stay under what is actually there.
 test('the advance fits what the pool holds', () => {
-	const decision = underwrite(CLEAN, POLICY)
+	const decision = underwrite(CLEAN, POLICY, NOW)
 	expect(decision.kind === ReportKind.Record && decision.advanceUsdc6).toBeLessThanOrEqual(
 		16_000_000n,
 	)
@@ -92,7 +93,7 @@ test('the advance fits what the pool holds', () => {
 // The pool refuses to disburse at or past expiry, so an expiry without real headroom pays out an
 // advance that is defaultable in the same second. And `Date` is banned on this path.
 test('expiry is the due date plus the configured grace, computed without Date', () => {
-	const decision = underwrite(CLEAN, POLICY)
+	const decision = underwrite(CLEAN, POLICY, NOW)
 	expect(decision.kind === ReportKind.Record && decision.expiresAt).toBe(1798675200n + 2_592_000n)
 })
 
@@ -160,4 +161,27 @@ test('a record with seven commitments fits the body budget', () => {
 test('the report path is deterministic', () => {
 	const source = readFileSync('./report.ts', 'utf8')
 	expect(source).not.toMatch(/Date\.now|new Date|Math\.random|toLocaleString/)
+})
+
+// The pool refuses to disburse at or past expiry, so a lien recorded already expired can never be
+// drawn, never settled, and — with no Default producer — never closed. It permanently blocks the
+// receivable and every 6-of-7 variant of it, with no on-chain explanation. An overdue invoice is
+// the most ordinary input in factoring, so this is reachable on day one.
+test('a claim whose expiry has already passed is refused, not recorded', () => {
+	const past = { ...CLEAN, dueDate: '2020-01-01' }
+	const decision = underwrite(past, POLICY, 1_800_000_000n)
+	expect(decision.kind).toBe(ReportKind.Reject)
+	expect(decision.kind === ReportKind.Reject && decision.reason).toBe(RejectReason.SourceUnverified)
+})
+
+test('a claim with real headroom still records', () => {
+	expect(underwrite(CLEAN, POLICY, 1_700_000_000n).kind).toBe(ReportKind.Record)
+})
+
+// The boundary is the expiry itself: the pool's guard is `>=`, so an expiry equal to now is
+// already unfundable.
+test('expiry exactly now is refused', () => {
+	const at = epochOf(CLEAN.dueDate) + BigInt(POLICY.graceSeconds)
+	expect(underwrite(CLEAN, POLICY, at).kind).toBe(ReportKind.Reject)
+	expect(underwrite(CLEAN, POLICY, at - 1n).kind).toBe(ReportKind.Record)
 })

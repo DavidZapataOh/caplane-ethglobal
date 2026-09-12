@@ -17,6 +17,11 @@ contract Ghosts {
   mapping(bytes32 lienId => bool) public known;
   mapping(bytes32 lienId => uint8) public lastSeenStatus;
   mapping(bytes32 lienId => uint256) public enteredActiveCount;
+  /// @dev Default is the one terminal state. Released is not, since a paid receivable is
+  ///      financeable again, so "was it ever defaulted" is the thing worth remembering.
+  mapping(bytes32 lienId => bool) public everDefaulted;
+  /// @dev Releases are what earn a re-entry into active, so the two counts bound each other.
+  mapping(bytes32 lienId => uint256) public releaseCount;
 
   uint256 public totalEverDisbursed;
   uint256 public totalEverRepaidPrincipal;
@@ -87,6 +92,18 @@ contract Ghosts {
     }
     if (status == 1) ++enteredActiveCount[lienId];
     lastSeenStatus[lienId] = status;
+  }
+
+  function noteReleased(
+    bytes32 lienId
+  ) external {
+    releaseCount[lienId] += 1;
+  }
+
+  function noteDefaulted(
+    bytes32 lienId
+  ) external {
+    everDefaulted[lienId] = true;
   }
 
   function noteStatus(

@@ -23,6 +23,9 @@ contract CaplaneRegistry is ICaplaneRegistry {
   mapping(bytes32 lienId => bytes32[COMPONENTS]) private _commitments;
   mapping(bytes32 nonce => bool) private _used;
   mapping(bytes32 commitment => bytes32[] lienIds) private _postings;
+  /// @dev One-based position of a lien inside a posting list, so closing can swap-and-pop in O(1).
+  ///      Zero means absent.
+  mapping(bytes32 commitment => mapping(bytes32 lienId => uint256 slot)) private _postingSlot;
 
   constructor(
     address forwarder,
@@ -84,12 +87,35 @@ contract CaplaneRegistry is ICaplaneRegistry {
     }
   }
 
+  /// @dev Closing reclaims the posting-list entries. They used to be left behind, so the walk
+  ///      `matchesOf` performs grew with every lien ever recorded rather than with the live ones,
+  ///      degraded monotonically for the life of the registry, and could never be reclaimed — a
+  ///      debtor eventually became permanently unqueryable. Removal is swap-and-pop against a
+  ///      remembered position, so it is O(1) and cannot itself become the gas ceiling it removes.
   function _close(
     bytes32 lienId,
     uint8 status
   ) private {
     if (_liens[lienId].status != 1) revert LienNotActive(lienId);
     _liens[lienId].status = status;
+
+    uint256[3] memory positions = _indexedPositions();
+    for (uint256 p; p < positions.length; ++p) {
+      bytes32 commitment = _commitments[lienId][positions[p]];
+      uint256 slot = _postingSlot[commitment][lienId];
+      if (slot == 0) continue;
+
+      bytes32[] storage list = _postings[commitment];
+      uint256 last = list.length - 1;
+      uint256 at = slot - 1;
+      if (at != last) {
+        bytes32 moved = list[last];
+        list[at] = moved;
+        _postingSlot[commitment][moved] = at + 1;
+      }
+      list.pop();
+      delete _postingSlot[commitment][lienId];
+    }
   }
 
   /// @dev Not `BadMetadata`: the metadata was well-formed and the report body was not, so that
@@ -100,7 +126,15 @@ contract CaplaneRegistry is ICaplaneRegistry {
     if (body.componentCommitments.length != COMPONENTS) {
       revert WrongComponentCount(body.componentCommitments.length);
     }
-    if (_liens[body.lienId].status != 0) revert AlreadyEncumbered(body.lienId);
+    // Active and Defaulted block; None and Released do not. The gate was `!= 0`, which meant a
+    // RELEASED lien kept its key for ever — and the key is deterministic over the claim, so a paid
+    // invoice could never be financed again. That is the opposite of what releasing is for, and
+    // the enclave could not see it coming: `matchesOf` skips non-active liens, so it would answer
+    // "clear", emit a Record, and the report would revert.
+    //
+    // Default stays terminal. Freeing a receivable is what settlement earns; a write-down is not.
+    uint8 status = _liens[body.lienId].status;
+    if (status == 1 || status == 3) revert AlreadyEncumbered(body.lienId);
 
     _liens[body.lienId] = Lien({
       borrower: body.borrower,
@@ -118,7 +152,10 @@ contract CaplaneRegistry is ICaplaneRegistry {
 
     uint256[3] memory positions = _indexedPositions();
     for (uint256 p; p < positions.length; ++p) {
-      _postings[body.componentCommitments[positions[p]]].push(body.lienId);
+      bytes32 commitment = body.componentCommitments[positions[p]];
+      _postings[commitment].push(body.lienId);
+      // One-based, so zero means absent and a re-recorded lien overwrites cleanly.
+      _postingSlot[commitment][body.lienId] = _postings[commitment].length;
     }
 
     emit LienRecorded(body.lienId, body.borrower, body.expiresAt);

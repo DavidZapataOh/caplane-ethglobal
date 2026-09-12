@@ -1,3 +1,12 @@
+⚠️ SUPERSEDED, as to the inbox address. The four contracts were redeployed on 2026-09-12 at block 61,681,981, after
+an audit found two defects immutable in the previous registry: the record gate refused a RELEASED
+lien for ever — so a paid invoice could never be financed again — and closing a lien left its
+posting-list entries behind, so the fuzzy lookup degraded with no way to reclaim it. Redeploying
+was free because the registry held zero liens; it stops being free after the first one.
+
+The measurements below stand as measurements. The addresses in them do not. Current addresses are
+in `contracts/abi/deployments.arc-testnet.json`.
+
 The log trigger, fired by a real submission on Arc Testnet.
 
 --- why this could not be faked ------------------------------------------------

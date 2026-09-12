@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { expect, test } from 'bun:test'
 import { type Hex, hexToBytes, toEventSelector, zeroAddress, zeroHash } from 'viem'
 import { ReportKind } from './abi/frozen'
@@ -5,6 +6,24 @@ import { nonceFor } from './report'
 import { SETTLED_TOPIC, decodeSettled, releaseBody } from './settlement'
 
 const LIEN = `0x${'ab'.repeat(32)}` as Hex
+
+// Pinned against the contract's own source, the way the inbox topic is pinned against its ABI.
+// A log trigger matches on topic0 and nothing else, so a signature that drifted downstream would
+// stop the filter with no error and no releases, ever. Read from Solidity rather than from a
+// generated ABI because no escrow ABI is emitted — a test that skipped when a file was missing
+// would pass by doing nothing, which is the failure this whole audit kept finding.
+test('the settled topic matches the escrow contract source', () => {
+	const source = readFileSync('../contracts/src/CaplaneEscrow.sol', 'utf8')
+	const declaration = /event\s+Settled\s*\(([^)]*)\)/.exec(source)
+	expect(declaration).not.toBeNull()
+	const types = (declaration?.[1] ?? '')
+		.split(',')
+		.map((p) => p.trim().split(/\s+/)[0])
+		.join(',')
+	expect(SETTLED_TOPIC).toBe(toEventSelector(`Settled(${types})`))
+	// And the handler reads topics[1], so `lienId` must be the first indexed parameter.
+	expect(declaration?.[1]).toMatch(/^\s*bytes32\s+indexed\s+lienId/)
+})
 
 // The escrow's signature is the whole filter. A log trigger matches on topic0, so a signature
 // change downstream would stop the filter silently — no error, no releases, ever.

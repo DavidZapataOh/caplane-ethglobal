@@ -153,6 +153,7 @@ contract RegistryHandler is Test {
     bool ok = _send(Reports.body(2, SELECTOR, _next(), lienId, bytes32(0), address(0), 0, 0, 0, _tuple(seed)));
     if (!ok) return GHOSTS.recordRevert(this.releaseLien.selector);
     GHOSTS.noteStatus(lienId, 2);
+    GHOSTS.noteReleased(lienId);
     GHOSTS.recordCall(this.releaseLien.selector);
   }
 
@@ -172,6 +173,7 @@ contract RegistryHandler is Test {
     bool ok = _send(Reports.body(3, SELECTOR, _next(), lienId, bytes32(0), address(0), 0, 0, 0, _tuple(seed)));
     if (!ok) return GHOSTS.recordRevert(this.defaultLien.selector);
     GHOSTS.noteStatus(lienId, 3);
+    GHOSTS.noteDefaulted(lienId);
     GHOSTS.recordCall(this.defaultLien.selector);
   }
 

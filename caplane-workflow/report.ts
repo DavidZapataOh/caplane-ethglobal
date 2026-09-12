@@ -69,15 +69,23 @@ const refusalOf = (facts: Facts): number | undefined => {
  * repository, and there will not be one; they are published in configuration precisely so that is
  * visible. What the system demonstrates is the mechanism, not that the numbers are right.
  */
-export const underwrite = (facts: Facts, policy: Policy): Decision => {
+export const underwrite = (facts: Facts, policy: Policy, nowSeconds: bigint): Decision => {
 	const reason = refusalOf(facts)
 	if (reason !== undefined) return { kind: ReportKind.Reject, reason }
+
+	const expiresAt = epochOf(facts.dueDate) + BigInt(policy.graceSeconds)
+	// An already-expired lien is worse than a refusal. The pool will not disburse at or past
+	// expiry, nothing produces a Default report, and a lien cannot be released without a
+	// settlement — so it sits Active for ever, blocking this receivable and every near-variant of
+	// it, with no on-chain explanation and no recovery path in a contract that has no owner.
+	// An invoice more than the grace period overdue is the most ordinary input in factoring.
+	if (expiresAt <= nowSeconds) return { kind: ReportKind.Reject, reason: RejectReason.SourceUnverified }
 
 	return {
 		kind: ReportKind.Record,
 		advanceUsdc6: (BigInt(policy.settlementBaseUsdc6) * BigInt(policy.advanceRateBps)) / 10_000n,
 		rateBps: Number(policy.feeRateBps),
-		expiresAt: epochOf(facts.dueDate) + BigInt(policy.graceSeconds),
+		expiresAt,
 	}
 }
 

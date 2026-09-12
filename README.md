@@ -35,10 +35,10 @@ Pinned so a clean machine reproduces this build:
 
 | Contract | Address |
 |---|---|
-| `CaplaneInbox` | [`0x14f3bbf3b21b0411f798aa50edd05df06e72ae88`](https://testnet.arcscan.app/address/0x14f3bbf3b21b0411f798aa50edd05df06e72ae88) |
-| `CaplaneRegistry` | [`0xf2de8798750ea3bcb0faca049fc7581a118ef1f6`](https://testnet.arcscan.app/address/0xf2de8798750ea3bcb0faca049fc7581a118ef1f6) |
-| `CaplanePool` | [`0xa7ec42984bfc9f0024ca0873721e8b1166c2b0ee`](https://testnet.arcscan.app/address/0xa7ec42984bfc9f0024ca0873721e8b1166c2b0ee) |
-| `CaplaneEscrow` | [`0x5de99d8be27468dd175738e1703259130eb703b5`](https://testnet.arcscan.app/address/0x5de99d8be27468dd175738e1703259130eb703b5) |
+| `CaplaneInbox` | [`0xc5218fd1b6eb7c91f905871301bf8620bc8baf91`](https://testnet.arcscan.app/address/0xc5218fd1b6eb7c91f905871301bf8620bc8baf91) |
+| `CaplaneRegistry` | [`0xe7170ee0ce4cab4593970ef5c4ebf7d0d62ae19b`](https://testnet.arcscan.app/address/0xe7170ee0ce4cab4593970ef5c4ebf7d0d62ae19b) |
+| `CaplanePool` | [`0x4df4c8d722b3a9ebd18b9094c883b5ff83565d7c`](https://testnet.arcscan.app/address/0x4df4c8d722b3a9ebd18b9094c883b5ff83565d7c) |
+| `CaplaneEscrow` | [`0x2bc74ceb10287890fb9be43667a55b73e080db1f`](https://testnet.arcscan.app/address/0x2bc74ceb10287890fb9be43667a55b73e080db1f) |
 
 Source is verified, so the explorer's read tab works without an account: open the registry and
 call `isEncumbered(bytes32)` on any commitment. It answers from chain state — there is no server

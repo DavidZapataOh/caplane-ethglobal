@@ -53,7 +53,8 @@ export const VECTORS = {
       "issuerTaxId": "E1218A28743747ECBFB5252092825083",
       "country": "AU"
     },
-    "lienId": "0xf84b7a4a3620bb18f5486af09e223c7273d3d6118acda3b4b322a6f037403900",
+    "claimId": "0xf84b7a4a3620bb18f5486af09e223c7273d3d6118acda3b4b322a6f037403900",
+    "lienIdUnderTestPepper": "0x9de519607298ecf24f9742cf30cd2869d0d86a4bd320ad30b7ad2c1b72a5e908",
     "commitments": [
       "0x7fe06f21c37c947f5bb033166b40969d9d5b6d03fbd51e44acd75d232c642c1b",
       "0x8847a3f022c214b1a1bf561141a83c88743735ae925b1bcaa704493130256762",

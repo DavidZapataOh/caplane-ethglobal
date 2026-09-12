@@ -18,6 +18,12 @@ export const configSchema = z.object({
 	 * quota is five for the whole execution.
 	 */
 	ledgerTenantId: z.string().regex(/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/),
+	/**
+	 * The organisation's jurisdiction, ISO 3166-1 alpha-2. A claim component, and one the enclave
+	 * must not take from the submitter: it is checked against nothing, so leaving it to the claim
+	 * let two edited fields drop the collision agreement below its threshold.
+	 */
+	ledgerCountry: z.string().regex(/^[A-Z]{2}$/),
 	watchlistUrl: z.string().regex(/^https:\/\//),
 	registryAddress: z.string().regex(/^0x[0-9a-fA-F]{40}$/),
 	/** Emits `Settled` once per lien and never again, which is what makes it safe as a trigger. */

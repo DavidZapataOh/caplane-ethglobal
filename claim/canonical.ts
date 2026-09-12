@@ -17,7 +17,7 @@ const enumerated =
   (value: string): string => {
     const canonical = value.normalize('NFKC').trim().toUpperCase()
     if (!new RegExp(`^[A-Z]{${width}}$`).test(canonical)) {
-      throw new ClaimError(component, `expected ${width} letters, got ${JSON.stringify(value)}`)
+      throw new ClaimError(component, `expected ${width} letters`)
     }
     return canonical
   }
@@ -31,7 +31,7 @@ const daysIn = (y: number, m: number) =>
 
 const assemble = (y: number, m: number, d: number): string => {
   if (m < 1 || m > 12 || d < 1 || d > daysIn(y, m)) {
-    throw new ClaimError('dueDate', `no such date: ${y}-${m}-${d}`)
+    throw new ClaimError('dueDate', 'no such date')
   }
   return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`
 }
@@ -53,16 +53,22 @@ export const canonicalDate = (value: string): string => {
   if (slashed) {
     const day = Number(slashed[1]!)
     if (day <= 12) {
-      throw new ClaimError('dueDate', `ambiguous date ${JSON.stringify(value)}: use ISO 8601`)
+      throw new ClaimError('dueDate', 'ambiguous date: use ISO 8601')
     }
     return assemble(Number(slashed[3]!), Number(slashed[2]!), day)
   }
 
-  throw new ClaimError('dueDate', `unparseable date ${JSON.stringify(value)}`)
+  throw new ClaimError('dueDate', 'unparseable date')
 }
 
 /** ISO 4217 exponents that are not 2. Only the one that has a test lives here. */
-const EXPONENT: Record<string, number> = { JPY: 0 }
+/**
+ * ISO 4217 minor-unit exponents that are not 2. Exported because the enclave compares the ledger's
+ * amount against the claim's minor units and must scale by the same figure — hardcoding 100 in a
+ * second place is how the two drift, and a JPY claim then fails to match an invoice the ledger
+ * really holds.
+ */
+export const EXPONENT: Record<string, number> = { JPY: 0 }
 
 /**
  * A doubling bucket, not the amount. One real invoice has two defensible amounts — its net
@@ -83,13 +89,13 @@ export const canonicalAmountBucket = (amount: string, currency: string): string 
     const exponent = EXPONENT[code] ?? 2
     const fraction = decimal[2]!
     if (fraction.length !== exponent) {
-      throw new ClaimError('amountBucket', `${code} has ${exponent} minor digits, got ${fraction.length}`)
+      throw new ClaimError('amountBucket', `${code} has ${exponent} minor digits`)
     }
     minor = BigInt(decimal[1]! + fraction)
   } else if (/^\d+$/.test(text)) {
     minor = BigInt(text)
   } else {
-    throw new ClaimError('amountBucket', `unparseable amount ${JSON.stringify(amount)}`)
+    throw new ClaimError('amountBucket', 'unparseable amount')
   }
 
   if (minor <= 0n) throw new ClaimError('amountBucket', 'amount must be positive')

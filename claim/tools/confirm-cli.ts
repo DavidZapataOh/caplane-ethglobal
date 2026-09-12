@@ -13,7 +13,7 @@ import { keccak_256 } from '@noble/hashes/sha3.js'
 import { type Hex, toHex } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { CONFIRMATION_TYPES, confirmationDomain } from '../attestation'
-import { lienIdOf } from '../commit'
+import { claimIdOf } from '../commit'
 // `ClaimType` is not on the barrel: it comes from the frozen copy the contracts emit.
 import { ClaimType } from '../abi/frozen'
 import { toComponents } from '../index'
@@ -40,7 +40,9 @@ const account = privateKeyToAccount(need('DEBTOR_KEY') as Hex)
 const confirmation = {
 	creditor: creditor as Hex,
 	debtor: account.address,
-	claimId: lienIdOf(ClaimType.Invoice, toComponents(claim)),
+	// The pepper-free claim id, not the registry key. This tool runs on the debtor's side and must
+	// never hold the pepper — and this value never leaves the sealed envelope.
+	claimId: claimIdOf(ClaimType.Invoice, toComponents(claim)),
 	invoiceNumber: claim.invoiceNumber,
 	currency: claim.currency,
 	amountMinor: BigInt(claim.amountMinor),

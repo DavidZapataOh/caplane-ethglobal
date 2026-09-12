@@ -1,11 +1,12 @@
 import { type TeeRuntime, cre, json, ok } from '@chainlink/cre-sdk'
-import { type Hex, decodeFunctionResult, encodeFunctionData, hexToBytes } from 'viem'
+import { type Hex, decodeFunctionResult, encodeFunctionData } from 'viem'
 import { componentCommitments } from '../claim/commit'
 import { toComponents } from '../claim/index'
 import { decide } from '../claim/match'
 import { registryAbi } from './abi'
 import { ClaimType } from './abi/frozen'
 import type { Config } from './config'
+import { secretBytes } from './secrets'
 import type { SubmittedClaim } from './ledger'
 
 const http = new cre.capabilities.HTTPClient()
@@ -44,12 +45,19 @@ export const commitmentsOf = (claim: SubmittedClaim, pepper: Uint8Array): Hex[] 
  * otherwise look exactly like "no collision". A batch is a single request, so the discriminator
  * costs nothing against the call quota.
  */
-export const batchBody = (commitments: Hex[], registry: string): string => {
+export const batchBody = (commitments: Hex[], registry: string, blockNumber: bigint): string => {
+	// The trigger's own block, never `'latest'`. The trigger is FINALIZED precisely because a lien
+	// is permanent, and then reading at the tip put the one state the decision depends on back on
+	// a moving target: two deliveries of the same event could observe different registries and
+	// emit different reports — and BOTH would land, because the kind is in the nonce preimage, so
+	// their nonces differ and neither hits the replay guard. The chain would carry a Record and a
+	// Reject for one submission.
+	const at = `0x${blockNumber.toString(16)}` as const
 	const call = (id: number, data: Hex) => ({
 		jsonrpc: '2.0',
 		id,
 		method: 'eth_call',
-		params: [{ to: registry, data }, 'latest'],
+		params: [{ to: registry, data }, at],
 	})
 	return Buffer.from(
 		JSON.stringify([
@@ -103,11 +111,12 @@ export const readRegistry = (
 	runtime: TeeRuntime<Config>,
 	secrets: Record<string, { value: string }>,
 	claim: SubmittedClaim,
+	blockNumber: bigint,
 ): { read: BatchRead; commitments: Hex[] } => {
 	const { config } = runtime
 	// Hex, not raw text: the two produce different commitments, and the first execution fixes the
 	// index format for good — the pepper never rotates and there is no reindex.
-	const pepper = hexToBytes(secrets.COMMITMENT_PEPPER.value as Hex)
+	const pepper = secretBytes('COMMITMENT_PEPPER', secrets.COMMITMENT_PEPPER.value)
 	const commitments = commitmentsOf(claim, pepper)
 
 	const response = http
@@ -117,7 +126,7 @@ export const readRegistry = (
 			// Base64, because in the JSON form of the request `body` is bytes. A raw string is
 			// reinterpreted as base64 and sends silent garbage whenever its characters happen to
 			// fall inside the alphabet.
-			body: batchBody(commitments, config.registryAddress),
+			body: batchBody(commitments, config.registryAddress, blockNumber),
 			multiHeaders: { 'Content-Type': { values: ['application/json'] } },
 			// A cached query is a persisted record of which commitment was asked about, which is
 			// the leak this whole path exists to prevent. The production limits leave the cache

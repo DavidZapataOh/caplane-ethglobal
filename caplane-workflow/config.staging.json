@@ -1,14 +1,15 @@
 {
-  "inboxAddress": "0x14f3bbf3b21b0411f798aa50edd05df06e72ae88",
+  "inboxAddress": "0xc5218fd1b6eb7c91f905871301bf8620bc8baf91",
   "ledgerTokenUrl": "https://identity.xero.com/connect/token",
   "ledgerApiBase": "https://api.xero.com/api.xro/2.0",
   "ledgerTenantId": "e1218a28-7437-47ec-bfb5-252092825083",
   "watchlistUrl": "https://data.trade.gov/consolidated_screening_list/v1/search",
-  "registryAddress": "0xf2de8798750ea3bcb0faca049fc7581a118ef1f6",
+  "registryAddress": "0xe7170ee0ce4cab4593970ef5c4ebf7d0d62ae19b",
   "rpcUrl": "https://rpc.testnet.arc.io",
   "advanceRateBps": "8000",
   "feeRateBps": "200",
   "settlementBaseUsdc6": "10000000",
   "graceSeconds": "2592000",
-  "escrowAddress": "0x5de99d8be27468dd175738e1703259130eb703b5"
+  "escrowAddress": "0x2bc74ceb10287890fb9be43667a55b73e080db1f",
+  "ledgerCountry": "AU"
 }
