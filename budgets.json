@@ -23,6 +23,22 @@
       "_responseBytesAtSizeThree": "largest observed over four names at size=3: 16,305 B (international). Size follows the fatness of the three returned records, not the total",
       "responseBytesAtSizeThree": 32768
     },
+    "registry": {
+      "callsPerExecution": 1,
+      "_comment": [
+        "One POST carrying two eth_calls. The second reads an immutable whose value is known",
+        "offline, so a response carrying it cannot have come from a wrong address, an empty",
+        "registry or a dead endpoint — the three failures that otherwise look like no collision.",
+        "The response does not grow with registry density: the posting lists are walked inside",
+        "the view and never cross the wire."
+      ],
+      "_checkedAgainstRequestSizeLimit": "batchRequestBytes. The body travels base64-encoded in the JSON form of the request, but the limiter counts the DECODED bytes: measured, a 500 B cap rejects this call naming 851, not 1136",
+      "singleRequestBytes": 712,
+      "batchRequestBytes": 851,
+      "batchRequestBase64Bytes": 1136,
+      "singleResponseBytes": 168,
+      "batchResponseBytes": 271
+    },
     "httpCallPlan": {
       "_comment": [
         "One execution. Three calls read the ledger and the watchlist, one asks the registry",

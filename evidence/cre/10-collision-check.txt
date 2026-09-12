@@ -1,0 +1,127 @@
+The registry answered, and a zero alone would not have shown it.
+
+The enclave derives seven peppered commitments from the opened claim and asks the deployed
+registry about them in one JSON-RPC POST that leaves the enclave rather than the DON nodes. The
+answer is one of three verdicts, and the third is the one that matters.
+
+  binary hash     151770f6153492fa68c03fda376d697a99a9867425da10003f1dcf9a0dc95add
+  registry        0xf2de8798750ea3bcb0faca049fc7581a118ef1f6
+  endpoint        https://rpc.testnet.arc.io
+
+
+--- the result ------------------------------------------------------------------
+
+"0x13afb97d…19574 0x86Ec9f04485Db066CF155353f15eef356Ae90253 true true true true true clear"
+                                                                                     ^^^^^
+
+Eight fields now, not seven. `clear` is one of three words; the lien id it would collide with and
+the seven commitments it asked about both stay inside — the first is registry state the enclave was
+told, the second is the query itself.
+
+
+--- why `clear` is not the evidence ---------------------------------------------
+
+The registry is empty. An implementation that made no call at all and returned "clear" produces
+exactly this line. So the batch carries a second element: `WORKFLOW_NAME()`, an immutable whose
+value is known offline. A response carrying it cannot have come from a wrong address, an empty
+registry or a dead endpoint — the three failures that otherwise look identical to no collision.
+
+The selector is written literally, `0x007271ce`, because the getter is a public immutable the ABI
+generator never emitted: the frozen ABI has five functions and this is not one of them, so asking
+viem to encode it throws. Both the selector and the expected word were confirmed against the live
+chain before a line was written:
+
+  $ cast sig 'WORKFLOW_NAME()'
+  0x007271ce
+
+  [{"id":1,"result":"0x0000…0000"},                    matchesOf: no candidate, no matches
+   {"id":2,"result":"0x33396465656661623966" + 22 zero bytes}]    the identity, as expected
+
+The identity is compared against the full padded word, not the ten bytes of the name: `bytes10`
+arrives left-aligned, so comparing the short value passes on a hand-made fixture and never matches
+anything real.
+
+
+--- two ablations, because a green is not a measurement --------------------------
+
+1. Did the fourth call actually go out? Capping the quota one below what the execution needs:
+
+     --limits with HTTPAction.CallLimit = 3
+     ✗ [101]LimitExceeded: … cannot use 4, limit is 3
+
+   The error names the count. Four calls: token, invoice, watchlist, registry — with one held in
+   reserve against a limit of five.
+
+2. Does the discriminator discriminate? Pointing the config at a different deployed contract — the
+   inbox, which is real and answers, but is not the registry:
+
+     registryAddress → 0x14f3bbf3b21b0411f798aa50edd05df06e72ae88
+     "… true true true true true undecidable"
+
+   Not `clear`. That is the entire point of the plan in one line: a registry that cannot answer and
+   a registry that answers no are the difference between refusing a pledge and writing a second one
+   over the first. The config was restored and the binary rebuilt to the identical hash above.
+
+
+--- the sizes, and one thing the plan had backwards ------------------------------
+
+  what                          bytes    budget     how
+  matchesOf alone, request        712        —      measured
+  batch request, decoded          851     10,240    what the limiter counts
+  batch request, base64         1,136        —      what the field carries
+  matchesOf alone, response       168        —      measured against the endpoint
+  batch response                  271    102,400    measured against the endpoint
+
+The plan recorded that base64 expansion is the number to check against `RequestSizeLimit`, "because
+it is what travels". That is wrong, and the simulator says so:
+
+  --limits with HTTPAction.RequestSizeLimit = 500b
+  ✗ [8]ResourceExhausted: HTTP request body of 851 bytes exceeds the simulation limit of 500 bytes
+
+851, not 1,136. The limiter measures the decoded body. Confirmed a second way at 50b, where the
+token exchange trips naming 60 bytes — the exact length of its form string. `budgets.json` now
+records which of the two numbers the limit applies to.
+
+The response does not grow with registry density. The posting lists are walked inside the view and
+never cross the wire, so 271 bytes is the answer with three entries or three thousand. What runs
+out instead is the node's gas cap.
+
+
+--- what this does not prove ------------------------------------------------------
+
+**The positive arm.** A collision check is only shown when it fires, and that needs a lien on
+chain. The only write path into the registry is a DON-signed report through the forwarder — there
+is no owner, no pause and no seeding function — and staging carries a different workflow name on
+purpose, so it cannot exercise `onReport` at all. The first lien exists once the workflow is
+registered under the production name and a submission clears underwriting. What
+is proven off-chain, against a real corpus, is the six-of-seven predicate itself.
+
+**That the two counts agree.** `matched` on chain returns 0 for a claim sharing no indexed
+commitment, where the off-chain `agreement()` returns 3. They coincide where the threshold decides
+and diverge below it. That is reasoned, not measured against the chain, because the registry is
+empty — and if they ever disagreed where the threshold decides, every rate measured off-chain would
+describe a system that is not the one running.
+
+**Not a real enclave, and no vault.** The simulator says so in its own banner, and secrets resolve
+from `.env` rather than from the vault.
+
+
+--- limitations that belong to the system ------------------------------------------
+
+**Privacy here is stable pseudonymity, not unlinkability.** The pepper never rotates and the
+commitment is deterministic, so the same debtor produces the same 32 bytes for ever. The RPC
+provider sees a stable pseudonym, can link repeated queries, and can correlate them against chain
+state — `_postings` is `private` in Solidity but it is public storage, readable by
+`eth_getStorageAt`. And `matchesOf` takes all seven, so the debtor's identity commitment travels on
+every query whether or not there is a collision. A pepper compromise is retroactive and permanent:
+there is no reindex.
+
+**The posting lists are bounded by nothing.** Cost is flat in the size of the registry and linear
+in how many liens share a debtor and due date. Around 1,194 of them — extrapolated from 5,075,156
+gas measured with 200, against a node cap of 30,000,000 probed rather than documented — the
+`eth_call` stops answering. Annotations are not removed when a lien is released, so the lists grow
+with every lien ever recorded, not with the live ones. `undecidable` is the honest answer at that
+boundary, not a solution: a heavily pledged debtor stops being queryable.
+
+**The walk is deliberately not truncated.** A cap would return a count that is too low, which turns
+a hard failure into a silent double-pledge machine. The gas limit is a hard edge on purpose.

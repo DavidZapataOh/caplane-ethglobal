@@ -43,7 +43,8 @@ export const isCollision = (a: ClaimComponents, b: ClaimComponents): boolean =>
 export type MatchResult = { lienId: string; matched: number }
 export type Verdict = { collision: true; lienId: string } | { collision: false }
 
-const NO_LIEN = `0x${'0'.repeat(64)}`
+/** The registry's empty candidate. Exported so nothing downstream redeclares the same sentinel. */
+export const NO_LIEN = `0x${'0'.repeat(64)}`
 
 /**
  * The registry returns a candidate and a count; both are needed to decide.

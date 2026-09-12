@@ -70,6 +70,8 @@ test('both config files carry the same shape and no dead keys', async () => {
 		'ledgerApiBase',
 		'ledgerTenantId',
 		'ledgerTokenUrl',
+		'registryAddress',
+		'rpcUrl',
 		'watchlistUrl',
 	])
 	expect(Object.keys(production).sort()).toEqual(Object.keys(STAGING).sort())
@@ -87,8 +89,21 @@ test('the ledger tenant is a uuid, not a credential', () => {
 // `api.trade.gov` carries an expired TLS certificate and an enclave cannot accept a warning;
 // the static list is 33,752,788 bytes against a 100 KB response cap. Neither is reachable, so
 // the keyed endpoint on `data.trade.gov` is the only path, not a preference.
+// Neither of the registry's two values is a secret and neither could be: the endpoint carries no
+// credential, the address is public on chain, and the secret ring is already at the documented
+// ceiling of five, so a sixth would not fit.
+test('the registry endpoint carries no credential', () => {
+	expect(STAGING.rpcUrl).toBe('https://rpc.testnet.arc.io')
+	expect(STAGING.registryAddress).toMatch(/^0x[0-9a-f]{40}$/)
+})
+
 test('no endpoint the enclave cannot reach', () => {
-	for (const url of [STAGING.ledgerTokenUrl, STAGING.ledgerApiBase, STAGING.watchlistUrl]) {
+	for (const url of [
+		STAGING.ledgerTokenUrl,
+		STAGING.ledgerApiBase,
+		STAGING.watchlistUrl,
+		STAGING.rpcUrl,
+	]) {
 		expect(url.startsWith('https://')).toBe(true)
 		expect(url).not.toContain('api.trade.gov')
 	}
@@ -135,7 +150,22 @@ test('the handler returns facts about the body, never the body', () => {
 	expect(returned).not.toBe('')
 	expect(returned).not.toContain('json(')
 	expect(returned).not.toContain('length')
-	expect(returned.match(/\$\{/g) ?? []).toHaveLength(7)
+	// Seven became eight when the collision verdict joined. Pinned, because the return value is
+	// the widest channel out of the enclave that does not look like one.
+	expect(returned.match(/\$\{/g) ?? []).toHaveLength(8)
+	expect(returned).toContain('collision.status')
+	// The commitments are the query itself; the lien id is registry state the enclave was told.
+	// Neither is a fact about this claim that anyone outside is entitled to.
+	expect(returned).not.toContain('commitments')
+	expect(returned).not.toContain('lienId')
+})
+
+// The number and timing of outbound calls are observable from outside the enclave. Branching the
+// registry read on a confidential result leaks by metadata what the encryption protects.
+test('the registry is asked whenever the envelope opened', () => {
+	const source = readFileSync('./workflow.ts', 'utf8')
+	expect(source).not.toMatch(/verified\.\w+\s*(\?|&&)[^\n]*readRegistry/)
+	expect(source).toMatch(/submitted\s*\n?\s*\?\s*readRegistry/)
 })
 
 // Anything logged leaves the enclave by Chainlink's own definition, and the ledger response is
@@ -145,10 +175,14 @@ test('the enclave never logs', () => {
 	expect(source).not.toMatch(/runtime\.log\(|console\./)
 })
 
-// Three calls cost the ledger a token exchange and the watchlist a query. A claim whose sealer
-// did not authorise its submitter is refused either way, so verifying it spends the quota for a
-// verdict that cannot change.
-test('an unauthorized submission is not verified', () => {
+// Four calls cost the ledger a token exchange and two queries, plus one to the registry. A claim
+// whose sealer did not authorise its submitter is refused either way, so spending the quota buys
+// a verdict that cannot change. Both outbound paths hang off the same gate, and that gate is the
+// envelope — never anything a third party answered.
+test('an unauthorized submission reaches no external service', () => {
 	const source = readFileSync('./workflow.ts', 'utf8')
-	expect(source).toMatch(/authorized\s*\n?\s*\?\s*verifyExternally/)
+	const guards = [...source.matchAll(/(\w+)\s*\n?\s*\?\s*(verifyExternally|readRegistry)\(/g)]
+	expect(guards).toHaveLength(2)
+	expect(new Set(guards.map((g) => g[1])).size).toBe(1)
+	expect(source).toMatch(/const submitted = authorized \?/)
 })

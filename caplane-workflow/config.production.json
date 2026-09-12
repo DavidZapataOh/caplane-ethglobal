@@ -3,5 +3,7 @@
   "ledgerTokenUrl": "https://identity.xero.com/connect/token",
   "ledgerApiBase": "https://api.xero.com/api.xro/2.0",
   "ledgerTenantId": "e1218a28-7437-47ec-bfb5-252092825083",
-  "watchlistUrl": "https://data.trade.gov/consolidated_screening_list/v1/search"
+  "watchlistUrl": "https://data.trade.gov/consolidated_screening_list/v1/search",
+  "registryAddress": "0xf2de8798750ea3bcb0faca049fc7581a118ef1f6",
+  "rpcUrl": "https://rpc.testnet.arc.io"
 }

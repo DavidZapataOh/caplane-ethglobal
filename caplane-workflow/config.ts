@@ -19,6 +19,16 @@ export const configSchema = z.object({
 	 */
 	ledgerTenantId: z.string().regex(/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/),
 	watchlistUrl: z.string().regex(/^https:\/\//),
+	registryAddress: z.string().regex(/^0x[0-9a-fA-F]{40}$/),
+	/**
+	 * Read by raw JSON-RPC rather than by the EVM capability: every method on that capability
+	 * takes the ordinary runtime, and obtaining one inside a TEE handler means `usingTheDons()`,
+	 * which routes the request back out and hands node operators the commitment being asked about.
+	 *
+	 * Not a secret, and could not be one: it carries no credential, and the secret ring already
+	 * sits at the documented ceiling of five.
+	 */
+	rpcUrl: z.string().regex(/^https:\/\//),
 })
 
 export type Config = z.infer<typeof configSchema>

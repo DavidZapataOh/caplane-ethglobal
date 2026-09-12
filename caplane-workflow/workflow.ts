@@ -5,6 +5,7 @@ import { CHAIN } from './abi/frozen'
 import type { Config } from './config'
 import { open } from './envelope'
 import { decodeClaim } from './ledger'
+import { readRegistry, verdictOf } from './registry'
 import { UNVERIFIED, verifyExternally } from './verify'
 
 /**
@@ -92,15 +93,26 @@ export const onClaimSubmitted = (runtime: TeeRuntime<Config>, log: EVMLog): stri
 	// Three calls cost a token exchange and two queries. A claim whose sealer did not authorise
 	// this submitter is refused whatever the ledger says, so verifying it buys nothing and
 	// spends the quota the collision check still needs.
-	const verified = authorized
-		? verifyExternally(runtime, secrets, decodeClaim(opened.claim))
-		: UNVERIFIED
+	const submitted = authorized ? decodeClaim(opened.claim) : undefined
+	const verified = submitted ? verifyExternally(runtime, secrets, submitted) : UNVERIFIED
+
+	// Asked whenever the envelope opened, and never conditioned on what the ledger answered: the
+	// count and timing of outbound calls are observable from outside, so branching on a
+	// confidential result would leak by metadata what the encryption protects.
+	//
+	// The seven commitments come back with the verdict. They are derived once, here, from a pepper
+	// that never rotates; deriving them again in the report encoder would be two paths to the same
+	// bytes, and the day they disagreed nothing would say so.
+	const registryRead = submitted
+		? readRegistry(runtime, secrets, submitted)
+		: { read: { kind: 'error', reason: 'not authorized' } as const, commitments: [] }
+	const collision = verdictOf(registryRead.read)
 
 	// Derived facts only. This return value is the one thing that crosses, and the plaintext's
 	// length used to be in it: that was safe while nothing confidential distinguished one claim
 	// from another, and stopped being safe the moment the ledger's answer did. A length is the
 	// body too — it tells one invoice from another — so it is gone and the verdicts replace it.
-	return `${claim.submissionId} ${claim.submitter} ${authorized} ${verified.exists} ${verified.unpaid} ${verified.matches} ${verified.screened}`
+	return `${claim.submissionId} ${claim.submitter} ${authorized} ${verified.exists} ${verified.unpaid} ${verified.matches} ${verified.screened} ${collision.status}`
 }
 
 export function initWorkflow(config: Config) {
