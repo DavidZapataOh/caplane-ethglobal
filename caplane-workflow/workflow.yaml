@@ -3,7 +3,11 @@
 # ==========================================================================
 staging-settings:
   user-workflow:
-    workflow-name: "caplane-vault-check-staging"
+    # Deliberately not the production name. The owner is shared by every workflow in the
+    # organization and the name is the only thing separating them, so a staging workflow under
+    # the production name would write to the real registry. The price is that staging cannot
+    # exercise onReport at all.
+    workflow-name: "caplane-registry-staging"
     deployment-registry: "private"
   workflow-artifacts:
     workflow-path: "./main.ts"
@@ -13,10 +17,10 @@ staging-settings:
 # ==========================================================================
 production-settings:
   user-workflow:
-    # Throwaway name on purpose. The registry pins workflowName and the owner is shared by
-    # every workflow in the organization, so a test workflow registered under the production
-    # name could write to the real registry. 03/09 renames it before any contract exists.
-    workflow-name: "caplane-vault-check"
+    # Frozen in the deployed registry as an immutable: bytes10 of the first ten hex characters
+    # of sha256("caplane-registry"), taken as ASCII. A workflow registered under any other name
+    # produces reports onReport rejects for ever, and there is no setter.
+    workflow-name: "caplane-registry"
     deployment-registry: "private"
   workflow-artifacts:
     workflow-path: "./main.ts"

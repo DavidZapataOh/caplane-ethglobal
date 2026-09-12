@@ -1,0 +1,110 @@
+The log trigger, fired by a real submission on Arc Testnet.
+
+--- why this could not be faked ------------------------------------------------
+
+`cre workflow simulate` offers no synthetic payload for a log trigger. Its only inputs are a real
+transaction hash with an event index, or `--listen`. So the evidence below starts with a real
+`submit()` to the deployed inbox, and the simulator replays that log.
+
+Before it, the inbox had never been used: the explorer reported has_logs false and a transaction
+count of zero for the whole life of the contract, and the borrower account had nonce 0. This is
+the first one.
+
+  submission tx    0x839eefc7fd0431238f44642b282dd33e8b75607fa5518b91c39aa8e37ddbdcf2
+  block            61660581
+  gas used         54,144   the figure the budget table already carried
+  event index      0
+  topics[0]        0x8af2b32ba8e251a8a7c973226674ac1045c1be5b98c6717bd9c9f9ba8b6b801f
+  topics[1]        0x447338374074e18512210b875c49870e8a898f5ad61c80acc48113d7b4ff7785   submissionId
+  topics[2]        0x00000000000000000000000086ec9f04485db066cf155353f15eef356ae90253   submitter, left-padded
+
+╭────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Trigger requested TEE Execution your trigger will run in one of the following Tees:                │
+│     - AWS Nitro in us-west-2                                                                       │
+│ The simulator is not a real TEE, and is meant to debug.                                            │
+│ Do not use it for sensitive information.                                                           │
+│ During real execution, user logs for this trigger will not be visible, and will not leave the TEE. │
+│ They are presented in the simulator for debugging only.                                            │
+│                                                                                                    │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+  handler returned "0x447338374074e18512210b875c49870e8a898f5ad61c80acc48113d7b4ff7785 0x86Ec9f04485Db066CF155353f15eef356Ae90253 275"
+
+  That is the submission id, the submitter recovered from a padded topic, and the envelope's
+  275 bytes — the exact size sent. No decryption, no secret, no call, no report.
+
+--- what the handler is, and what it deliberately is not ------------------------
+
+It decodes the log with the frozen ABI and returns the submission id, the submitter and the
+envelope's length. That is the whole scaffold.
+
+It does not decrypt: the enclave keypair does not exist yet. It does not read secrets, call any
+endpoint, read chain state, or emit a report. A report crossing the one-way door carrying a
+placeholder would be worse than no report at all — the door is the product, and what goes through
+it is the only thing anyone can check.
+
+Two of those are not choices. Every EVM method in this SDK takes the ordinary runtime, so a chain
+read from inside the enclave requires `usingTheDons()`, which routes the request out of the TEE.
+And the confidential HTTP client takes the ordinary runtime too, which is counterintuitive but is
+what the types say.
+
+--- what the banner does and does not prove -------------------------------------
+
+It proves the TEE constraint parsed and resolved: the simulator echoes the region it would run in.
+It proves nothing about attestation, because the simulator says so itself — it is not a real TEE,
+and its own banner tells you not to put anything sensitive through it. Attestation is a property of
+a deployed execution, not of a simulation, and nothing in this file claims otherwise.
+
+The banner also settles a question the code comments had backwards: user logs for a TEE trigger
+"will not be visible, and will not leave the TEE". The no-logging discipline stands, but the
+reason is that logs are invisible, not that they escape.
+
+--- what the trigger filters on -------------------------------------------------
+
+  address   0x14f3bbf3b21b0411f798aa50edd05df06e72ae88   the deployed inbox
+  topic0    0x8af2b32ba8e251a8a7c973226674ac1045c1be5b98c6717bd9c9f9ba8b6b801f
+            keccak256("ClaimSubmitted(bytes32,address,bytes)"), derived in code and matched
+            byte for byte against topics[0] of the receipt below
+  confidence FINALIZED
+
+One address and one signature. A filter carrying several of either takes the cross product, so a
+second event needs its own trigger and its own handler — which is what the release-and-default
+work will add, at the next position in the handler array.
+
+--- two things the command line does not do what you would expect ---------------
+
+`--limits ./prod-limits.json` does not resolve from the project root. The path is taken relative
+to the workflow folder, so from the project root it is `../prod-limits.json`, or an absolute path.
+A wrong path is not silently ignored: it aborts with `failed to read limits file`.
+
+And every variable named in `secrets.yaml` must be exported before a simulation will start, whether
+any handler asks for it or not — the CLI resolves the whole file before reaching the trigger. An
+entry with no reader and no exported value blocks every simulation in the repository, which is why
+this scaffold ships the map empty rather than carrying an identifier nothing reads yet.
+
+--- the budget, measured --------------------------------------------------------
+
+The event is capped at 4,096 bytes of envelope by the contract. Encoding a worst-case log with
+the SDK's own generated protobuf schema:
+
+  envelope        ABI data      serialized Log
+       0 B            64 B           305 B
+     275 B           352 B           594 B     the envelope this submission carried
+   4,096 B         4,160 B         4,402 B     the cap
+
+Those figures move by a byte or two with the block number and the log index, because protobuf
+varints are width-variable — call it 4,400 to 4,405 at the cap rather than a single exact number.
+Against an EventSizeLimit of 5,000 that leaves about 597 bytes, 11.9%, and no plausible varint
+width changes that conclusion. The limit is 5,000 and not 5,120: their KByte is 1,000, and the
+5,120 is a different limit — the chain-write report size.
+
+The rate limit, ten events every six seconds, is shared by every log trigger in the workflow.
+A second trigger does not add budget; it divides this one.
+
+--- the one thing this measurement does not settle ------------------------------
+
+Whether the platform applies that 5,000-byte limit to the serialized protobuf Log, to the ABI
+data alone, or to some wrapper around it. The figure above is measured on the Log message. If the
+limit is measured on something larger, the 597-byte margin shrinks by an unknown amount, and an
+over-limit event is dropped with no failure, no retry and no trace. Nothing in the repository has
+measured this, and nothing can without deliberately overshooting on a live deployment.

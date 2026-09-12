@@ -1,0 +1,131 @@
+The four contracts on Arc Testnet: addresses, transactions, and verified source.
+
+--- what "verified" had to mean ------------------------------------------------
+
+The bar is not that the bytecode is on chain. It is that a stranger can open the explorer, find
+the read tab, and call `isEncumbered()` without an account — which is only possible once the
+source is verified, because the read tab is built from the ABI.
+
+  CaplaneInbox      0x14f3bbf3b21b0411f798aa50edd05df06e72ae88     828 bytes
+  CaplaneRegistry   0xf2de8798750ea3bcb0faca049fc7581a118ef1f6   4,762 bytes
+  CaplanePool       0xa7ec42984bfc9f0024ca0873721e8b1166c2b0ee   6,871 bytes
+  CaplaneEscrow     0x5de99d8be27468dd175738e1703259130eb703b5   3,500 bytes
+
+  registry deployed in block 61,604,203
+  explorer  https://testnet.arcscan.app/address/<address>
+
+All four verified: solc v0.8.28+commit.7893614a, evm prague, optimizer on at 200 runs — the same
+profile the local build used, echoed back by the explorer rather than asserted here. The read tab
+the registry publishes carries `isEncumbered`, `lienOf`, `matchesOf`, `statusOf`, the four
+immutables and `supportsInterface`, which is the whole point: a stranger opens the page and asks
+the chain, with no account and no server in the path.
+
+The vault was seeded with 10.000000 USDC from the deploying account, minting 1e19 shares — the
+twelve-decimal offset, exactly — and `maxRedeem` returns the whole balance because nothing is
+lent out yet. Ten was chosen rather than twenty because gas comes out of the same pot: the
+account keeps 9.9 USDC, and a full redeployment costs eight cents.
+
+Every runtime size matches what the local build reported to the byte, which is the first thing
+that would differ if the deployed bytecode were not the audited bytecode.
+
+--- the immutables, read back off the chain ------------------------------------
+
+Not trusted from the broadcast artefact — read from the deployed contracts:
+
+  WORKFLOW_NAME    0x33396465656661623966      "39deefab9f" as ASCII
+  CHAIN_SELECTOR   3034092155422581607
+  FORWARDER        0x76c9cf548b4179F8901cda1f8623568b58215E62
+  pool.REGISTRY    0xf2De8798750EA3Bcb0FaCa049fc7581A118ef1F6
+  escrow.POOL      0xA7eC42984bFC9f0024Ca0873721E8b1166c2b0eE
+
+--- how it was verified --------------------------------------------------------
+
+The explorer is Blockscout v11.3.0 and its verification route takes no API key: an
+unauthenticated POST is refused for a missing field, not for missing credentials. Verification is
+multi-file standard JSON with the whole import closure, not a flattened blob.
+
+Deployment and verification were one command, and they were rehearsed first on a throwaway
+contract, because three things could not be settled without a real broadcast. All three came back
+positive: the chained verify reaches this explorer; a populated receipt carries `contractAddress`,
+`blockNumber`, `gasUsed`, `effectiveGasPrice` and `transactionHash`, with the block as a hex
+string that `tonumber` refuses; and the verifier recompiles to the same bytecode under this
+chain's semantics, reporting `evm prague`, which is what `foundry.toml` declares. The rehearsal
+cost 0.001727 USDC.
+
+The rehearsal did NOT cover constructor-argument encoding, because the throwaway has no
+constructor. That turned out not to be what broke: three of the four verifications were refused
+in the chained run for rate limiting, `Too many requests`, not for anything about the payload.
+
+The headers name the quota exactly — `x-ratelimit-limit: 10`, `x-ratelimit-remaining: 0`,
+`x-ratelimit-reset` about half an hour out — so it is a quota on verification submissions, not a
+short burst window, and spacing the retries five minutes apart did not help. What did: the v1
+route `?module=contract&action=verifysourcecode`, which is the one the toolchain uses, answers
+429, while the v2 route `POST /api/v2/smart-contracts/<address>/verification/via/standard-input`
+answers on its own budget. The three were resubmitted there as multipart standard JSON, with the
+same compiler settings the toolchain emits and constructor arguments ABI-encoded from the same
+values the deploy read out of the environment. All four came back verified within a minute.
+
+Worth knowing before the next deployment: budget ten verification submissions per window, count
+the rehearsal against them, and prefer the v2 route when there is more than one contract.
+
+--- the compile profile, which is what makes a later re-verification reproducible
+
+  solc            0.8.28
+  evm_version     prague
+  network         arc
+  optimizer       true, 200 runs
+
+The `evm_version` label matters more than it looks. `network = "arc"` is what prices this chain;
+this key only tells a verifier which rules to recompile under, and the explorer echoed `prague`
+back. Had the deployment happened while the file still said `cancun`, a later re-verification
+would not have matched the deployed bytecode, and this profile is the only thing that would make
+it reproducible.
+
+--- what it cost ---------------------------------------------------------------
+
+  four deployments      3,744,156 gas      0.082371 USDC
+  rehearsal                78,519 gas      0.001727 USDC
+  effective gas price      22 gwei         the 20 floor plus a 2 tip
+
+The 22 is not luck. `--with-gas-price` sets the maximum, not the effective price: with the base
+fee pinned at its 20 Gwei floor and an estimated tip of zero, the effective price lands exactly
+ON the floor, which is the edge below which a transaction is accepted by the RPC, never mined,
+and disappears with no error, no receipt and no nonce consumed. The explicit priority price is
+what puts it above the edge.
+
+So gas is not the constraint. Eight cents is half of one percent of a single faucet drip. The
+constraint is the vault's opening balance: the faucet gives 20 USDC per address every two hours
+and there is no second faucet anywhere. A demonstration holding sixty dollars needs three
+addresses claiming ahead of time; it cannot be assembled while somebody is watching.
+
+And the balance is one pot seen two ways — the ERC-20 view is the native balance divided by a
+trillion — so every gas payment comes out of the same dollars the pool is waiting for.
+
+--- the one that would have been unrecoverable ---------------------------------
+
+The workflow's name is hashed into the registry as an immutable. No document had chosen the
+string. A name differing by one character from the one the workflow registers under is not a
+warning: the report is signed by the DON, transmitted by the forwarder, compared, and rejected —
+for ever, with no setter, and a redeployment would orphan every lien recorded until then.
+
+It was chosen, derived twice by independent paths that had to agree before anything was
+broadcast, and read back off the deployed contract before it was trusted. Both guards were proven
+to bite first: one character of difference in the name, and a declared value one byte short, each
+stop the script before it broadcasts.
+
+The name is `caplane-registry`. The CRE workflow must register under exactly that string.
+
+--- what is deliberately still zero --------------------------------------------
+
+`workflowId` and `enclavePublicKey` in the address book are zero on purpose. The first changes
+with every edit of the workflow; the second does not exist until the enclave keypair is
+generated. The book is incomplete at deploy time and that is correct — but anything reading it
+before those land will see zeros where it expects values.
+
+--- Arc Mainnet ----------------------------------------------------------------
+
+It does not exist. Circle's own documentation says Arc is available on Testnet only, and Arc
+appears in neither the CRE nor the CCIP chain tables. The deploy script takes every address,
+selector and key from the environment and carries no literal, so retargeting it is a change of
+variables rather than a change of code — but that property can be demonstrated and never
+exercised, and saying so is better than waiting to be asked.

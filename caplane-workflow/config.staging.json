@@ -1,5 +1,3 @@
 {
-  "schedule": "0 */5 * * * *",
-  "url": "https://data.trade.gov/consolidated_screening_list/v1/search?name=probe&size=1",
-  "secretId": "VAULT_ROUNDTRIP_PROBE"
+  "inboxAddress": "0x14f3bbf3b21b0411f798aa50edd05df06e72ae88"
 }

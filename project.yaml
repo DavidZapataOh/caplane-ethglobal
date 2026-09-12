@@ -1,8 +1,10 @@
 # ==========================================================================
 # CRE PROJECT SETTINGS
 # ==========================================================================
-# The repository root is the CRE project root: every `cre` command resolves
-# from the directory holding this file, which is what its documentation assumes.
+# This directory is the CRE project root: every `cre` command resolves from the directory
+# holding this file. From here:            cre workflow simulate ./caplane-workflow -T staging-settings
+# From the repository root, with -R:       cre workflow simulate ./caplane-workflow -R ./caplane -T staging-settings
+# Note -R resolves the workflow path relative to the PROJECT root, not to the shell's cwd.
 staging-settings:
   rpcs:
     - chain-name: arc-testnet

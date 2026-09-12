@@ -114,16 +114,27 @@ calldata floor. Receipts are the source; see `evidence/contracts/01-inbox.txt`.
 
 ## Deployment order
 
-With no id to pin, the graph has no cycle:
+With no id to pin, the graph has no cycle. Four contracts, and only one edge is forced:
 
-1. `CaplaneInbox` and
-   `CaplaneRegistry(forwarder, workflowOwner, workflowName, chainSelector)` — every constructor
-   argument is known offline, so these can go in either order
-2. Workflow config, carrying both addresses
-3. `cre workflow deploy --deployment-registry private` — on the private registry the deploy lands
-   `Active` and the first cron tick fires without a separate `activate`
+1. `CaplaneInbox()` — no constructor. It can go anywhere in the sequence.
+1. `CaplaneRegistry(forwarder, workflowOwner, workflowName, chainSelector)` — every argument is
+   known offline, so it needs nothing deployed first
+2. `CaplanePool(usdc, registry)` — then `CaplaneEscrow(usdc, registry, pool)`. These two are the
+   forced edge: their arguments are addresses of contracts that do not exist yet, so "every
+   constructor argument is known offline" is true of the first two only
+3. Workflow config, carrying the addresses
+4. `cre workflow deploy --deployment-registry private` — on the private registry the deploy lands
+   `Active` with no separate `activate`. The first execution comes from a log trigger, not a cron
+   tick: nothing in this system is scheduled
 
-Never rename the workflow after step 1: the name is immutable in the contract.
+Never rename the workflow after step 1: the name is immutable in the contract. It is
+`caplane-registry`, and the `bytes10` the registry holds is the first ten hex characters of its
+sha256 taken as ASCII. A name differing by one character is not a warning — the DON signs the
+report, the forwarder transmits it, `onReport` compares and rejects it for ever, and there is no
+setter. Recovering means redeploying the registry, which orphans every lien recorded until then.
+
+Deployed addresses are deliberately absent from this file: they are on the not-frozen list, and
+writing one here would turn a redeployment into a four-way break.
 
 ## Component count and order
 
