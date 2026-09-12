@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit",
     "test": "npm run build && node --test --test-concurrency=1 dist/src/*.test.js",
     "build": "tsc -p tsconfig.build.json",
-    "start": "node dist/src/main.js"
+    "start": "node dist/src/main.js",
+    "prebuild": "npm --prefix ../../sdk ci && npm --prefix ../../sdk run build"
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
