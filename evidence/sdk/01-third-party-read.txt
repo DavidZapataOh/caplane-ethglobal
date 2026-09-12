@@ -71,3 +71,46 @@ carries debtor confirmation.
 Measured: a clean consumer installs the tarball and reads the chain. The endpoint rate-limits at
 `-32005`, so the suite runs its files sequentially and the scan retries with backoff — a seven-page
 scan plus a quorum read is enough of a burst to trip it.
+
+--- published, and installed the way a stranger would ------------------------
+
+Verified 2026-09-12 from an empty directory outside this repository, with no checkout in sight:
+
+  $ npm install caplane-sdk
+    added 14 packages, and audited 15 packages in 4s
+    found 0 vulnerabilities
+    caplane-sdk 0.1.1, with viem 2.56.3
+
+  registry     0xe7170ee0ce4cab4593970ef5c4ebf7d0d62ae19b
+  identity     0x33396465656661623966
+  recorded     status 2   encumbered false
+  refused      status 0   encumbered false
+  terms        0x86Ec9f04485Db066CF155353f15eef356Ae90253   8000000 base units at 200 bps
+  liensOf      1 lien(s)
+
+That is the divergence above, reproduced by someone who has only the package name — which is the
+claim this package exists to make and could not make while it installed from a path inside a
+checkout.
+
+--- what 0.1.0 cost, and why 0.1.1 exists ------------------------------------
+
+0.1.0 shipped with viem pinned at 2.34.0, matching the rest of the repository. Measured on a fresh
+install, `npm audit` then reported three advisories, two of them high:
+
+  ws  uninitialized memory disclosure       GHSA-58qx-3vcg-4xpx   >=8.0.0 <8.20.1
+  ws  memory exhaustion from tiny fragments GHSA-96hv-2xvq-fx4p   >=8.0.0 <8.21.0
+
+`ws` is viem's WebSocket transport dependency. This package never constructs one — every read goes
+over `http()` — so the vulnerable code is unreachable from here. `npm audit` cannot know that, and a
+reader's first command printing "1 high severity vulnerability" costs more than the fix did.
+
+viem carries the patched `ws` in its recent releases and the exact pin was the obstacle, so this
+package takes a range where the rest of the repository keeps its pin. The two cases are different:
+the copy vendored into the enclave has to behave byte for byte, while a package somebody installs
+should dedupe against what they already have and receive security patches without waiting for us to
+cut a release. Bumping it in the four other packages the night before a deadline — one of which
+compiles into WASM — is the change that breaks something subtle, so it was made here and nowhere
+else. The suite is what makes that safe: 26 tests against the live registry, green on the new
+version before it was published.
+
+Result on a fresh install of 0.1.1: `found 0 vulnerabilities`.
