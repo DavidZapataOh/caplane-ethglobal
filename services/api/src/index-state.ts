@@ -7,9 +7,14 @@ export const DEPLOYED_AT = 61_681_981n
 export const MAX_EVENTS = 2_000
 const PAGE = 10_000n
 const STALE_AFTER_MS = 60_000
-/** A seven-page backfill is a burst against an endpoint measured to shed load at 429. */
-const PAUSE_MS = 250
-const RETRY_DELAY_MS = 2_000
+/**
+ * A backfill from the deployment block is eight pages, which is a burst against an endpoint
+ * measured to shed load at `-32005` and at a transport-level 429. The spacing is for a cold restart
+ * as much as for the suite: a restart replays the whole range, and a page that gave up would leave
+ * the feed quietly short with the service still answering 200.
+ */
+const PAUSE_MS = 400
+const RETRY_DELAY_MS = 2_500
 
 export const ADDRESSES: readonly Hex[] = [
   book.registry as Hex,
@@ -89,7 +94,7 @@ export const createIndex = (
       } catch (error) {
         if (!(error instanceof RpcError) && !(error as { code?: number }).code) throw error
         refusals += 1
-        if (refusals > 6) throw error
+        if (refusals > 9) throw error
         const seen = classify(error as { code: number; message: string })
         if (seen.kind === 'narrow' && seen.hint !== undefined) {
           span = seen.hint.to - seen.hint.from + 1n
