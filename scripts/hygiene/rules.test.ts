@@ -87,15 +87,19 @@ test("accepts express in a service that legitimately serves http", () => {
   expect(noTemplateMockServer(s)).toEqual([]);
 });
 
+// The count is not the property. `Sprint-03/05` matches both the prefixed shape and the bare
+// NN/NN one, so pinning it at one was pinning how many patterns happen to overlap.
 test("flags a sprint reference in a tracked file", () => {
   const s = snap({ files: [{ path: "sdk/index.ts", content: "// see Sprint-03/05 for context" }] });
-  expect(noSprintReferences(s)).toHaveLength(1);
+  const found = noSprintReferences(s);
+  expect(found.length).toBeGreaterThan(0);
+  expect(found.every((f) => f.where === "sdk/index.ts")).toBe(true);
 });
 
 test("flags a sprint reference in a commit message", () => {
   const s = snap({ commitMessages: ["feat: close Sprint-02/01"] });
   const found = noSprintReferences(s);
-  expect(found).toHaveLength(1);
+  expect(found.length).toBeGreaterThan(0);
   expect(found[0].where).toBe("commit message");
 });
 
@@ -154,6 +158,35 @@ test("flags a node-builtin dependency reaching the workflow", () => {
 
 // Both quote styles. The fixtures here were double-quoted while the workflow package is written
 // in single quotes, so the rule and its test agreed with each other and with nothing else.
+// The bare NN/NN form. Measured: it was sitting in all three copies of the frozen ABI, inside the
+// repository that ships, and none of the existing shapes recognised it.
+test("flags a bare sprint reference with no Sprint- prefix", () => {
+  for (const content of [
+    "/** Value comes from 03/02. */",
+    "# 03/09 renames it before any contract exists",
+    "see 07b for the rest",
+  ]) {
+    expect(
+      noSprintReferences(snap({ files: [{ path: "caplane-workflow/abi/frozen.ts", content }] })),
+    ).toHaveLength(1);
+  }
+});
+
+// And it must not fire on the things that look like it. A date, a version range and a fraction in
+// prose are all NN/NN, and a rule that flagged them would be turned off within a week.
+test("does not flag dates, versions or fractions", () => {
+  for (const content of [
+    "measured 09/11 against the live endpoint",
+    "solc 0.8.28 and 0.8.29",
+    "covers 12/31 of the corpus",
+    "const ratio = 10 / 20",
+  ]) {
+    expect(
+      noSprintReferences(snap({ files: [{ path: "caplane-workflow/abi/frozen.ts", content }] })),
+    ).toEqual([]);
+  }
+});
+
 test("flags a tee region other than us-west-2, in either quote style", () => {
   for (const content of ['regions: ["eu-west-1"]', "regions: ['eu-west-1']"]) {
     expect(onlyApprovedTeeConstraint(snap({

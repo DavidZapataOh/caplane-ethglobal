@@ -23,6 +23,13 @@ jobs:
       - run: bun test
         working-directory: scripts/hygiene
       - run: bun run scripts/hygiene/check.ts
+      # No new job: this one already sees every tracked file and already has bun. The budgets
+      # and the platform limits are two files that must agree, and until now nothing compared
+      # them — a budget could drift above a limit and the first sign would be an execution
+      # dying on a DON.
+      - run: bun test
+        working-directory: scripts/budgets
+      - run: bun run scripts/budgets/check.ts
 
   contracts:
     runs-on: ubuntu-latest

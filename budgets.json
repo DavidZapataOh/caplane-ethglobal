@@ -1,8 +1,9 @@
 {
   "cre": {
     "httpCallsPerExecution": 5,
-    "httpRequestBytes": 10240,
-    "httpResponseBytes": 102400,
+    "_httpBytes": "Decimal, not binary. The platform writes 10kb/100kb and its kb is 1000 — measured: a 1kb cap reports itself as 'the simulation limit of 1000 bytes'. These were 10240 and 102400, which sat ABOVE the real limits by 240 and 2400 bytes, and nothing compared the two files.",
+    "httpRequestBytes": 10000,
+    "httpResponseBytes": 100000,
     "chainReadCallsPerExecution": 15,
     "secretCallsPerExecution": 5,
     "executionTimeoutSeconds": 300,

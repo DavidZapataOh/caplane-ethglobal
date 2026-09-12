@@ -97,6 +97,14 @@ const SPRINT_SHAPES = [
   /\bestado:\s*(pendiente|en-progreso)\b/,
   /\bPROYECTO\.md\b/,
   /\bAUDITORIA-DE-COBERTURA\b/,
+  // The bare forms, with no `Sprint-` to anchor on. Measured: `03/02` was sitting in all three
+  // copies of the frozen ABI and none of the shapes above saw it. Deliberately narrow so the
+  // rule survives contact: both halves must be zero-padded two-digit, with no spaces around the
+  // slash, which excludes dates like 09/11 and 12/31, version strings, and `10 / 20`.
+  /\b0[0-9]\/0[0-9][a-z]?\b/,
+  // The suffixed plan form on its own, e.g. `07b`. Digit-digit-letter is specific enough not to
+  // collide with hex (`0x07b` has no word boundary before the digits) or with version numbers.
+  /\b0[0-9][a-z]\b/,
 ];
 
 // The realistic leak is a pasted Spanish paragraph, not the word "Sprint".

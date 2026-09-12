@@ -15,7 +15,9 @@ test("exits one and names every violated rule", () => {
   };
   const r = report(dirty);
   expect(r.exitCode).toBe(1);
-  expect(r.findings.map((f) => f.rule).sort()).toEqual([
+  // Which rules fired, not how many patterns each matched: one string can trip several shapes
+  // inside a single rule, and that count is an implementation detail.
+  expect([...new Set(r.findings.map((f) => f.rule))].sort()).toEqual([
     "no-mock-call-sites",
     "no-sprint-references",
   ]);

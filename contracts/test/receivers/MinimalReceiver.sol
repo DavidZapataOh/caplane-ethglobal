@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import {ICaplaneRegistry} from "../../src/interfaces/ICaplaneRegistry.sol";
 
-/// @dev The exact ERC-165 shape a Keystone receiver must expose. `02/01` copies this verbatim.
+/// @dev The exact ERC-165 shape a Keystone receiver must expose. The registry copies it verbatim.
 ///      Kept `pure` and cheap: the checker gives each probe a 30,000 gas stipend and runs three.
 contract MinimalReceiver {
   function supportsInterface(

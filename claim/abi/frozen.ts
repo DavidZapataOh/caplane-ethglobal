@@ -107,7 +107,7 @@ export type Deployments = {
   workflowId: `0x${string}`
   workflowOwner: `0x${string}`
   workflowName: `0x${string}`
-  /** X25519 public key submissions are sealed to. Value comes from 03/02. */
+  /** X25519 public key submissions are sealed to. Recorded when the enclave key is generated. */
   enclavePublicKey: `0x${string}`
   blockNumber: number
 }

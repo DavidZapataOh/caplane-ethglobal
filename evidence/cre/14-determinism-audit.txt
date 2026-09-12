@@ -1,0 +1,173 @@
+Three gates. Two of them had been green for months without looking at anything.
+
+That is the finding, and it is why this file leads with the reds. A gate that has never failed has
+not been proven to work — it has only been proven not to have fired.
+
+
+--- GATE 1: non-determinism. It did not exist at all ------------------------------
+
+The SDK already detects it, and its own header says what it does with what it finds:
+
+  "Returns an array of warnings. Does **not** throw — compilation should continue regardless."
+
+So today a clock inside a handler compiles green, passes typecheck, passes hygiene, and surfaces
+only as a consensus disagreement on a live DON — the most expensive place in the system to learn
+about it. Wiring their analyser up as a test is the one piece that existed nowhere.
+
+Reached through `node_modules` rather than by package specifier: measured, the bare import does not
+resolve, because the package does not publish these validators through its `exports` map. Its own
+compile pipeline is the only intended caller. Their analysis is not reimplemented.
+
+  clean tree → 0 findings
+
+  injected  export const _probe = () => Date.now()                       into workflow.ts
+    → workflow.ts:231:29  Date.now() uses the system clock which varies across nodes.
+
+  injected  export const _probe = () => new Date()                       into report.ts
+    → report.ts:158:29    new Date() without arguments uses the system clock…
+
+  injected  export const _probe = (o: object) => Object.keys(o).join('') into report.ts
+    → report.ts:158:38    Object.keys() returns items in an order that may vary across engines.
+
+The second and third are injected into `report.ts`, not into the handler, and are still caught: the
+validator follows imports. That is the case a per-file check misses, and the enclave has six
+modules now.
+
+  injected  export const _probe = () => Math.random()                    into report.ts
+    → NO FINDINGS
+
+That last one is correct and deliberate, and it is pinned so nobody "fixes" it: the javy plugin
+replaces `Math.random` with a seeded ChaCha8 that is deterministic in node mode, which the SDK's
+header states. The repository's own hygiene rule covers what this validator does not look at —
+`Intl`, `toLocaleString`, the RegExp `v` flag — without overlapping.
+
+
+--- GATE 2: the enclave constraint. Blind since it was written ----------------------
+
+The rule that keeps the workflow on Nitro in us-west-2 matched only double-quoted literals. The
+workflow package is written in single quotes throughout. Against the real file:
+
+  before the fix   clean → 0 findings    regions: ['eu-west-1'] injected → 0 findings
+  after the fix    clean → 0 findings    regions: ['eu-west-1'] injected → 1: region "eu-west-1"
+                                         tee: 'sev'            injected → 1: tee: "sev"
+
+Its own test fixtures were double-quoted too, so the rule and its test agreed with each other and
+with nothing else. Both now carry both quote styles.
+
+
+--- GATE 2b: and the repaired sprint rule found four live violations ------------------
+
+The same pass added the bare `NN/NN` form, which none of the existing shapes recognised. Running
+the scanner immediately afterwards was not a formality:
+
+  no-sprint-references: caplane-workflow/abi/frozen.ts
+  no-sprint-references: claim/abi/frozen.ts
+  no-sprint-references: contracts/abi/frozen.ts
+  no-sprint-references: contracts/test/receivers/MinimalReceiver.sol
+
+Four real violations of the house rule, in the repository that ships, three of them in the frozen
+ABI whose three copies are checked byte-for-byte against each other. All removed.
+
+The shape is deliberately narrow so it survives contact: both halves zero-padded and two digits,
+no spaces around the slash. Dates (`09/11`, `12/31`), version strings (`0.8.28`) and `10 / 20` are
+all negative-tested.
+
+
+--- GATE 3: the budgets. Nobody compared them, and they were wrong --------------------
+
+`budgets.json` appeared twice in the whole tree and neither was a gate, so the repository's budgets
+and the platform's limits could drift apart in silence. On first run:
+
+  budget: httpRequestBytes 10240 exceeds the platform limit of 10000
+  budget: httpResponseBytes 102400 exceeds the platform limit of 100000
+
+Binary kilobytes against decimal ones. Whether that was a real violation depends on which KB the
+platform means, so it was measured rather than argued:
+
+  --limits with HTTPAction.ResponseSizeLimit = 1kb
+  ✗ HTTP response body of 1083 bytes exceeds the simulation limit of 1000 bytes
+
+1kb is 1000, stated by the limiter itself. Both budgets were genuinely above the real limit, by 240
+and 2,400 bytes, and had been since they were written.
+
+The check treats an unrecognised budget key as a violation rather than a pass. That is the case
+that matters: a check which ignores what it does not recognise lets through precisely the new
+budget nobody tied to anything.
+
+
+--- the three quotas where ablation can discriminate, and the two where it cannot -----
+
+`cre workflow limits export` prints the simulator's own defaults, so which quotas an ablation can
+prove is knowable in advance rather than by trial:
+
+  quota                  production   simulator default   ablation?
+  HTTP calls                      5                  15   yes
+  HTTP response              100 kb              250 kb   yes
+  EVM report size             5,120              50,000   yes
+  Secrets calls                   5                   5   no — identical
+  Execution timeout            300 s          5m0s=300s   no — identical
+  LogTrigger event size        5 kb                5 kb   no — identical
+
+That last column is also the answer to something the repository had recorded as a mystery: eight
+secret reads once passed cleanly with production limits loaded. Not because quotas are unenforced,
+but because for that one quota `--limits` changed nothing.
+
+The three that can discriminate, each run with one quota below what the execution actually spends:
+
+  ../limits/http-calls.json     ✗ [101]LimitExceeded: … cannot use 2, limit is 1
+  ../limits/http-response.json  ✗ [8]ResourceExhausted: 1083 bytes exceeds 1000 bytes
+  ../limits/report-size.json    ✗ [8]ResourceExhausted: 685 bytes exceeds 100 bytes
+  ../prod-limits.json           ✓ Workflow Simulation Result
+
+The red-then-green pair is the evidence. The green alone says nothing. The limits files are
+committed so this is reproducible rather than anecdotal.
+
+Note the path: `--limits` resolves relative to the WORKFLOW folder, not the project root. A path
+that does not resolve is not an error — the run proceeds with defaults and looks like a pass.
+
+
+--- WHAT THIS PLAN DOES NOT CLOSE -----------------------------------------------------
+
+  Secrets call limit        the simulator's default equals production, so only a deployed
+                            execution could prove it
+  Execution timeout         would need a handler deliberately built to run five minutes
+  Log trigger event size    nobody has measured what it is applied against, and an event over it
+                            is dropped with no failure, no retry and no trace
+  eth_call gas ceiling      30,000,000, probed against the endpoint and not documented by Circle
+
+Closing these needs deliberately broken deployed executions, one per quota. What this file does is
+stop them being scattered across four plans as marginal notes.
+
+
+--- MEASURED HERE: the build is not reproducible, and now diagnosed --------------------
+
+Building the same source twice gives different binaries. The config hash is stable; the binary
+is not, and therefore neither is the workflow hash — which the CLI's own help describes as using
+"the same algorithm as the on-chain workflow ID".
+
+  cre workflow build   8 runs    8670954f23c9babe ×7    6ca92afafd7fff8d ×1
+  cre workflow hash    5 runs    00a4fd6067f193ba ×4    003809f9170bab6e ×1   (workflow hash)
+
+Diagnosis, by comparing the two captured binaries:
+
+  sizes                     3,086,206 and 3,086,093 — 113 bytes apart
+  first differing byte      offset 247,922, a single LEB128 constant: b2 ba e9 00 vs b1 ba e9 00,
+                            which is a data-section offset shifting
+  positions differing       171,507, or 5.56% of the file, all after that offset
+  embedded text             IDENTICAL — zero printable runs present in one and not the other
+  embedded text ORDER       DIFFERENT — same 10,038 runs, different sequence, first divergence at
+                            run 829 between two viem error strings
+
+So it is not a timestamp, not an embedded path, and not randomness in our code: the set of compiled
+content is identical and only its emission order changes. That is module ordering inside the build
+pipeline.
+
+Both variants produced byte-identical handler output on the same submission, so the risk is
+identity churn rather than divergent behaviour. But it is not nothing:
+
+  · Every evidence file in this repository quotes a binary hash as the artifact's identity. Each is
+    true of the build that produced the result beside it, and none of them is reproducible.
+  · A deployment registers a workflow ID derived from the binary, so two deployments of identical
+    source can register different identities.
+
+This is upstream, not ours. It is recorded rather than worked around.

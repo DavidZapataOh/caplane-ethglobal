@@ -1,0 +1,5 @@
+{
+  "name": "caplane-budgets",
+  "private": true,
+  "scripts": { "test": "bun test" }
+}
