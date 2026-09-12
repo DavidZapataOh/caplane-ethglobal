@@ -74,6 +74,15 @@ The 5,120 this file carried until now is `ChainWrite.EVM.ReportSizeLimit`, which
 and is a different limit; the two were conflated.
 The enclave's public key is published in `deployments.<network>.json`.
 
+The plaintext inside that ciphertext begins with the twenty raw bytes of the address entitled to
+submit it — lowercase, unprefixed — followed by the claim. This is an addition to what this
+section described, not an amendment to what it fixed: the envelope itself is unchanged.
+
+The width matters. The enclave compares those twenty bytes against the event's `submitter`, which
+arrives left-padded to a 32-byte topic and must be trimmed. Twenty against thirty-two never
+matches, and the failure looks like a relayed ciphertext rather than a bug, so it is pinned by a
+test rather than left to a comment.
+
 ## Additive changes to the frozen interface
 
 Adding an error is additive: it changes no existing selector, no event topic and no function

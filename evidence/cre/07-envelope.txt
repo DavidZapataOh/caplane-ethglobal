@@ -1,0 +1,109 @@
+A claim sealed in a browser-shaped tool, opened inside the enclave, and nowhere else.
+
+--- the round trip, end to end -------------------------------------------------
+
+  enclave public key   0xb749f4fb4b8c526c8a3ff6a224eee9e6bbeeefaecc6f43979c6b9077bda99504
+  submission tx        0xb5c78ba8e089d3c7663f7b1eec034f4b3d094270e87379dab26c5232b54b4b88
+  block                61661859
+  gas used             54,993
+  submissionId         0x13afb97d7976a84d0c2415b3ff9cbfda0e73b6be63c7cc47ab8d825331a19574
+
+  handler returned
+  "0x13afb97d…19574 0x86Ec9f04485Db066CF155353f15eef356Ae90253 218 true"
+
+  218 is the recovered claim's length and `true` is the address check. The arithmetic closes
+  exactly: 312 envelope − 58 header − 16 Poly1305 tag − 20 authorized submitter = 218.
+
+  The length and a verdict are all that leave. The claim itself never appears in the return
+  value, because the return value is the only thing that crosses.
+
+--- the attack this closes, and the one it does not -----------------------------
+
+The ciphertext is public in the calldata from the moment it is broadcast, so anyone can relay it
+from their own address and obtain a verdict on somebody else's receivable. The plaintext names
+the address entitled to submit — twenty raw bytes, lowercase, first — so the enclave compares it
+against the event's submitter and can tell a relay from the original.
+
+Binding the address as AEAD associated data was considered and rejected. It costs zero bytes and
+a relay would not even authenticate, which reads as strictly better until you look at the whole
+thing: the enclave would receive `invalid tag` and could not distinguish a relay from a corrupt
+envelope, an expired key, or a sealer who named the wrong address. Sealing would also require
+knowing the exact msg.sender in advance, so a smart account or a gas payer would produce
+envelopes that are permanently unopenable and — by the previous sentence — undiagnosable.
+
+What this does not close is the business and its debtor agreeing. The registry proves uniqueness,
+not existence.
+
+--- the cryptography runs in the enclave, measured ------------------------------
+
+Not asserted. The seal was compiled with `javy build -C deterministic=y` and run under WASI, and
+its output diffed against the same code under bun:
+
+  native   0x010113be4feaeaf204c7fd3358fc9c00721881d174278128…  120 bytes
+  enclave  0x010113be4feaeaf204c7fd3358fc9c00721881d174278128…  120 bytes
+  identical
+
+Two engines with different BigInt implementations agreeing byte for byte is what stops two nodes
+of the DON from disagreeing. Before this, the repository had proven only hashes ran there.
+
+The refusal path was exercised too: the previous plan's filler envelope, replayed through this
+handler, fails with `invalid tag`. The tag is doing its job, and the handler reached it — which
+also proves the Vault secret resolved.
+
+--- what the seal cost, re-measured rather than inherited ------------------------
+
+Encoding the Log with the SDK's own generated protobuf schema:
+
+  envelope        ABI data      serialized Log     margin against 5,000
+     275 B           352 B            581 B            88.4%     the previous plan's filler
+     312 B           384 B            613 B            87.7%     this real sealed claim
+   4,096 B         4,160 B          4,389 B            12.2%     the envelope cap
+
+A real claim costs 37 bytes more than the filler the skeleton used, and the margin is unchanged
+to within a percentage point. The figures move by a few bytes with the block number and log
+index, because protobuf varints are width-variable.
+
+`budgets.json` is deliberately not edited. Its `submit` entry is a receipt-measured number owned
+by a contracts plan with its own evidence file; overwriting it from here would leave the budget
+pointing at a measurement that no longer backs it. The 54,993 gas above is within it.
+
+--- one thing the plan had wrong: there is one vault, not two -------------------
+
+The instruction was to upload the secret to both targets. There is only one store: it is keyed by
+owner and namespace, not by target. The second upload fails with `key already exists`, and
+listing either target returns the same identifier:
+
+  secret_id=ENCLAVE_ENVELOPE_KEY, owner=0xd5557A1d0806323caD77bC4049ccaca0EaDAaf06, namespace=main
+
+One upload is enough, and it is also the concrete form of a risk already written down elsewhere:
+any workflow under this owner reads this secret. Staging and production are separated by workflow
+name, not by secret store.
+
+--- the three trust assumptions, named ------------------------------------------
+
+The ciphertext is readable by whoever holds the private key. That is three parties, not one:
+
+  1. the Vault DON, which holds and releases it
+  2. the attested enclave, which receives it
+  3. whoever generated the pair — because the enclave cannot generate its own
+
+The third is the one nobody can verify. There is no attestation reachable from the guest, no
+secure entropy — `crypto` does not exist inside javy at all, measured — and the only randomness
+is a seeded generator the platform documents as not cryptographically secure. So the key is
+generated outside, and "only the enclave decrypts" is true only if the generator destroyed their
+copy. That is an assumption, not a property.
+
+Worse, and newly written down: the public half is served in an operator-controlled JSON with no
+signature, no attestation and no on-chain anchor. An operator who substitutes their own key reads
+everything in the clear, and the resulting envelope is indistinguishable from a correct one. The
+claim "there is no operator wallet" is proven for the write path — the registry accepts only
+DON-signed reports — and not for the read path.
+
+Closing it would need a key generated inside the enclave whose public half arrived signed in a
+Nitro attestation document carrying the workflow's measurements. That is not buildable with this
+SDK: it exposes neither.
+
+And there are no per-submission ephemeral keys on the recipient side. The envelope's ephemeral key
+is the sender's; the enclave's is long-lived, so there is no forward secrecy. If it leaked, the
+whole history — which is on chain for ever — is exposed. Rotating it loses the ability to decrypt
+anything earlier, so there is no cheap mitigation.

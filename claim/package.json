@@ -11,6 +11,8 @@
     "derive:wasm": "bun run build:wasm >/dev/null 2>&1 && node --no-warnings tools/run-wasi.mjs /tmp/caplane-probe.wasm"
   },
   "dependencies": {
+    "@noble/ciphers": "^2.4.0",
+    "@noble/curves": "^2.4.0",
     "@noble/hashes": "^2.2.0"
   },
   "devDependencies": {

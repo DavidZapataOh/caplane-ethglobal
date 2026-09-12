@@ -1,8 +1,9 @@
 import { type EVMLog, type TeeRuntime, cre, logTriggerConfig } from '@chainlink/cre-sdk'
-import { type Hex, bytesToHex, decodeEventLog, toEventSelector } from 'viem'
+import { type Hex, bytesToHex, decodeEventLog, hexToBytes, toEventSelector } from 'viem'
 import { z } from 'zod'
 import { inboxAbi } from './abi'
 import { CHAIN } from './abi/frozen'
+import { open } from './envelope'
 
 export const configSchema = z.object({
 	inboxAddress: z.string().regex(/^0x[0-9a-fA-F]{40}$/),
@@ -20,6 +21,7 @@ export const CLAIM_SUBMITTED_TOPIC = toEventSelector('ClaimSubmitted(bytes32,add
 export type Claim = {
 	submissionId: Hex
 	submitter: Hex
+	envelope: Hex
 	envelopeBytes: number
 }
 
@@ -42,6 +44,9 @@ export const decodeClaimSubmitted = (log: {
 	return {
 		submissionId: args.submissionId,
 		submitter: args.submitter,
+		// The envelope itself, not `log.data`: that is the ABI encoding of a `bytes` — an offset
+		// word, a length word and padded payload — so an 81-byte envelope arrives as 160 bytes.
+		envelope: args.ciphertext,
 		envelopeBytes: (args.ciphertext.length - 2) / 2,
 	}
 }
@@ -54,9 +59,27 @@ export const decodeClaimSubmitted = (log: {
  * No logging. Log output is not visible for a TEE trigger, so a handler that leaned on it would
  * be debugging into a void — and anything that did escape would stop being confidential.
  */
-export const onClaimSubmitted = (_runtime: TeeRuntime<Config>, log: EVMLog): string => {
+export const onClaimSubmitted = (runtime: TeeRuntime<Config>, log: EVMLog): string => {
 	const claim = decodeClaimSubmitted(log)
-	return `${claim.submissionId} ${claim.submitter} ${claim.envelopeBytes}`
+
+	// One batch call spends one unit against the five-per-execution secrets quota. The value
+	// arrives as a string, so the key travels as hex and is decoded here. `namespace` is omitted:
+	// `main` is the SDK's default and the only namespace the CLI can write.
+	const secrets = runtime.getSecrets([{ id: 'ENCLAVE_ENVELOPE_KEY' }]).result()
+	const opened = open(
+		hexToBytes(claim.envelope),
+		hexToBytes(secrets.ENCLAVE_ENVELOPE_KEY.value as Hex),
+	)
+
+	// The event's submitter is the address that paid for the transaction; the envelope names the
+	// address its sealer authorised. A relay of somebody else's ciphertext differs here, and this
+	// is the only place in the system that can tell.
+	const authorized =
+		bytesToHex(opened.authorizedSubmitter).toLowerCase() === claim.submitter.toLowerCase()
+
+	// The length and a verdict, never the content: what this returns is the only thing that
+	// leaves, and returning the plaintext would turn the one-way door into a window.
+	return `${claim.submissionId} ${claim.submitter} ${opened.claim.length} ${authorized}`
 }
 
 export function initWorkflow(config: Config) {

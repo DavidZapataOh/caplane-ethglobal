@@ -1,0 +1,14 @@
+{
+  "canonical": {
+    "recipientPublicKey": "0xc8102cf771fd483f00056ae04b3d84ed05384205e0ab97e5b5d657a33619167f",
+    "recipientSecret": "0xde4fcb31b7147a6f550c501ea48c218f88a956ca40f5ed0ff9c76704623a578c",
+    "otherRecipientSecret": "0xd442bcf6aaf55b73e72477a4c968738a09ee4ee9a6ab7c6bb64eccdf1a4e7910",
+    "ephemeralSecret": "0x0707070707070707070707070707070707070707070707070707070707070707",
+    "nonce": "0x090909090909090909090909090909090909090909090909",
+    "authorizedSubmitter": "0x86ec9f04485db066cf155353f15eef356ae90253",
+    "submitterTopic": "0x00000000000000000000000086ec9f04485db066cf155353f15eef356ae90253",
+    "plaintext": "caplane envelope vector v1",
+    "realisticClaim": "{\"debtorTaxId\":\"Bayside Club\",\"invoiceNumber\":\"ORC1043\",\"amountMinor\":\"27500000\",\"currency\":\"AUD\",\"dueDate\":\"2026-12-31\",\"issuerTaxId\":\"e1218a28-7437-47ec-bfb5-252092825083\",\"country\":\"AU\"}",
+    "envelope": "0x010113be4feaeaf204c7fd3358fc9c00721881d174278128227ec674f37f7fe97b6d090909090909090909090909090909090909090909090909610f38e5af2ac5c64cc33a97a6c216107217a251de05167df4d9b29ae4c2628a46b3422160a9eaa666607b4f262b4c70d37a37c1659a035161424221930f"
+  }
+}
