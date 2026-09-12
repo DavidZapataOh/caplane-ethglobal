@@ -1,10 +1,10 @@
-# @caplane/sdk
+# caplane-sdk
 
 Read the Caplane lien registry on Arc Testnet from your own machine, against your own endpoint.
 No account, no key, and no Caplane service in the path.
 
 ```ts
-import { createCaplaneClient, isEncumbered, lienOf, liensOf, statusOf } from '@caplane/sdk'
+import { createCaplaneClient, isEncumbered, lienOf, liensOf, statusOf } from 'caplane-sdk'
 
 const client = createCaplaneClient()
 await isEncumbered(client, lienId)
@@ -15,12 +15,19 @@ await liensOf(client, borrower)
 ## Install
 
 ```
-npm install @caplane/sdk
+npm install caplane-sdk
 ```
 
 A git dependency does not work — this package lives in a subdirectory and a git dep installs the
 repository root — so the alternatives, if you would rather not take it from the registry, are a
 file dependency (`npm install ../sdk` from inside a checkout) or a tarball (`npm pack`).
+
+## One dependency
+
+viem, and a caret rather than a pin. The rest of this repository pins viem exactly, because the
+copy vendored into the enclave has to behave byte for byte; a package you install is the opposite
+case — pinning it forces a duplicate install on you and holds back security patches until we cut a
+release. Measured: on the version this shipped with, `npm audit` reports nothing.
 
 ## What this proves
 

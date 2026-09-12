@@ -1,5 +1,5 @@
 import type { Hex } from 'viem'
-import { LienStatus, RejectReason, createCaplaneClient, deployments, liensOf } from '@caplane/sdk'
+import { LienStatus, RejectReason, createCaplaneClient, deployments, liensOf } from 'caplane-sdk'
 import { readLien } from './rpc.js'
 
 const HASH = /^0x[0-9a-fA-F]{64}$/

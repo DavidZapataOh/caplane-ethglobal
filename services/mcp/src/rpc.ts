@@ -1,6 +1,6 @@
 import { decodeFunctionResult, encodeFunctionData, parseAbi } from 'viem'
 import type { Hex } from 'viem'
-import { type Lien, deployments } from '@caplane/sdk'
+import { type Lien, deployments } from 'caplane-sdk'
 
 export const RPC_URL = process.env.ARC_TESTNET_RPC_URL ?? 'https://rpc.testnet.arc.io'
 

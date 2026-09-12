@@ -1,6 +1,6 @@
 {
-  "name": "@caplane/sdk",
-  "version": "0.1.0",
+  "name": "caplane-sdk",
+  "version": "0.1.1",
   "type": "module",
   "license": "MIT",
   "description": "Read the Caplane lien registry on Arc Testnet from your own machine, against your own endpoint",
@@ -28,7 +28,7 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "viem": "2.34.0"
+    "viem": "^2.56.3"
   },
   "devDependencies": {
     "@types/node": "22.19.1",

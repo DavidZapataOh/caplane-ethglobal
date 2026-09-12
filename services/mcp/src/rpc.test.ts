@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { LienStatus } from '@caplane/sdk'
+import { LienStatus } from 'caplane-sdk'
 import { RPC_URL, readLien, requests } from './rpc.js'
 
 // A lien the registry wrote, and a submission it refused. Both are real ids the chain knows; the

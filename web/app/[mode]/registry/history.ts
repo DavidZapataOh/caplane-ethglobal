@@ -44,10 +44,12 @@ const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 /**
  * Paced and retried, because the endpoint rate-limits and a sweep is a burst by nature.
  *
- * Measured while building this: eight pages of a topic-filtered sweep is enough to earn `-32005
- * rate limit exceeded`, and a page that answered that and was not retried would leave a visitor
- * with "no record" about a lien that exists. The pages are sequential, spaced, and retried; a
- * rejection that never clears is raised, never turned into an empty result.
+ * Measured while building this: a sweep from the deployment block is eight pages, and a handful of
+ * them back to back earns `-32005 rate limit exceeded`. A page that answered that and was not
+ * retried would leave a visitor with "no record" about a lien that exists. The pages are sequential,
+ * spaced and retried, and the spacing is for the visitor as much as for the suite — this page
+ * competes with whatever else is asking the same public endpoint. A rejection that never clears is
+ * raised, never turned into an empty result.
  */
 const sweep = async (topics: Array<string | string[] | null>, fetchLogs: FetchLogs): Promise<Log[]> => {
   const to = await head()
@@ -65,11 +67,11 @@ const sweep = async (topics: Array<string | string[] | null>, fetchLogs: FetchLo
         found.push(...(await fetchLogs(filter)))
         break
       } catch (error) {
-        if (attempt === 4) throw error
-        await pause(400 * 2 ** attempt)
+        if (attempt === 5) throw error
+        await pause(600 * 2 ** attempt)
       }
     }
-    await pause(120)
+    await pause(350)
   }
   return found
 }

@@ -2,7 +2,7 @@ import { readFileSync, readdirSync } from 'node:fs'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { toFunctionSelector } from 'viem'
-import { createCaplaneClient, lienOf, statusOf } from '@caplane/sdk'
+import { createCaplaneClient, lienOf, statusOf } from 'caplane-sdk'
 import { REGISTRY, SELECTORS, classify, read } from './chain.ts'
 
 const RECORDED = '0xebd60de9b8c99e6bde3ce7ad1894177e706e75c0120c192da71400a378ae7e4c'
