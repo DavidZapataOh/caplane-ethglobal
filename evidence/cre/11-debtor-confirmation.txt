@@ -1,0 +1,108 @@
+Three real signatures, three real submissions, three real executions. One approves.
+
+The debtor's confirmation travels inside the sealed envelope, collected before the submission is
+made. That is what removes the second execution: nothing has to survive between runs and no human
+has to answer inside a five-minute timeout. The enclave recovers who signed and checks what they
+named.
+
+  binary hash   2d2caae973f6cb218d3f73e59388a3f090653f1c804eea0f02da129f956616a9
+  debtor        0xBB8449f3eAf624AC83c08855aCb1aa77926ff704
+  submitter     0x86Ec9f04485Db066CF155353f15eef356Ae90253
+  third party   0xb3f85869D8790F1DDC8981306b5bA1c9F76036cC
+
+
+--- the three arms --------------------------------------------------------------
+
+All three signatures are genuine, produced by the debtor's own key over the EIP-712 structure.
+None of them is malformed. What separates them is what they name.
+
+  A  names the submitter as creditor, over the claimed amount
+     tx 0x6d004376fa6dd5f43db1fac15e62eae8f49e79657de786c7d783b2e364ff61b3
+     "… true true true true true clear true"
+
+  B  names a third party as creditor — an honest confirmation of a real debt, to someone else
+     tx 0x6b42da69f32ef3bb9b540b05154dde708582c6956b00e84616b90bba42bdcaab
+     "… true true true true true clear false"
+
+  C  names the submitter, but signs over 30,000,000 where the claim says 27,500,000
+     tx 0xebf6aa44adf3e54f674cb94ee557e0d6bb86a86e2ac22126746e808c71a5dd0a
+     "… true true true true true clear false"
+
+The seven fields before the last one are identical across all three: the invoice exists, is
+unpaid, matches the claim, the debtor screens clean, and there is no collision. Only the last
+field moves. That is the point — this is not a blanket failure that happens to land in the right
+place, it is the confirmation check discriminating while everything around it stays green.
+
+Arm C is why the four invoice fields are compared exactly instead of through `claimId`. That
+identifier passes the amount through a power-of-two bucket, so a confirmation signed over
+27,500,000 covers anything up to 33,554,431 — nearly double the debt. Showing someone a number in
+their wallet that the verifier does not enforce is precisely the failure EIP-712 was chosen to
+prevent, and binding only to `claimId` would have reintroduced it.
+
+
+--- the library's three traps, measured rather than assumed ------------------------
+
+Before a line of the module was written, the curve library was exercised directly:
+
+  prehash: false     0x3325a78425f17a7e487eb5666b2bfd93abb06c70   the signing address
+  prehash: default   0x1edde60a5b6c449b52ff1365bdad938cbd88527f   a DIFFERENT valid address
+  [r, s, v] order    throws `invalid recovery id`
+
+The first is the dangerous one. With the default the library hashes the digest a second time and
+recovers an address that is perfectly well-formed and simply wrong — no error, nothing red. Every
+signature would have passed for the wrong signer.
+
+The byte order trap fails loudly instead, which is the better of the two. What matters there is
+different: an uncaught throw aborts the whole execution and emits no report, so the submission
+would be lost rather than refused, and nothing on chain would record that it was ever seen.
+Recovery therefore returns undefined instead of throwing, and a malformed signature is a verdict.
+
+`% 27` covers both conventions. Wallets emit v as 27 and 28; some emit 0 and 1. Subtracting 27
+outright turns a 0 into 229 and the library refuses it.
+
+
+--- what the envelope costs now ---------------------------------------------------
+
+  plaintext, compact JSON        742 B    seven claim fields + confirmation + signature
+  envelope                       836 B    + 20 submitter + 58 header + 16 Poly1305 tag
+  envelope cap                 4,096 B    inbox, 3,260 B spare
+  abi-encoded event data         928 B
+  serialized trigger Log       1,159 B    of 5,000 — 76.8% margin
+  gas for submit                68,037    receipt-measured, arm A
+
+The 275-byte figure recorded elsewhere is deliberate filler sized for a gas receipt, not a sealed
+claim. `budgets.json` now carries both and says which is which.
+
+
+--- what none of this proves ------------------------------------------------------
+
+**The enclave cannot prove the signer is the debtor.** This is the honest residue and it is not
+small. The ledger stores no chain address, and the connection is read-only over contacts, so there
+is no anchor the enclave could read even in principle. What it establishes is that somebody
+holding a key signed a structure naming this submitter as creditor, over this claim and these
+exact amounts, pointing at the contact id the ledger returned — `3e776c4b-ea9e-4bb1-96be-
+6b0c7a71a37f`, fetched in the same response the invoice came in, never taken from the claim, so
+the submitter cannot nominate a confederate as the debtor of record.
+
+The link between that key and the real debtor is made by the channel: a one-time link sent to the
+address the ledger holds. That lives outside the enclave by construction. In production it is what
+closes pre-emptive poisoning — a copyist cannot read the victim's ledger, so they never receive the
+link — but with a single accounting tenant the demonstration cannot show that difference.
+
+**It does not close the invented invoice or collusion.** Both counterparties here are ours: the
+invoice lives in a test company we control and the debtor is a colleague. This exercises the path
+end to end; it does not demonstrate adversarial separation.
+
+**A live confirmation allows re-sealing, though not re-pledging.** The same plaintext under a new
+ephemeral key produces a different ciphertext and a different submission id, so it can be sent as
+many times as someone is willing to pay gas for, until the expiry block. Every one of them stops
+later: while the lien lives, at the collision check; and permanently after that, because the claim
+id is deterministic and carries no nonce and the registry reverts with `AlreadyEncumbered` for any
+state that is not zero — released and failed are both terminal. It is nuisance, not theft, and the
+expiry bounds the window.
+
+**Expiry is a block height, not a time.** The enclave has no clock, and asking for a header would
+take it outside itself. The height arrives with the trigger as a protobuf message — absolute bytes
+and a sign, not a number. Compared raw it coerces to NaN, which is false against everything: every
+confirmation would be refused while a test written with a bigint stayed green. It is decoded
+explicitly and a missing height is a refusal.

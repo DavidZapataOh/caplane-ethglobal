@@ -152,8 +152,12 @@ test('the handler returns facts about the body, never the body', () => {
 	expect(returned).not.toContain('length')
 	// Seven became eight when the collision verdict joined. Pinned, because the return value is
 	// the widest channel out of the enclave that does not look like one.
-	expect(returned.match(/\$\{/g) ?? []).toHaveLength(8)
+	// Eight became nine when the debtor confirmation joined.
+	expect(returned.match(/\$\{/g) ?? []).toHaveLength(9)
 	expect(returned).toContain('collision.status')
+	expect(returned).toContain('confirmed')
+	// The signature is the debtor's and it stays sealed; only the verdict crosses.
+	expect(returned).not.toContain('signature')
 	// The commitments are the query itself; the lien id is registry state the enclave was told.
 	// Neither is a fact about this claim that anyone outside is entitled to.
 	expect(returned).not.toContain('commitments')

@@ -20,22 +20,64 @@ const CLAIM = {
 	country: 'AU',
 }
 
+// The sealed plaintext is the seven claim fields plus the debtor's confirmation and its signature.
+// The two are not optional: a document without them is not a claim this system approves, and
+// accepting one would make every check above it decorative.
+const CONFIRMATION = {
+	creditor: '0x86ec9f04485db066cf155353f15eef356ae90253',
+	debtor: '0x3325a78425f17a7e487eb5666b2bfd93abb06c70',
+	claimId: `0x${'11'.repeat(32)}`,
+	invoiceNumber: 'ORC1043',
+	currency: 'AUD',
+	amountMinor: '27500000',
+	dueDate: '2026-12-31',
+	debtorRef: `0x${'22'.repeat(32)}`,
+	expiresAtBlock: '61700000',
+}
+const SIGNATURE = `0x${'ab'.repeat(65)}`
+const DOCUMENT = { ...CLAIM, confirmation: CONFIRMATION, signature: SIGNATURE }
+
 // The plaintext format is frozen by this module: JSON of the seven submitted fields. A decoder
 // that accepts a partial document would let a claim omit the amount and match anything.
+const encode = (value: unknown) => new TextEncoder().encode(JSON.stringify(value))
+
 test('a claim missing any of the seven fields is refused', () => {
 	for (const field of Object.keys(CLAIM)) {
-		const short: Record<string, string> = { ...CLAIM }
+		const short: Record<string, unknown> = { ...DOCUMENT }
 		delete short[field]
-		expect(() => decodeClaim(new TextEncoder().encode(JSON.stringify(short)))).toThrow()
+		expect(() => decodeClaim(encode(short))).toThrow()
 	}
-	expect(decodeClaim(new TextEncoder().encode(JSON.stringify(CLAIM))).invoiceNumber).toBe('ORC1043')
+	expect(decodeClaim(encode(DOCUMENT)).invoiceNumber).toBe('ORC1043')
 })
 
-// The envelope that is already on chain carries the document pretty-printed with a trailing
-// newline. A decoder that only accepted the compact form would open it and then die.
-test('the document on chain decodes', () => {
-	const onChain = readFileSync('../claim/fixtures/demo-claim.json', 'utf8')
-	expect(decodeClaim(new TextEncoder().encode(onChain)).amountMinor).toBe('27500000')
+// Whitespace is not part of the format: the tool that seals writes whatever the document looks
+// like on disk, and a decoder that only took the compact form would open it and then die.
+test('a pretty-printed document decodes', () => {
+	expect(decodeClaim(encode(DOCUMENT)).amountMinor).toBe(
+		decodeClaim(new TextEncoder().encode(JSON.stringify(DOCUMENT, null, 2))).amountMinor,
+	)
+})
+
+// A document with no confirmation is not a claim this system approves. The seven string fields
+// cannot validate it: `confirmation` is an object, so the check that covers them passes it through.
+test('a claim with no confirmation is refused, not ignored', () => {
+	expect(() => decodeClaim(encode(CLAIM))).toThrow()
+	expect(() => decodeClaim(encode({ ...CLAIM, signature: SIGNATURE }))).toThrow()
+	expect(() => decodeClaim(encode({ ...CLAIM, confirmation: CONFIRMATION }))).toThrow()
+	for (const field of Object.keys(CONFIRMATION)) {
+		const short: Record<string, unknown> = { ...CONFIRMATION }
+		delete short[field]
+		expect(() => decodeClaim(encode({ ...DOCUMENT, confirmation: short }))).toThrow()
+	}
+	expect(decodeClaim(encode(DOCUMENT)).signature).toBe(SIGNATURE)
+})
+
+// JSON has no bigint, so the two numeric fields travel as text and are converted at the door.
+// Left as strings they would compare unequal to every amount and every block height.
+test('the numeric confirmation fields arrive as bigints', () => {
+	const { confirmation } = decodeClaim(encode(DOCUMENT))
+	expect(confirmation.amountMinor).toBe(27_500_000n)
+	expect(confirmation.expiresAtBlock).toBe(61_700_000n)
 })
 
 // The number reaches the clause inside double quotes and the ledger answers 400 to one inside it,

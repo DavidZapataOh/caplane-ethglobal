@@ -24,6 +24,12 @@ export type Verification = {
 	unpaid: boolean
 	matches: boolean
 	screened: boolean
+	/**
+	 * The invoice the ledger returned, carried out with the verdicts because the debtor's
+	 * confirmation points at the ledger's own contact id. Re-fetching it downstream would cost a
+	 * second call against a quota with one left.
+	 */
+	invoice?: Invoice
 }
 
 export const UNVERIFIED: Verification = {
@@ -107,5 +113,6 @@ export const verifyExternally = (
 		unpaid: invoice !== undefined && isUnpaid(invoice),
 		matches: invoice !== undefined && matchesClaim(invoice, claim),
 		screened: !hasSanctionsHit(json(screeningResponse) as ScreeningResponse),
+		invoice,
 	}
 }

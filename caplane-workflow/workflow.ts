@@ -3,6 +3,7 @@ import { type Hex, bytesToHex, decodeEventLog, hexToBytes, toEventSelector } fro
 import { inboxAbi } from './abi'
 import { CHAIN } from './abi/frozen'
 import type { Config } from './config'
+import { blockNumberOf, confirmationBinds, recoverConfirmer } from './attestation'
 import { open } from './envelope'
 import { decodeClaim } from './ledger'
 import { readRegistry, verdictOf } from './registry'
@@ -76,6 +77,7 @@ export const decodeClaimSubmitted = (log: {
  * would be debugging into a void.
  */
 export const onClaimSubmitted = (runtime: TeeRuntime<Config>, log: EVMLog): string => {
+	const { config } = runtime
 	const claim = decodeClaimSubmitted(log)
 
 	const secrets = runtime.getSecrets(SECRET_IDS.map((id) => ({ id }))).result()
@@ -108,11 +110,34 @@ export const onClaimSubmitted = (runtime: TeeRuntime<Config>, log: EVMLog): stri
 		: { read: { kind: 'error', reason: 'not authorized' } as const, commitments: [] }
 	const collision = verdictOf(registryRead.read)
 
+	// The debtor's own signature, recovered here and nowhere else. What it proves is bounded and
+	// worth stating: somebody holding a key signed a structure naming this submitter as creditor,
+	// over this claim and these exact amounts, pointing at the contact the ledger holds. That the
+	// key belongs to that contact is established off chain, by the channel that delivered the
+	// request — the ledger stores no chain address, so the enclave has nothing to anchor it to.
+	const confirmed =
+		submitted !== undefined &&
+		confirmationBinds(
+			submitted.confirmation,
+			recoverConfirmer(
+				submitted.confirmation,
+				// Both casts are on unvalidated input, and both are safe: recovery returns
+				// undefined for anything that is not a 65-byte signature, and the address came
+				// through the config schema's own twenty-byte check.
+				submitted.signature as Hex,
+				config.registryAddress as Hex,
+			),
+			submitted,
+			verified.invoice ?? {},
+			claim.submitter,
+			blockNumberOf(log),
+		)
+
 	// Derived facts only. This return value is the one thing that crosses, and the plaintext's
 	// length used to be in it: that was safe while nothing confidential distinguished one claim
 	// from another, and stopped being safe the moment the ledger's answer did. A length is the
 	// body too — it tells one invoice from another — so it is gone and the verdicts replace it.
-	return `${claim.submissionId} ${claim.submitter} ${authorized} ${verified.exists} ${verified.unpaid} ${verified.matches} ${verified.screened} ${collision.status}`
+	return `${claim.submissionId} ${claim.submitter} ${authorized} ${verified.exists} ${verified.unpaid} ${verified.matches} ${verified.screened} ${collision.status} ${confirmed}`
 }
 
 export function initWorkflow(config: Config) {

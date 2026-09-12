@@ -1,8 +1,16 @@
+import { CONFIRMATION_FIELDS, type DebtorConfirmation } from '../claim/attestation'
+
 /**
  * What the sealed plaintext holds, after the twenty bytes naming the authorized submitter: the
- * seven submitted fields as JSON. Raw, as the submitter wrote them — not the canonical text the
- * commitment hashes, which strips everything that is not a letter or a number and would make
- * every multi-word name unusable against a third party.
+ * seven submitted fields as JSON, plus the debtor's confirmation and its signature. Raw, as the
+ * submitter wrote them — not the canonical text the commitment hashes, which strips everything
+ * that is not a letter or a number and would make every multi-word name unusable against a third
+ * party.
+ *
+ * The confirmation travels inside the envelope because it is evidence the creditor brings, not
+ * something the protocol waits for. Collecting it before submission is what removes the second
+ * execution entirely: nothing has to survive between runs, and no human has to answer inside a
+ * five-minute timeout.
  */
 export type SubmittedClaim = {
 	debtorTaxId: string
@@ -12,6 +20,8 @@ export type SubmittedClaim = {
 	dueDate: string
 	issuerTaxId: string
 	country: string
+	confirmation: DebtorConfirmation
+	signature: string
 }
 
 const FIELDS = [
@@ -24,13 +34,38 @@ const FIELDS = [
 	'country',
 ] as const
 
-/** A document short of any field would verify against whatever the ledger happened to return. */
+/**
+ * A document short of any field would verify against whatever the ledger happened to return.
+ *
+ * The confirmation cannot be validated by the check that covers the seven: it is an object, so
+ * `typeof === 'string'` passes it straight through. Its fields are checked by name, and the two
+ * numeric ones are converted here — JSON has no bigint, so they travel as text, and left as text
+ * they would compare unequal to every amount and every block height without anything erroring.
+ */
 export const decodeClaim = (bytes: Uint8Array): SubmittedClaim => {
 	const parsed = JSON.parse(new TextDecoder().decode(bytes)) as Record<string, unknown>
 	for (const field of FIELDS) {
 		if (typeof parsed[field] !== 'string') throw new Error(`claim is missing ${field}`)
 	}
-	return parsed as unknown as SubmittedClaim
+	if (typeof parsed.signature !== 'string') throw new Error('claim is missing signature')
+
+	const confirmation = parsed.confirmation
+	if (typeof confirmation !== 'object' || confirmation === null) {
+		throw new Error('claim is missing confirmation')
+	}
+	const fields = confirmation as Record<string, unknown>
+	for (const field of CONFIRMATION_FIELDS) {
+		if (typeof fields[field] !== 'string') throw new Error(`confirmation is missing ${field}`)
+	}
+
+	return {
+		...(parsed as unknown as SubmittedClaim),
+		confirmation: {
+			...(confirmation as unknown as DebtorConfirmation),
+			amountMinor: BigInt(fields.amountMinor as string),
+			expiresAtBlock: BigInt(fields.expiresAtBlock as string),
+		},
+	}
 }
 
 /**
@@ -55,7 +90,10 @@ export type Invoice = {
 	AmountDue?: number
 	CurrencyCode?: string
 	DueDateString?: string
-	Contact?: { Name?: string }
+	// `ContactID` is the ledger's own stable key for the counterparty, and it is what the debtor
+	// confirmation points at. The embedded contact carries the id and the name and nothing else —
+	// no email, no tax number — so identifying the debtor any further would cost the fifth call.
+	Contact?: { ContactID?: string; Name?: string }
 }
 
 /** A missing invoice is a 200 with an empty array. The status code says nothing about existence. */

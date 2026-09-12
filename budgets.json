@@ -55,7 +55,14 @@
     "gasSnapshotForkPath": "contracts/.gas-snapshot.fork",
     "maxGasDeltaPercent": 2,
     "receiptMeasured": {
-      "CaplaneInbox.submit": { "envelopeBytes": 275, "gas": 54144, "evidence": "evidence/contracts/01-inbox.txt" }
+      "_CaplaneInbox.submit": "275 B is deliberate filler, sized for a gas receipt — not a sealed claim. The real one is below.",
+      "CaplaneInbox.submit": { "envelopeBytes": 275, "gas": 54144, "evidence": "evidence/contracts/01-inbox.txt" },
+      "CaplaneInbox.submit.sealedClaim": {
+        "envelopeBytes": 836,
+        "gas": 68037,
+        "_comment": "A claim with its debtor confirmation sealed in: 742 B plaintext + 20 submitter + 58 header + 16 tag. Serialized trigger Log is 1,159 B of 5,000 — 76.8% margin. Envelope cap is 4,096.",
+        "evidence": "evidence/cre/11-debtor-confirmation.txt"
+      }
     }
   },
   "web": { "firstLoadJsBytes": null, "lcpMs": null, "clsScore": null },
