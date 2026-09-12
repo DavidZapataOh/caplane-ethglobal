@@ -1,0 +1,55 @@
+What an agent can tell apart, and how it checks without us. Measured 2026-09-12.
+
+The acceptance is not a tools/list that answers: a server that returned "not encumbered" for
+everything would answer identically today, because the only lien the registry holds is released.
+The divergence lives in the status and in the seven fields of the lien.
+
+--- the same tool, two real ids ----------------------------------------------
+  a lien the registry wrote — 0xebd60de9…
+    encumbered  false
+    status      released
+  a submission it refused — 0x9c22eff8…
+    encumbered  false
+    status      none
+
+The boolean is the same for both. It is not a bug and it is not hidden: encumbered is status exactly
+active, and a released lien and an id nobody ever wrote are both not-active. The instructions the
+server sends at initialize say so, so an agent learns it from the protocol rather than from a README
+it will never fetch.
+
+--- get_lien, all seven fields ------------------------------------------------
+    borrower       0x86Ec9f04485Db066CF155353f15eef356Ae90253
+    rateBps        200
+    createdAt      1789191961
+    advanceUsdc6   8000000
+    expiresAt      1801267200
+    status         released
+    submissionId   0xdb0577a4e0025f56d6b8e3f71871a42dccb2bc6447aa366685b42d33505752b3
+    receipt        https://rpc.testnet.arc.io  block 0x3ae5884  3 calls
+
+--- and the receipt replays, outside the server, to the same bytes -----------
+    isEncumbered   same bytes  32 bytes
+    statusOf       same bytes  32 bytes
+    lienOf         same bytes  224 bytes
+    replayed with curl at the height the receipt names — no server of ours in the path
+
+--- registry_identity: an agent checks the address is the real registry ------
+    chainId                5042002
+    registry               0xe7170ee0ce4cab4593970ef5c4ebf7d0d62ae19b
+    codeBytes              5232
+    codeHash               0xcb0c5a71721f3df1ebfe2bda742c9eb3ee491169476012bb53d4cd0d22574d8d
+    workflowName           0x33396465656661623966
+    matchesFrozenIdentity  true
+
+--- liens_of_borrower: the one question needing nothing handed over ----------
+    fromBlock 61681981 | liens 1
+      0xebd60de9b8c99e6bde3ce7ad1894177e706e75c0120c192da71400a378ae7e4c block 61685965
+
+--- what this does not prove -------------------------------------------------
+
+That the receivable exists, that the lien is fair, or that this server is honest. The receipt is
+what makes the last one unnecessary: an agent replays every call against any node and compares
+bytes, which is what the replay above does from outside the process.
+
+It is still us in the middle. The defensible claim is the dossier's own §19.4 — demonstrably
+dispensable — and not §20.3's "without us in the middle", which is false for this surface.

@@ -1,0 +1,82 @@
+MCP conformance, before and after. Measured 2026-09-12.
+
+The suite is the official one, pinned: `@modelcontextprotocol/conformance@0.2.0-alpha.11`. `latest`
+does not resolve. A suite shown only in green does not demonstrate that it discriminates, so the
+run against the placeholder is kept.
+
+--- before: the deployed placeholder -----------------------------------------
+
+  $ curl -X POST https://mcp.caplane.xyz/mcp   ->  404  "not found"
+  $ conformance server --url https://mcp.caplane.xyz/mcp --scenario tools-list
+    FAILURE  Server lists available tools with valid structure
+    Error:   Streamable HTTP error: Error POSTing to endpoint: not found
+    Passed: 1/2, 1 failed
+    exit 1
+
+--- after: the built artifact, over loopback ---------------------------------
+
+  server-initialize              Passed: 2/2, 0 failed, 0 warnings
+  ping                           Passed: 2/2, 0 failed, 0 warnings
+  tools-list                     Passed: 3/3, 0 failed, 0 warnings
+  dns-rebinding-protection       Passed: 2/2, 0 failed, 0 warnings
+  server-session-lifecycle       Passed: 0/0, 0 failed, 0 warnings
+  server-sse-multiple-streams    Passed: 0/0, 0 failed, 1 warnings
+
+Every scenario that exercises this server's own surface passes, and each of them also reports
+`wire-schema-valid SUCCESS`: every JSON-RPC message this server emits validates against the
+specification's own JSON schema for the negotiated revision. That is the conformance claim worth
+making, and it is what justifies writing the responder by hand instead of taking the official SDK's
+ninety-four packages and twenty-six megabytes.
+
+--- the whole suite, and why 25 scenarios fail -------------------------------
+
+  Total: 34 passed, 25 failed
+
+Not one of the failures is about this server's surface. They fall into two groups:
+
+  * capabilities this server does not declare — resources (6), prompts (5), logging, completion,
+    elicitation (3). A read-only registry has no resources to list and no prompts to serve, and it
+    says so in its initialize response: `capabilities: { tools: { listChanged: false } }`.
+
+  * the ten `tools-call-*` scenarios, which require the server to implement the SUITE'S OWN fixture
+    tools. Verified directly on two of the ten rather than assumed:
+      tools-call-simple-text   Error: Failed: unknown tool: test_simple_text
+      tools-call-error         Error: Failed: unknown tool: test_error_handling
+    Those are a harness for SDK authors, not a requirement on a server that has real tools.
+
+--- one real defect the suite found, which the tests had not ------------------
+
+`dns-rebinding-protection` failed at first:
+
+  FAILURE  Server accepts requests with valid localhost Host/Origin headers
+  Error:   Expected HTTP 2xx for valid localhost Host/Origin headers, got 403
+
+The Origin check allowed only `*.caplane.xyz`. The official inspector is a browser application
+served from a loopback port, so it would have been refused — the tool anyone reaches for first,
+turned away by a check meant to protect localhost servers. Loopback origins are now allowed, a
+foreign one is still 403, and a request with no Origin at all — the normal case, because an MCP
+client is not a browser — is allowed.
+
+--- the handshake, by hand ---------------------------------------------------
+
+  initialize
+    protocolVersion 2025-11-25 | capabilities {"tools": {"listChanged": false}} | instructions 558 chars
+  notifications/initialized
+    202, empty body
+  tools/list
+    get_lien is_encumbered liens_of_borrower registry_identity explain_rejection
+  GET /mcp
+    405
+  Accept without the event stream
+    406
+  unsupported protocol version
+    400, supported: ['2025-11-25', '2025-06-18', '2025-03-26']
+  no session id on any response
+    headers named mcp-session-id: 0
+
+--- reproduce it -------------------------------------------------------------
+
+  cd sdk && npm ci && npm run build       # file:../../sdk installs a link, not a build
+  cd ../services/mcp && npm ci && npm test
+  PORT=8080 npm start
+  npx @modelcontextprotocol/conformance@0.2.0-alpha.11 server --url http://127.0.0.1:8080/mcp

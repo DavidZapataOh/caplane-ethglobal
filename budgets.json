@@ -76,7 +76,8 @@
   "services": {
     "_p95Ms": "Client-observed round trip against the deployed service. It lands with the deploy: writing a number here without evidence/measured.json carrying it is now a violation, not a pass.",
     "api": { "serveMs": 5, "p95Ms": null },
-    "mcp": { "p95Ms": null }
+    "_mcp": "serveMs is the server's own cost on a tool that touches nothing; readMs is a tool that reads the chain, and it is almost entirely two round trips to an endpoint whose own p95 is 190 ms. p95Ms is the client-observed round trip against the deployment and lands with it.",
+    "mcp": { "serveMs": 5, "readMs": 900, "p95Ms": null }
   },
   "ci": { "hermeticJobSeconds": 300, "cleanCloneJobSeconds": 600 }
 }

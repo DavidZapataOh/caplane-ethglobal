@@ -120,12 +120,19 @@ jobs:
       # claim inside a job with no bun installed — red for an unrelated reason. `sdk` runs
       # `node --test` over what it emits, so it needs no bun.
       #
-      # NOT HERMETIC for `sdk` and `services/api`: their tests read the live registry over
-      # https://rpc.testnet.arc.io.
+      # NOT HERMETIC for `sdk`, `services/api` and `services/mcp`: their tests read the live
+      # registry over https://rpc.testnet.arc.io.
       # The endpoint needs no credential but it does need the network and it rate-limits, so the
       # suite runs its files one at a time. A red here can be the endpoint rather than the code,
       # and saying so is the difference between a gate and a coin toss.
-      - if: matrix.dir == 'brand' || matrix.dir == 'sdk' || matrix.dir == 'services/api'
+      # `file:../../sdk` installs a link to a package that has not been built, so the import fails at
+      # runtime with a missing dist/. The matrix installs each directory independently, so the build
+      # order has to be stated rather than assumed — and the failure it prevents reads like a code
+      # error, not a configuration one.
+      - if: matrix.dir == 'services/mcp'
+        run: npm ci && npm run build
+        working-directory: sdk
+      - if: matrix.dir == 'brand' || matrix.dir == 'sdk' || matrix.dir == 'services/api' || matrix.dir == 'services/mcp'
         run: npm test
         working-directory: ${{ matrix.dir }}
 

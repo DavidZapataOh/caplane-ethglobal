@@ -1,3 +1,5 @@
 {
-  "services.api.serveMs": 0.6
+  "services.api.serveMs": 0.6,
+  "services.mcp.serveMs": 1.1,
+  "services.mcp.readMs": 400
 }
