@@ -80,3 +80,35 @@ client is not a browser — is allowed.
   cd ../services/mcp && npm ci && npm test
   PORT=8080 npm start
   npx @modelcontextprotocol/conformance@0.2.0-alpha.11 server --url http://127.0.0.1:8080/mcp
+
+--- after: the same suite against the deployment -----------------------------
+
+  npx @modelcontextprotocol/conformance@0.2.0-alpha.11 server --url https://mcp.caplane.xyz/mcp
+
+  server-initialize              2/2 passed
+  ping                           2/2 passed
+  tools-list                     3/3 passed
+  dns-rebinding-protection       0/2 — out of scope, not a defect
+
+The last scenario never sends a request. It refuses first:
+
+  Error: DNS rebinding tests require a localhost server URL (localhost, 127.0.0.1, or [::1])
+  Scope: This test applies to localhost MCP servers running without HTTPS and without
+         an authorization header.
+
+A public HTTPS origin is the condition the scenario exists to make unnecessary, and the
+runner counts "does not apply" as a failure rather than a skip. It passes 2/2 against the
+same binary on http://127.0.0.1:8080, which is the URL shape it asks for.
+
+So the Origin check is proven where the runner declines to look — against the deployment,
+by hand, with the negative control that makes the greens mean something:
+
+  POST https://mcp.caplane.xyz/mcp   {"jsonrpc":"2.0","id":1,"method":"ping"}
+
+  Origin: https://evil.example       403     <- the control
+  Origin: http://localhost:6274      200     <- the Inspector's own origin
+  Origin: https://app.caplane.xyz    200
+  (no Origin header)                 200     <- not a browser, nothing to rebind
+
+A server that answered 200 to all four would produce the same three greens above. The 403
+is the only line that distinguishes an allow-list from no check at all.
