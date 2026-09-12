@@ -7,12 +7,15 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "node --test",
+    "test": "npm run build && node --test --test-concurrency=1 dist/src/*.test.js",
     "build": "tsc -p tsconfig.build.json",
-    "start": "node dist/health.js"
+    "start": "node dist/src/main.js"
   },
   "devDependencies": {
-    "typescript": "5.9.3",
-    "@types/node": "22.19.1"
+    "@types/node": "22.19.1",
+    "typescript": "5.9.3"
+  },
+  "dependencies": {
+    "viem": "^2.34.0"
   }
 }

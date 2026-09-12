@@ -46,3 +46,49 @@ test("commentary keys are not budgets", () => {
   const noted = { ...budgets, cre: { ...budgets.cre, _note: "why this number" } };
   expect(violations(noted, limits)).toEqual([]);
 });
+
+// `cre` was the only branch anyone read, so every other budget in this file passed by never being
+// looked at. A services latency budget has no platform limit to resolve against, so it is tied to a
+// measurement — and a budget with nothing behind it has to fail, or it is decoration that reads as
+// a gate.
+test("a services budget with no measurement behind it is a violation", () => {
+  const found = violations(
+    { ...budgets, services: { api: { p95Ms: 400 }, mcp: { p95Ms: null } } } as typeof budgets,
+    limits as Limits,
+    {},
+  );
+  expect(found.some((line) => line.includes("services.api.p95Ms has no measurement behind it"))).toBe(true);
+});
+
+test("a measurement above its budget is a violation", () => {
+  const found = violations(
+    { ...budgets, services: { api: { p95Ms: 400 }, mcp: { p95Ms: null } } } as typeof budgets,
+    limits as Limits,
+    { "services.api.p95Ms": 981 },
+  );
+  expect(found.some((line) => line.includes("981 exceeds the budget of 400"))).toBe(true);
+});
+
+test("a null budget is not yet a budget and asks for nothing", () => {
+  const found = violations(
+    { ...budgets, services: { api: { p95Ms: null }, mcp: { p95Ms: null } } } as typeof budgets,
+    limits as Limits,
+    {},
+  );
+  expect(found.filter((line) => line.startsWith("services."))).toEqual([]);
+});
+
+// Iterated as a service, an underscore-prefixed commentary string yields its own characters as
+// metric names — measured, 179 violations from one comment. The `cre` branch has always skipped
+// them and this one has to as well.
+test("commentary keys under services are not budgets", () => {
+  const found = violations(
+    {
+      ...budgets,
+      services: { _note: "why this exists", api: { p95Ms: null }, mcp: { p95Ms: null } },
+    } as unknown as typeof budgets,
+    limits as Limits,
+    {},
+  );
+  expect(found.filter((line) => line.startsWith("services."))).toEqual([]);
+});

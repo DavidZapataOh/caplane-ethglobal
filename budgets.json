@@ -73,6 +73,10 @@
   },
   "web": { "firstLoadJsBytes": null, "lcpMs": null, "clsScore": null },
   "site": { "firstLoadJsBytes": null, "lcpMs": null, "clsScore": null },
-  "services": { "api": { "p95Ms": null }, "mcp": { "p95Ms": null } },
+  "services": {
+    "_p95Ms": "Client-observed round trip against the deployed service. It lands with the deploy: writing a number here without evidence/measured.json carrying it is now a violation, not a pass.",
+    "api": { "serveMs": 5, "p95Ms": null },
+    "mcp": { "p95Ms": null }
+  },
   "ci": { "hermeticJobSeconds": 300, "cleanCloneJobSeconds": 600 }
 }

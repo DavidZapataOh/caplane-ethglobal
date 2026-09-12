@@ -1,0 +1,20 @@
+Latency of the activity route, measured 2026-09-12 against the built artifact over loopback.
+
+  /activity   n=30   min 0.3   p50 0.4   p95 0.6   max 2.5 ms
+  /health     n=30                       p95 0.6 ms
+  body        16,506 bytes (17 events)
+
+The two are the same number, and that is the finding: the feed is served from memory, so it adds
+nothing measurable over a route that does no work at all. What a caller will actually see is network
+— measured separately, the deployed `/health` answers at p95 256 ms from a development machine, all
+of it round trip on a platform edge.
+
+So the budget is split, because one number cannot mean both things:
+
+  services.api.serveMs   5 ms     server-side cost of building the answer. Measured: 0.6.
+  services.api.p95Ms     null     client-observed round trip. Lands with the deploy.
+
+`p95Ms` stays null on purpose. The checker now treats a number with no measurement behind it as a
+violation, so writing 400 here today would be red in CI — which is the correct behaviour and the
+reason the branch was wired at all: before this, `budgets.services` was read by no code, and any
+number in it passed by never being looked at.

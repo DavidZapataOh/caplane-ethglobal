@@ -5,8 +5,10 @@
  * gate, so the two files could drift apart in silence — which is exactly how a quota is
  * discovered in production rather than in CI.
  *
- * Hermetic. No credentials, no network, no toolchain.
+ * Hermetic. No credentials, no network, no toolchain — it reads two committed files and, for the
+ * budgets that have no platform limit to resolve against, a committed measurement.
  */
+import { readFileSync } from "node:fs";
 import budgets from "../../budgets.json";
 import limits from "../../prod-limits.json";
 
@@ -58,8 +60,45 @@ const DERIVED: Record<string, (l: Limits) => number | undefined> = {
   "report.bodyBudgetBytes": (l) => bytesOf(l.ChainWrite.EVM.ReportSizeLimit),
 };
 
-export const violations = (b: typeof budgets, l: Limits): string[] => {
+/**
+ * The measurements a self-standing budget is compared against.
+ *
+ * `cre` is backed by the platform's own limits file, so it needs nothing else. A latency budget has
+ * no upstream limit to resolve — there is no such number in `prod-limits.json` and inventing one
+ * there would corrupt a verbatim copy of the platform's contract. So a services budget is tied to a
+ * measurement instead, and a budget with no measurement behind it is a violation rather than a pass:
+ * a number nothing compares reads as a gate and is not one.
+ */
+export const measured = (): Record<string, number> => {
+  try {
+    return JSON.parse(readFileSync("evidence/measured.json", "utf8")) as Record<string, number>;
+  } catch {
+    return {};
+  }
+};
+
+export const violations = (
+  b: typeof budgets,
+  l: Limits,
+  m: Record<string, number> = measured(),
+): string[] => {
   const found: string[] = [];
+
+  for (const [service, entries] of Object.entries(b.services).sort()) {
+    // Underscore-prefixed keys carry the reasoning inline, exactly as they do under `cre`. Iterated
+    // as a service, one of them yields its characters as metrics — measured, 179 violations.
+    if (service.startsWith("_")) continue;
+    for (const [metric, budget] of Object.entries(entries as Record<string, number | null>).sort()) {
+      if (metric.startsWith("_") || budget === null) continue;
+      const key = `services.${service}.${metric}`;
+      const seen = m[key];
+      if (seen === undefined) {
+        found.push(`${key} has no measurement behind it`);
+        continue;
+      }
+      if (seen > budget) found.push(`${key} ${seen} exceeds the budget of ${budget}`);
+    }
+  }
 
   for (const [key, value] of Object.entries(b.cre).sort()) {
     // Underscore-prefixed keys carry the reasoning inline; none of them is a number.

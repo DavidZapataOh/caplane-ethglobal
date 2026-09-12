@@ -1,0 +1,57 @@
+The activity feed against two independent derivations, 2026-09-12.
+
+The acceptance is not a 200: a service that answered [] forever would return the same 200
+against a chain holding seventeen logs. What is compared below is the count and the identity
+of every event, three ways — the feed, the JSON-RPC endpoint directly, and the block explorer,
+which decodes on its own and is not ours.
+
+--- 1. what the service serves ----------------------------------------------
+  source chain  chainId 5042002  indexedThrough 61752114  head 61752114
+  lagBlocks 0  stale false  truncated false  events 17
+    ClaimSubmitted       6
+    Deposit              2
+    Disbursed            1
+    LienRecorded         1
+    LienReleased         1
+    Paid                 1
+    Repaid               1
+    Settled              1
+    SubmissionRejected   1
+    Transfer             2
+  newest first: True
+  the rejection, named: reasonCode 1 -> AlreadyEncumbered
+--- 2. the endpoint directly, paged by hand ---------------------------------
+  pages 8  logs 17
+
+--- 3. the explorer, which decodes on its own and is not ours ---------------
+  0xe7170ee0…  3
+  0xc5218fd1…  6
+  0x4df4c8d7…  6
+  0x2bc74ceb…  2
+  total      17
+
+--- the three agree ---------------------------------------------------------
+  served events       17
+  rpc logs            17
+  identical, set-wise True
+
+--- the four inherited events, which a naive watcher loses --------------------
+
+`Transfer` 2 and `Deposit` 2 are ERC4626's, emitted by CaplanePool and declared in none of its
+source files. Four of seventeen — a quarter of the feed. The watcher is built from signatures, not
+from contracts/src, for exactly that reason; and the generated ABI would not have helped, since it
+carries the registry and the inbox and neither the pool nor the escrow.
+
+--- what is measured here and what is not ------------------------------------
+
+Measured: the feed equals the chain, three ways, and it names the rejection's reason from the frozen
+code table. The index holds no store — this run rebuilt all seventeen events from the deployment
+block in eight pages, which is what a restart does.
+
+NOT measured here, because it needs the service running on the platform:
+
+  * the client-observed p95, which is why `services.api.p95Ms` is still null rather than a number
+    with nothing behind it. See 00-latency.txt.
+  * the outage run — api, mcp and the harness stopped, and the registry still answering. That
+    belongs to the rehearsal, which owns the window: the same process also carries debtor
+    confirmation, so the outage costs two things and must not land mid-confirmation.
