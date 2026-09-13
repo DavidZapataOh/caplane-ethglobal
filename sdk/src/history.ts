@@ -25,7 +25,13 @@ export const DEPLOYED_AT = 61_681_981n
  * avoids it. The same backoff covers `-32005 rate limit exceeded`, which a seven-page scan reaches
  * if two of them run at once. A rejection that never clears is still raised.
  */
-export const withRetry = async <T>(ask: () => Promise<T>, baseDelayMs = 1_000): Promise<T> => {
+/**
+ * Two seconds of base, not one: five attempts then span just over a minute, and the public
+ * endpoint's rate-limit window outlasts the shorter budget. Measured — with one second, a suite
+ * that sweeps the deployed history more than a couple of times fails somewhere different on every
+ * run, which is the shape of a limit rather than of a bug.
+ */
+export const withRetry = async <T>(ask: () => Promise<T>, baseDelayMs = 2_000): Promise<T> => {
   for (let attempt = 0; ; attempt += 1) {
     try {
       return await ask()

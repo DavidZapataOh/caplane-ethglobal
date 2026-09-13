@@ -1,7 +1,13 @@
 import type { IconName } from '@caplane/brand/icon-names'
 import type { Pair } from './contrast'
 
-export type BadgeVariant = 'encumbered' | 'free' | 'verified' | 'released'
+export type BadgeVariant =
+  | 'encumbered'
+  | 'free'
+  | 'verified'
+  | 'released'
+  | 'pending'
+  | 'defaulted'
 
 /**
  * The brand's semantic-use table, transcribed: an encumbered claim is filled with the seal and is
@@ -40,5 +46,22 @@ export const BADGE_VARIANTS: Record<BadgeVariant, Pair & { className: string; ic
     bg: '--cp-ground',
     className: 'text-text-3',
     icon: 'released',
+  },
+  // A claim the enclave has not answered for. Not `free`: free means nobody has taken it, and
+  // saying that about one in flight tells a second financier the road is clear while the first is
+  // halfway down it.
+  pending: {
+    fg: '--cp-text-2',
+    bg: '--cp-ground',
+    className: 'text-text-2',
+    icon: 'loading',
+  },
+  // Terminal, and colourless for the same reason `released` is: the seal marks a live claim on
+  // something, and a defaulted lien is no longer one.
+  defaulted: {
+    fg: '--cp-text-3',
+    bg: '--cp-ground',
+    className: 'text-text-3',
+    icon: 'expired',
   },
 }
