@@ -24,3 +24,6 @@ contracts/lib/
 # The values live in .env, which is ignored above.
 # npm pack output: the tarball is how a consumer installs this, not something to track.
 *.tgz
+
+# Local git worktrees used to isolate plan implementation from the working tree.
+.worktrees/
