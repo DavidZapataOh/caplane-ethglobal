@@ -754,3 +754,30 @@ test("loopback anywhere else in the same file is still a finding", () => {
     ),
   ).toHaveLength(1);
 });
+
+// A performance run against the production build on a local port records that port in every asset
+// URL it saw. The record is not a service and cannot be reached; scrubbing it would make the
+// evidence less true than the run it describes.
+test("a loopback url inside a measurement record is not a finding", () => {
+  const s = snap({
+    files: [{ path: "evidence/site/01-lighthouse.json", content: '{"finalUrl":"http://localhost:3417/"}' }],
+  });
+  expect(noLoopbackUrls(s)).toEqual([]);
+});
+
+/**
+ * And the carve-out stays narrow in both directions.
+ *
+ * Source is still source. And the other rules still read evidence — which for these rules means
+ * evidence that carries a scanned extension: `isFirstPartySource` never matched `.txt` at all, so
+ * the only evidence file any of them has ever examined is a `.json`. That is worth knowing before
+ * anyone concludes from a clean run that the prose in `evidence/` was checked.
+ */
+test("a loopback url in source is still a finding, and evidence json is still scanned", () => {
+  expect(
+    noLoopbackUrls(snap({ files: [{ path: "web/app/page.tsx", content: 'fetch("http://localhost:3417/")' }] })),
+  ).toHaveLength(1);
+  expect(
+    noSprintReferences(snap({ files: [{ path: "evidence/site/01-lighthouse.json", content: '{"a":"Sprint-04"}' }] })),
+  ).toHaveLength(1);
+});

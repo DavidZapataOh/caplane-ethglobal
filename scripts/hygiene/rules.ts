@@ -70,9 +70,22 @@ export const noMockCallSites = (s: Snapshot): Finding[] =>
  */
 const RESOLVER_MAPPING = /--host-resolver-rules=[^"'\s]*(?:\s+[^"'\s]+)*/g;
 
+/**
+ * A measurement is not a service.
+ *
+ * `evidence/` records what was measured, and a browser performance run against the production build
+ * on a local port records that port in every asset URL it saw. Scrubbing it would make the record
+ * less true, and the rule protects against a service of ours being *reached* over loopback — which
+ * nothing under `evidence/` can do, because nothing under it is executed. Narrow to this rule
+ * rather than to the engine: a committed credential or a sprint reference in an evidence file is
+ * still a finding.
+ */
+const MEASUREMENT_RECORD = /^evidence\//;
+
 export const noLoopbackUrls = (s: Snapshot): Finding[] =>
   s.files
     .filter(isFirstPartySource)
+    .filter((f) => !MEASUREMENT_RECORD.test(f.path))
     .map((f) => ({ file: f, content: f.content.replace(RESOLVER_MAPPING, "") }))
     .filter((f) => LOOPBACK.test(f.content))
     .map((f) => ({
