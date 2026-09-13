@@ -9,10 +9,13 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
-    "test": "node --test --test-concurrency=1 --experimental-strip-types \"lib/**/*.test.ts\" \"*.test.ts\""
+    "test": "node --test --test-concurrency=1 --experimental-strip-types \"lib/**/*.test.ts\" \"*.test.ts\" \"scripts/docs/**/*.test.ts\""
   },
   "dependencies": {
     "@caplane/brand": "file:../brand",
+    "fumadocs-core": "16.15.10",
+    "fumadocs-mdx": "15.4.0",
+    "fumadocs-ui": "16.15.10",
     "next": "16.3.4",
     "react": "19.2.8",
     "react-dom": "19.2.8"
@@ -22,6 +25,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "caplane-sdk": "file:../sdk",
     "eslint": "^9",
     "eslint-config-next": "16.3.4",
     "tailwindcss": "^4",

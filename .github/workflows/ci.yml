@@ -171,10 +171,15 @@ jobs:
         working-directory: ${{ matrix.dir }}
       - run: npm run lint
         working-directory: ${{ matrix.dir }}
-      # NOT HERMETIC for `web`: the registry route's tests read the live registry over
-      # https://rpc.testnet.arc.io. The endpoint needs no credential but it does need the
-      # network and it rate-limits, so the files run one at a time.
-      - if: matrix.dir == 'web'
+      # `file:../sdk` installs a link to a package that has not been built, so the import fails at
+      # runtime with a missing dist/ — same reason `services/mcp` builds it above.
+      - if: matrix.dir == 'site'
+        run: npm ci && npm run build
+        working-directory: sdk
+      # NOT HERMETIC for `web` and `site`: the registry route's tests and the docs quickstart's
+      # example both read the live registry over https://rpc.testnet.arc.io. The endpoint needs no
+      # credential but it does need the network and it rate-limits, so the files run one at a time.
+      - if: matrix.dir == 'web' || matrix.dir == 'site'
         run: npm test
         working-directory: ${{ matrix.dir }}
       - run: npm run build
@@ -194,7 +199,9 @@ jobs:
               measure 'web.routes.dark/invest.firstLoadDeltaBytesGzip' dark/invest dark
             } > measured.jsonl
           else
-            measure site.firstLoadJsBytes dark > measured.jsonl
+            { measure site.firstLoadJsBytes dark
+              measure 'site.routes.paper/docs.firstLoadDeltaBytesGzip' paper/quickstart paper
+            } > measured.jsonl
           fi
           cat measured.jsonl
       # Core Web Vitals need a browser, so they are measured where the build already is. Chrome is

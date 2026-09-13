@@ -4,9 +4,17 @@ import { join } from 'node:path'
 const SCRIPTS_DOCS_DIR = import.meta.dirname
 
 /**
- * Copies a source file into a doc page verbatim, so the two can never read differently. A missing
- * source is not a failure: `THREATMODEL.md` and `RELATED-WORK.md` are written by later plans, and
- * this mirror runs on whatever exists today.
+ * MDX compiles to JSX, so an HTML comment is a syntax error there — Fumadocs' compiler rejects
+ * `<!-- ... -->` outright. Both source files this mirrors carry one of their own ("Generated
+ * from scripts/docs/..."), so the substitution has to survive the round trip, not just the
+ * header this module adds.
+ */
+const toMdxComments = (text: string) => text.replace(/<!--([\s\S]*?)-->/g, '{/*$1*/}')
+
+/**
+ * Copies a source file into a doc page verbatim (comment syntax aside), so the two can never read
+ * differently. A missing source is not a failure: `THREATMODEL.md` and `RELATED-WORK.md` are
+ * written by later plans, and this mirror runs on whatever exists today.
  */
 export const mirror = (
   sourcePathFromHere: string,
@@ -15,10 +23,10 @@ export const mirror = (
 ): 'written' | 'skipped' => {
   const sourcePath = join(SCRIPTS_DOCS_DIR, sourcePathFromHere)
   if (!existsSync(sourcePath)) return 'skipped'
-  const body = readFileSync(sourcePath, 'utf8')
+  const body = toMdxComments(readFileSync(sourcePath, 'utf8'))
   writeFileSync(
     join(SCRIPTS_DOCS_DIR, targetPathFromHere),
-    `---\ntitle: ${title}\n---\n\n<!-- generated from ${sourcePathFromHere}, do not edit -->\n\n${body}`,
+    `---\ntitle: ${title}\n---\n\n{/* generated from ${sourcePathFromHere}, do not edit */}\n\n${body}`,
   )
   return 'written'
 }
@@ -41,11 +49,12 @@ export const mirrorSection = (
 ): 'written' | 'skipped' => {
   const sourcePath = join(SCRIPTS_DOCS_DIR, sourcePathFromHere)
   if (!existsSync(sourcePath)) return 'skipped'
-  const body = extractSection(readFileSync(sourcePath, 'utf8'), heading)
-  if (body === undefined) return 'skipped'
+  const section = extractSection(readFileSync(sourcePath, 'utf8'), heading)
+  if (section === undefined) return 'skipped'
+  const body = toMdxComments(section)
   writeFileSync(
     join(SCRIPTS_DOCS_DIR, targetPathFromHere),
-    `---\ntitle: ${title}\n---\n\n<!-- generated from ${sourcePathFromHere}#${heading}, do not edit -->\n\n${body}\n`,
+    `---\ntitle: ${title}\n---\n\n{/* generated from ${sourcePathFromHere}#${heading}, do not edit */}\n\n${body}\n`,
   )
   return 'written'
 }

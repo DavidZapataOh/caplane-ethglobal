@@ -158,6 +158,21 @@ over stays inside.
 | Deployed on Arc | Four contracts, verified, [addresses below](#deployed-on-arc-testnet) |
 | Detailed documentation | This file, [`THREATMODEL.md`](THREATMODEL.md), [`RELATED-WORK.md`](RELATED-WORK.md), [`evidence/`](evidence/) |
 
+**On "deployed or deployment-ready on Arc mainnet".** Arc Public Mainnet launches on
+**16 September 2026** — three days after this submission closes. Today Arc is in private mainnet
+and the developer documentation still reads *"Arc is currently available on Testnet only"*, with no
+public mainnet RPC, chain id or explorer published. The reserved mainnet entry in the community
+chain registry carries an empty RPC list.
+
+More decisive than the date: **Chainlink supports Arc Testnet and not Arc mainnet.** Arc appears in
+CRE's testnet table and in CCIP's testnet directory, and in neither mainnet list. A registry whose
+only writer is a DON-consensused report therefore cannot follow Arc to mainnet until Chainlink does
+— and the alternative, relaying the verdict through a bridge of our own, would reintroduce exactly
+the operator this design exists to remove.
+
+So this is deployment-ready rather than deployed, and deliberately: same contracts, same EVM
+behaviour, no testnet-only dependency. Chain conformance is measured, not assumed.
+
 Arc is not a deployment target of convenience here. The registry settles in native USDC, and Arc&apos;s
 USDC-as-gas is what lets a business pay for a filing in the same unit it is financing in. Chain
 conformance is measured rather than assumed:

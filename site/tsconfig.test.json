@@ -3,6 +3,6 @@
   "compilerOptions": {
     "allowImportingTsExtensions": true
   },
-  "include": ["lib/**/*.test.ts", "next-env.d.ts"],
+  "include": ["lib/**/*.test.ts", "scripts/docs/**/*.test.ts", "next-env.d.ts"],
   "exclude": ["node_modules"]
 }

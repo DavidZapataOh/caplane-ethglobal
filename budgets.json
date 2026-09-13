@@ -107,8 +107,15 @@
     "_firstLoadJsBytes": "The same shell, measured at 173,904 B gzip. The two surfaces share a framework and a brand package, so they share a number."
   },
   "site": {
-    "firstLoadJsBytes": 190000,
-    "_firstLoadJsBytes": "The shell React and Next put on every page, measured at 173,483 B gzip. Budgeted with room: this number moves when the framework moves, and a budget set at the measurement would turn a Next patch into a red build with nothing to fix.",
+    "firstLoadJsBytes": 275000,
+    "_firstLoadJsBytes": "Measured at 249,726 B gzip, up from the pre-Fumadocs 173,483 B. `RootProvider` from `fumadocs-ui` wraps both trees in the shared `[mode]` layout — the search dialog needs its context wherever it mounts — so `dark` now pays the same shell cost as `paper` even though it renders no Fumadocs component of its own; the same residual already documented for `docs.css` on the `dark` branch. Budgeted with room over the real number rather than reverted: undoing it means splitting `dark`/`paper` into separate route files outside the shared `[mode]` segment, which belongs to the plan that owns `site/app/[mode]/layout.tsx`.",
+    "routes": {
+      "paper/docs": {
+        "firstLoadDeltaBytesGzip": 4000,
+        "against": "paper"
+      }
+    },
+    "_routes": "Measured 0 B, real: every doc page (quickstart, sdk, mcp, api, contracts, architecture) ships the exact same chunk set as the bare `paper` route, because `paper` itself renders through `DocsLayout` — it *is* the index doc page — and already pays the full Fumadocs cost. `paper/quickstart` is the concrete route CI measures, standing in for the docs section: there is no separate `/paper/docs` URL, since `lib/source.ts` mounts the doc tree at the root of `paper` rather than under a `/docs` prefix. Budgeted with a little room for a future page that adds its own client component, not at the measured line — nowhere near the 25 KB starting estimate or its 80 KB abandonment threshold.",
     "vitals": {
       "lcpMs": 3000,
       "clsScore": 0.1,
