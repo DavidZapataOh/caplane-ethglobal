@@ -399,7 +399,7 @@ export const brandInvariants = (s: Snapshot): Finding[] => {
  * registry's deployment whether or not anyone intended it. The guarantee therefore has to be a
  * property of the code path.
  */
-const REGISTRY_ROUTE = /(^|\/)web\/app\/(\[[^\]]+\]\/)?registry\//;
+const REGISTRY_ROUTE = /(^|\/)web\/app\/(\[[^\]]+\]\/)?(registry|harness)\//;
 const BACKEND_REFERENCE = /api\.caplane\.xyz|NEXT_PUBLIC_API_URL|CAPLANE_API_URL/;
 
 export const registryReadsChainOnly = (s: Snapshot): Finding[] =>

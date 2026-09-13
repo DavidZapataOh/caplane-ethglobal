@@ -10,7 +10,7 @@ import { DataRow } from '../../../components/data-row'
 import { Field } from '../../../components/field'
 import { Icon } from '../../../components/icon'
 import { FindDebtor } from './find-debtor'
-import { buildEnvelope } from './seal'
+import { buildEnvelope } from '../../../../claim/seal'
 import { watchVerdict } from './verdict'
 import { ARC, API, INBOX, inboxAbi, submissionIdOf } from './inbox'
 

@@ -28,7 +28,7 @@ export const DELIVERABLES: readonly Deliverable[] = [
     href: 'https://github.com/DavidZapataOh/caplane-ethglobal/blob/main/THREATMODEL.md',
     category: 'differentiator',
   },
-  { id: 12, label: 'Adversarial harness', href: 'https://REPLACE_WITH_HARNESS_PANEL_URL', category: 'differentiator' },
+  { id: 12, label: 'Adversarial harness', href: 'https://app.caplane.xyz/harness', category: 'differentiator' },
 ] as const
 
 export function assertDeliverablesComplete(list: readonly Deliverable[]): void {

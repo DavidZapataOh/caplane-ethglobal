@@ -9,7 +9,7 @@ import { toComponents } from '../../../../claim/index.ts'
 import { claimIdOf } from '../../../../claim/commit.ts'
 import { open } from '../../../../caplane-workflow/envelope.ts'
 import { decodeClaim } from '../../../../caplane-workflow/ledger.ts'
-import { buildEnvelope } from './seal.ts'
+import { buildEnvelope } from '../../../../claim/seal.ts'
 
 const REGISTRY = '0xe7170ee0ce4cab4593970ef5c4ebf7d0d62ae19b' as const
 const SUBMITTER = privateKeyToAccount(`0x${'04'.repeat(32)}`)

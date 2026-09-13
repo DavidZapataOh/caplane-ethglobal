@@ -1,8 +1,8 @@
 import { type Hex, hexToBytes } from 'viem'
-import type { DebtorConfirmation } from '../../../../claim/attestation'
-import { seal } from '../../../../claim/envelope'
-import { ClaimType } from '../../../../claim/abi/frozen'
-import type { ClaimInput } from '../../../../claim/index'
+import type { DebtorConfirmation } from './attestation'
+import { seal } from './envelope'
+import { ClaimType } from './abi/frozen'
+import type { ClaimInput } from './index'
 
 /**
  * The plaintext the enclave decodes is not the claim alone: its decoder requires the debtor's

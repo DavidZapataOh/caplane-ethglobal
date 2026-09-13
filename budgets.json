@@ -126,6 +126,10 @@
       "serveMs": 5,
       "readMs": 900,
       "p95Ms": null
+    },
+    "_harness": "One signed submission per attempt. Gas is not the binding constraint \u2014 the funded key covers roughly thirteen thousand attempts \u2014 but a jump in it means the envelope grew, and the envelope is bounded by the log-trigger budget rather than by cost. The cadence is not a budget here: it is a default in the worker, pinned by its own test, because a number this file could not measure would read as a gate and not be one.",
+    "harness": {
+      "gasPerAttempt": 70000
     }
   },
   "ci": {

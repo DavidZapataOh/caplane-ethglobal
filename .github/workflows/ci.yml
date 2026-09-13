@@ -132,7 +132,9 @@ jobs:
       - if: matrix.dir == 'services/mcp'
         run: npm ci && npm run build
         working-directory: sdk
-      - if: matrix.dir == 'brand' || matrix.dir == 'sdk' || matrix.dir == 'services/api' || matrix.dir == 'services/mcp'
+      # The harness suite is hermetic on purpose: this job is required by name before a release,
+      # so a test of it that wanted a funded key would block every promotion for ever.
+      - if: matrix.dir == 'brand' || matrix.dir == 'sdk' || matrix.dir == 'services/api' || matrix.dir == 'services/mcp' || matrix.dir == 'services/harness'
         run: npm test
         working-directory: ${{ matrix.dir }}
 

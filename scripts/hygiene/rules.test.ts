@@ -444,6 +444,16 @@ test("the rule follows the registry wherever its route lives", () => {
   expect(registryReadsChainOnly(s)).toHaveLength(1);
 });
 
+// The adversarial panel carries the same guarantee for the same reason, and it carries an extra
+// one: the rehearsal deliberately stops the API to show the registry outliving it, and a panel
+// that read the API would go dark in the middle of the demonstration it exists to make.
+test("the adversarial panel reads the chain too", () => {
+  const s = snap({
+    files: [{ path: "web/app/[mode]/harness/series.ts", content: 'fetch(`${process.env.NEXT_PUBLIC_API_URL}/activity`)' }],
+  });
+  expect(registryReadsChainOnly(s)).toHaveLength(1);
+});
+
 // Intl is not in the SDK's restricted-API types and its build validator does not catch it, so
 // code using it typechecks, compiles, and throws inside the enclave. toLocaleUpperCase is
 // worse: it does not throw, it returns different bytes.

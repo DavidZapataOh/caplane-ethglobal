@@ -12,5 +12,6 @@
   "web.routes.paper/registry.firstLoadDeltaBytesGzip": 5228,
   "site.vitals.lcpMs": 2563,
   "site.vitals.clsScore": 0,
-  "site.vitals.tbtMs": 59
+  "site.vitals.tbtMs": 59,
+  "services.harness.gasPerAttempt": 68350
 }

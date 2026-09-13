@@ -1,0 +1,108 @@
+The adversarial run, against the deployed registry. Measured 2026-09-13.
+
+A worker attempts to pledge a receivable that is already pledged, from its own funded address, and
+the registry refuses it every time. What follows is read from the chain rather than from the
+worker's own account of itself, because the worker is the thing under test.
+
+--- ten attempts, ten refusals -------------------------------------------------
+
+    submitter      0xA687F2A567B6d26Dd0E45F08d5ec40f0a25454e7
+    target lien    0xebd60de9b8c99e6bde3ce7ad1894177e706e75c0120c192da71400a378ae7e4c
+    receivable     ORC1043, 275,000.00 AUD, due 2026-12-31, recorded and active
+
+    submissions from that address   10
+    verdicts for those submissions  10
+    by reason                       {"1": 10}      1 = AlreadyEncumbered
+    blocks                          61,897,881 → 61,898,649
+
+    one attempt, opened:
+      submission   0x5c7428449765173781a2d8627dff7c95f9d2e897479876e2e03af11c0a36075f
+      transaction  0x58d33e2833c329159a1d1b68eb353036b62912d507f18ec77deb98f9ee0ac6b8
+      submitted    block 61,897,881, status 1, 68,350 gas
+      refused      block 61,897,909, reason 1 — 28 blocks, about fourteen seconds
+
+Each attempt is the same claim sealed again, never the same bytes replayed. The submission id is
+`keccak256(sender ‖ ciphertext)` and the inbox refuses an id it has seen, but the envelope carries a
+fresh ephemeral key and nonce, so one claim yields a different id every time. What is identical is
+the claim; what differs is its wrapping.
+
+--- why a refusal is not counted as a refusal ---------------------------------
+
+The registry publishes reason 1 for two different facts. One is a live lien refusing a second
+claim. The other is a registry the enclave could not read: an undecidable collision check is sent
+into the same arm deliberately, because neither of them approves. From the chain they are one event.
+
+So a refusal alone is never counted here. An attempt counts only beside two readings taken
+separately and after the verdict: the target still encumbered, and the registry answering its own
+identity call. Either missing and the attempt is filed as undecidable.
+
+    bounced       10
+    undecidable    0
+    unexpected     0
+
+Proved in both directions rather than asserted — `services/harness/src/classify.test.ts`:
+a refusal with an unreachable registry is undecidable; a refusal against a released target is
+undecidable; a refusal for any reason other than 1 is named and not counted; and a *recorded* lien
+is reported as an emergency, because a harness that succeeded would be the registry-poisoning
+attack run by us, in a loop.
+
+WHAT THIS DOES NOT CLOSE: the read that fails in the bad case is the enclave's, and the one checked
+here is the worker's own, from another client moments later. A node-side outage with a healthy
+endpoint on this side would still be counted as a bounce. The window is narrowed, not closed.
+Closing it would need CRE execution telemetry, which has no public surface a reader could check.
+
+--- what the worker's own journal recorded ------------------------------------
+
+Nine of the ten. The chain holds ten and the worker wrote nine, because a bounded run stopped
+before its last write. The gap is in the worker's record, not in the run, and it is why the numbers
+above come from the chain. Fixed in `src/loop.ts`: the journal is written after every iteration and
+once more on the way out.
+
+--- reformatting, and why it is not on this list ------------------------------
+
+The stated shape of this deliverable was "reformatted fields bouncing". They cannot bounce, and not
+for want of trying. The collision check is the last of five, and the four before it pin every
+component a submitter could vary:
+
+    debtorTaxId, issuerTaxId, country   overwritten by the enclave from the ledger
+    invoiceNumber                       interpolated literally into the ledger query
+    amountMinor, currency, dueDate      compared exactly against the invoice, twice — once by the
+                                        ledger check and again by the debtor's confirmation
+
+A reformatted claim is therefore refused earlier and for a different reason — SourceUnverified, not
+AlreadyEncumbered. On chain this can only ever be seven of seven. The tolerance the index has is
+real and is measured where it lives, against the same matcher the enclave imports
+(`web/app/[mode]/harness/reformatting.bun-test.ts`, over `evidence/data/02-invoice-corpus.json`):
+six real renderings of one invoice all score at or above the threshold of six, and the seventh
+entry — a genuinely different receivable — scores far below it.
+
+One tempting shortcut was refused. `evidence/claim/09-rates.txt` records one pair in 903 that
+agrees at six: ORC1003 and ORC1008, two real invoices to the same debtor for the same amount on the
+same date. Encumbering one and showing the other bounce would be a live six-of-seven — and it would
+be the measured false match dressed up as a defence. It is a known cost of the threshold, not a
+property worth demonstrating.
+
+--- cost ----------------------------------------------------------------------
+
+    gas per attempt        68,350   (budget 70,000, gated in budgets.json)
+    cost per attempt       0.00145 native at 21 gwei
+    signer balance         20 native — about 13,700 attempts
+    ledger reads           2 per attempt, against a tenant allowance of 5,000 a day
+    shipped cadence        one attempt per 900,000 ms — 96 a day, 192 ledger reads, 3.8% of it
+
+The cadence is that division and not a preference. At the sixty seconds the worker scaffold shipped
+with, it alone would spend 2,880 ledger reads a day — more than half the allowance a person needs
+to pledge a real receivable.
+
+The ledger's remaining daily allowance was read from the response headers before and after the run
+(935, then 924). That difference is NOT the harness's consumption: the counter is a rolling window
+and other calls were made in between. The honest figure is the derived one above.
+
+--- reproducing it ------------------------------------------------------------
+
+    cd services/harness && npm run typecheck && npm test        # 17 hermetic tests, no credentials
+    npm run build && HARNESS_ITERATIONS=1 npm start             # one real attempt
+
+The panel is at app.caplane.xyz/harness. It reads the inbox and the registry directly and names no
+service of ours, so it keeps answering while our own indexer is switched off — which is the
+demonstration the rest of the system exists to survive.
