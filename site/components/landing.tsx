@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
+import mark from '../public/caplane-mark.png'
 import { Icon } from './icon'
 import type { IconName } from '@caplane/brand/icon-names'
 import {
@@ -49,7 +51,13 @@ function Nav() {
   return (
     <header className="sticky top-0 z-10 border-b border-border bg-ground/95 backdrop-blur">
       <nav className="mx-auto flex max-w-6xl items-center justify-between gap-6 px-6 py-4">
-        <Link href="/" className="font-display text-lg font-medium tracking-[-0.03em] text-text">
+        <Link
+          href="/"
+          className="flex items-center gap-2.5 font-display text-lg font-medium tracking-[-0.03em] text-text"
+        >
+          {/* Priority: the lockup is the first thing above the fold, and a mark that arrives after
+              the wordmark reads as a page still loading. */}
+          <Image src={mark} alt="" width={32} height={32} priority className="shrink-0" />
           Caplane
         </Link>
         <ul className="hidden items-center gap-8 text-sm text-text-2 md:flex">
@@ -552,7 +560,10 @@ function Footer() {
     <footer className="mx-auto max-w-6xl px-6 pt-20 pb-12">
       <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-5">
         <div className="lg:col-span-1">
-          <p className="font-display text-lg font-medium text-text">Caplane</p>
+          <p className="flex items-center gap-2.5 font-display text-lg font-medium text-text">
+            <Image src={mark} alt="" width={32} height={32} className="shrink-0" />
+            Caplane
+          </p>
           <p className="mt-3 text-sm leading-[1.6] text-text-3">
             Capital plane: the layer that records which capital is already committed.
           </p>

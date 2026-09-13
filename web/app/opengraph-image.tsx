@@ -12,7 +12,7 @@ export const contentType = 'image/png'
  * Read from disk and inlined rather than referenced by URL. The card is rendered where no server is
  * listening yet, so a relative `src` resolves to nothing and the mark silently does not appear.
  */
-const mark = `data:image/png;base64,${readFileSync(join(process.cwd(), 'app', 'mark.png')).toString('base64')}`
+const mark = `data:image/png;base64,${readFileSync(join(process.cwd(), 'public', 'caplane-mark.png')).toString('base64')}`
 
 export default function OpengraphImage() {
   return new ImageResponse(
