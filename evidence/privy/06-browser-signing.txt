@@ -1,0 +1,43 @@
+Whether Privy's browser SDK can broadcast on Arc. Measured 2026-09-13, by a person.
+
+The question, and why it could not be answered by reading: the server SDK is refused outright —
+`eth_sendTransaction` with `caip2: eip155:5042002` answers `401 App is not authorized to transact on
+chain eip155:5042002`, which is an authorisation set per application and per chain. Nothing in the
+documentation says whether the browser SDK crosses the same gate. They are different products of one
+provider, and a guess either way decides how the submission page is built.
+
+So it was measured, through the page that already makes exactly that call — the investor console's
+deposit path uses `wallet.getEthereumProvider()` and `eth_sendTransaction`, the same two lines the
+submission page uses.
+
+  approval    0x435587b195ce752dec5fe10f07cf1f4c8961ea5e2dd27d71315e4d7a4dd07be3
+              status 0x1   block 61,875,049   to 0x3600…0000 (the asset)
+  deposit     0x8a6e80e0dd2b96acb34b6480218ef562da881e1dca0c11bd743199cbda48dadc
+              status 0x1   block 61,876,218   to 0x4df4…5d7c (the pool)   4 events
+  from        0x68905da737e5a11E3A93AB6CeC2eA8b145fce961   a Privy embedded wallet
+
+  position    0 -> 0.009900989492451795 cpUSDC
+  worth       0 -> 0.009999 USDC
+  pool holds  16.160001 -> 16.170001 USDC
+
+The shares are worth slightly less than one hundredth because the pool already carries earnings, so
+a hundredth of a USDC buys a little under a hundredth of a share. That is the share price working,
+not a rounding artefact.
+
+**The gate does not apply to the browser.** The submission page keeps `eth_sendTransaction` and
+needs no fallback. The server-side finding stands where it was measured — on the server.
+
+--- and what a person found that no test had ------------------------------------
+
+Two defects surfaced in the five minutes this took, both invisible to an automated suite because
+both only exist for someone using the page:
+
+  The wallet's address was never shown. A visitor cannot fund a wallet whose address they cannot
+  read, so the flow was unreachable from a fresh login however correct the code underneath was.
+
+  After the approval the button stayed disabled on "Approving" for good: the deposit returned early
+  and left the stage there, stranding the visitor one click short of what they had asked for. An
+  approval is a step, not an outcome.
+
+Both fixed. The second is held by a test that states the rule — an allowance already at the
+requested amount goes straight to the deposit — so the dead end cannot come back quietly.

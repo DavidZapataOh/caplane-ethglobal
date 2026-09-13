@@ -25,7 +25,7 @@ import {
 const CHAIN_ID = '0x4cef52'
 const USDC = '0x3600000000000000000000000000000000000000'
 
-type Stage = 'idle' | 'reading' | 'approving' | 'depositing' | 'redeeming' | 'error'
+type Stage = 'idle' | 'reading' | 'approving' | 'approved' | 'depositing' | 'redeeming' | 'error'
 
 /**
  * Deposit, position and redeem against the pool, read straight from the chain and signed by the
@@ -85,6 +85,9 @@ export function Invest() {
       if (nextDepositStep(allowance, assets) === 'approve') {
         setStage('approving')
         setHash(await send(USDC, encodeApprove(assets)))
+        // An approval is a step, not an outcome: leaving the stage here disabled the button for
+        // good and stranded the visitor one click short of the deposit they asked for.
+        setStage('approved')
         return
       }
       setStage('depositing')
@@ -136,6 +139,14 @@ export function Invest() {
   return (
     <div className="mt-6 flex max-w-3xl flex-col gap-6">
       <dl className="border border-border">
+        {/* First, because a visitor cannot fund a wallet whose address they cannot read. */}
+        <DataRow
+          label="your wallet"
+          value={address ?? '—'}
+          {...(address === undefined
+            ? {}
+            : { onCopy: () => void navigator.clipboard.writeText(address) })}
+        />
         <DataRow label="pool" value={POOL} />
         <DataRow
           label="pool holds"
@@ -169,9 +180,21 @@ export function Invest() {
           hint="The first deposit from a wallet needs an approval transaction before it."
         />
         <div>
-          <Button variant="primary" onClick={() => void deposit()} disabled={stage !== 'idle'}>
-            <Icon name={stage === 'idle' ? 'usdc' : 'loading'} />
-            {stage === 'approving' ? 'Approving' : stage === 'depositing' ? 'Depositing' : 'Deposit'}
+          <Button
+            variant="primary"
+            onClick={() => void deposit()}
+            disabled={stage === 'approving' || stage === 'depositing' || stage === 'reading'}
+          >
+            <Icon
+              name={stage === 'approving' || stage === 'depositing' ? 'loading' : 'usdc'}
+            />
+            {stage === 'approving'
+              ? 'Approving'
+              : stage === 'depositing'
+                ? 'Depositing'
+                : stage === 'approved'
+                  ? 'Approved — deposit now'
+                  : 'Deposit'}
           </Button>
         </div>
       </div>
