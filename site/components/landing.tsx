@@ -384,6 +384,41 @@ function Features() {
   )
 }
 
+function Architecture() {
+  return (
+    <section className="mx-auto mt-28 max-w-6xl px-6">
+      <h2 className="font-display text-3xl font-medium tracking-[-0.03em] text-text sm:text-4xl">
+        What you can switch off, and what you cannot.
+      </h2>
+      <p className="mt-6 max-w-2xl text-base leading-[1.65] text-text-2">
+        Most of this system is disposable. The indexer, the tool server, the adversarial worker and
+        these pages hold no authority: stop all four and a lien reads exactly the same, because the
+        public lookup reads the chain from your own browser. What is left is the part that cannot be
+        switched off — one entry point with no owner, an enclave where the claim is decided, and a
+        registry that accepts a write only from the network&apos;s own forwarder.
+      </p>
+      <div className="mt-10 overflow-x-auto border border-border bg-surface p-6">
+        {/* next/image would rasterise and re-encode an SVG that is already 40 KB of vector text,
+            and the diagram has to stay legible at any zoom a reader applies to it. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/architecture.svg"
+          alt="Caplane architecture: a lender seals a claim in the browser and sends it to the inbox; a confidential workflow inside a TEE opens it, reads the accounting ledger and the sanctions list, checks the registry for a collision and reports through the DON forwarder, which is the only caller the registry accepts. The indexer, MCP server, adversarial harness and web surfaces sit outside that path and carry no trust."
+          width={1400}
+          height={1360}
+          className="min-w-[46rem] max-w-none"
+        />
+      </div>
+      <p className="mt-4 max-w-2xl text-sm leading-[1.65] text-text-3">
+        One piece sits between: the confirmation service resolves the debtor&apos;s address from the
+        accounting ledger and never accepts one from the caller. The enclave cannot prove the key
+        that signed belongs to the debtor, so the link arriving at an address only the ledger knows
+        is the whole anchor. It is the weakest link, and it is named rather than hidden.
+      </p>
+    </section>
+  )
+}
+
 function Segments() {
   const segments = [
     {
@@ -495,8 +530,8 @@ function Limits() {
       body: 'Confidentiality depends on hardware attestation, not on pure cryptography. We say so rather than hide it.',
     },
     {
-      title: 'No lien is active today',
-      body: 'The only lien recorded so far has been repaid and released, which is why the panel above is a replay.',
+      title: 'One receivable, pledged and re-pledged',
+      body: 'The registry holds a single lien. It was recorded, released, and recorded again — everything shown here happened to that one claim.',
     },
     {
       title: 'Our API is disposable',
@@ -620,6 +655,7 @@ export function Landing() {
         <ProductPanel />
         <BuiltOn />
         <Features />
+        <Architecture />
         <Segments />
         <Receipts />
         <Quote />

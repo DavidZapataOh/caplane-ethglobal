@@ -28,6 +28,9 @@ test('the root metadata routes are left alone', () => {
     '/opengraph-image',
     '/favicon.ico',
     '/robots.txt',
+    // Middleware runs before a file in `public/` is served, so an asset the page loads by URL is
+    // rewritten like a route and answers 404 — the image renders as its own alt text.
+    '/architecture.svg',
   ]) {
     assert.equal(matcher.test(path), false, `${path} must not be rewritten`)
   }
@@ -42,4 +45,21 @@ test('the pages a visitor types still are', () => {
 test('the build output and the certificate challenge stay out', () => {
   assert.equal(matcher.test('/_next/static/chunks/a.js'), false)
   assert.equal(matcher.test('/.well-known/acme-challenge/x'), false)
+})
+
+/**
+ * The general case, added after the same failure twice: first the favicon, then the architecture
+ * diagram. A page route in this app never carries a file extension, so anything that does is a file
+ * and must reach it unprefixed — without anyone remembering to name it here.
+ */
+test('any asset with an extension is left alone, named or not', () => {
+  for (const path of ['/architecture.svg', '/anything.png', '/a/nested/asset.woff2', '/x.json']) {
+    assert.equal(matcher.test(path), false, `${path} must not be rewritten`)
+  }
+})
+
+test('and a page is still a page', () => {
+  for (const path of ['/', '/docs', '/docs/getting-started']) {
+    assert.equal(matcher.test(path), true, `${path} must be rewritten`)
+  }
 })

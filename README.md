@@ -6,6 +6,92 @@ Two package managers by design: `caplane-workflow/` uses Bun because the
 Chainlink CRE SDK requires it; everything else uses npm. Each directory
 installs independently — there is no workspace linkage.
 
+## Architecture
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'background':'#0D0C0B','primaryColor':'#1a1a18','primaryTextColor':'#E6E3DF','primaryBorderColor':'#39352F','lineColor':'#6B6459','edgeLabelBackground':'#0D0C0B','tertiaryColor':'#131311','fontFamily':'ui-monospace, monospace','fontSize':'14px'}}}%%
+flowchart TB
+    lender["Lender<br/>seals the claim in the browser"]
+    debtor["Debtor<br/>signs a confirmation"]
+    anyone["Anyone<br/>reads the registry"]
+
+    subgraph anchor["Trusted for one thing: that the link reached the real debtor"]
+        confirm["Confirmation service<br/>resolves the address from the accounting ledger,<br/>never from the caller"]
+    end
+
+    subgraph trust["Carries the guarantee — none of it can be switched off"]
+        direction TB
+        inbox["CaplaneInbox<br/>the only entry point · no owner, no admin, no pause"]
+        tee["Confidential workflow, inside a TEE<br/>opens the envelope, verifies, decides"]
+        forwarder["KeystoneForwarder · DON consensus"]
+        registry["CaplaneRegistry<br/>onReport reverts unless the caller is the forwarder"]
+        pool["CaplanePool"]
+        escrow["CaplaneEscrow"]
+    end
+
+    subgraph outside["Third parties, read by the enclave itself"]
+        ledger["Accounting ledger"]
+        watchlist["Sanctions screening"]
+    end
+
+    subgraph convenience["Carries no trust — switch it all off and the registry answers the same"]
+        indexer["Activity indexer"]
+        app["Web surfaces"]
+        mcp["MCP server"]
+        harness["Adversarial harness"]
+    end
+
+    debtor -->|"EIP-712 signature"| confirm
+    confirm -.->|"travels inside the envelope"| lender
+    lender -->|"sealed envelope, one transaction"| inbox
+    inbox -->|"ClaimSubmitted, log trigger"| tee
+    tee --> ledger
+    tee --> watchlist
+    tee -->|"collision check"| registry
+    tee -->|"report"| forwarder
+    forwarder --> registry
+    registry --> pool
+    pool --> escrow
+    registry -.->|"events"| indexer
+    indexer -.-> app
+    mcp -.-> registry
+    harness -.->|"tries to pledge what is already pledged"| inbox
+    anyone -->|"reads the chain from their own browser"| registry
+
+    classDef trusted fill:#1f1d1a,stroke:#E6E3DF,color:#E6E3DF
+    classDef conv fill:#1a1a18,stroke:#39352F,color:#A39C93,stroke-dasharray:4 3
+    classDef ext fill:#14181a,stroke:#39352F,color:#A39C93
+    classDef actor fill:#0D0C0B,stroke:#6B6459,color:#E6E3DF
+    %% No seal red anywhere in here. That colour means one thing in this product — a receivable
+    %% that is encumbered right now — and spending it on "this box is important" would take the
+    %% meaning away from the only place it earns it.
+    class inbox,tee,forwarder,registry,pool,escrow trusted
+    class indexer,mcp,harness,app conv
+    class ledger,watchlist,confirm ext
+    class lender,debtor,anyone actor
+    style trust fill:#171614,stroke:#E6E3DF,color:#E6E3DF
+    style convenience fill:#131311,stroke:#39352F,color:#A39C93
+    style outside fill:#101314,stroke:#39352F,color:#A39C93
+    style anchor fill:#141210,stroke:#6B6459,color:#E6E3DF
+```
+
+**What can be switched off.** Everything in the dashed box is a convenience. The activity indexer,
+the MCP server, the harness and the web surfaces hold no authority and no state the registry needs:
+stop all four and a lien still reads the same, because the public lookup reads the chain from the
+visitor's own browser with nothing of ours in the path. This is demonstrated rather than claimed —
+the rehearsal stops `api.caplane.xyz` on camera and queries the registry afterwards.
+
+**What cannot.** The inbox is the only way in and has no owner, no admin and no pause. The registry
+accepts a write only from the DON's forwarder, under the right workflow owner and name; there is no
+operator key and no upgrade path, so no one — including us — can edit an entry. The enclave is where
+the claim is decrypted and decided, and it is the only place the plaintext exists.
+
+**One thing sits between.** The confirmation service is not a convenience and is not trusted with the
+record either. The enclave cannot establish that the key which signed a confirmation belongs to the
+debtor — the accounting ledger holds no chain address — so the whole anchor is that the link arrived
+at an address only the ledger knows. That service resolves the address itself and never accepts one
+from the caller. It is the weakest link in the chain and is declared as such rather than hidden.
+
 ## Toolchain
 
 Pinned so a clean machine reproduces this build:
