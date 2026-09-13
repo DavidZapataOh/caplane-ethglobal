@@ -30,6 +30,12 @@ jobs:
       - run: bun test
         working-directory: scripts/budgets
       - run: bun run scripts/budgets/check.ts
+      # Same job again, same reason: the threat model and the related work are generated from data
+      # that a test holds to account, and a document regenerated from edited data but never
+      # committed reads as authoritative while being stale.
+      - run: bun test
+        working-directory: scripts/docs
+      - run: bun run scripts/docs/check.ts
 
   contracts:
     runs-on: ubuntu-latest

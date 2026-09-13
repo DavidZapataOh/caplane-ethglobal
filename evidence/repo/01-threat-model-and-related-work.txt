@@ -1,0 +1,46 @@
+The threat model and the related work, generated rather than written. Measured 2026-09-13.
+
+Both documents are rendered from data in `scripts/docs/`, and the data is held to account by tests
+that run in the hermetic gate. The reason is not tidiness. Prose about a closure survives the
+refactor that removes the closure; a test that opens the anchored line does not.
+
+--- what the tests hold to account --------------------------------------------
+
+    15 tests across two files, no network, no credentials.
+
+    Six variants, no more and no fewer, by id.
+    Every closed variant names a `path:line` that exists on disk.
+    Each anchor lands on a line carrying the guard it claims:
+      unilateral-operator-registration  ->  revert NotForwarder      contracts/src/CaplaneRegistry.sol:57
+      near-collision-squatting          ->  THRESHOLD                claim/match.ts:39
+      preemptive-poisoning              ->  submitterOf              contracts/src/CaplaneInbox.sol:39
+    Two variants share one revert and say so with the same anchor.
+    The open variant is declared open and carries its price.
+    The renderer owns the word "Open", so the data cannot say it twice.
+
+    Three papers, by exact arXiv id with the version where the source gives one.
+    Every paper names both what this takes from it and where it departs.
+    The fourth reference is a note, not a fourth item: it offers no closure to diverge from.
+
+--- the gate that matters ------------------------------------------------------
+
+`scripts/docs/check.ts` refuses when a committed document is not what the data renders. Verified by
+negative control: appending one line by hand to THREATMODEL.md exits 1 and names the file; restoring
+it exits 0. Without this, editing the data and forgetting to regenerate leaves a document that reads
+as authoritative and is stale.
+
+--- the one that stays open ----------------------------------------------------
+
+Five variants are closed. Pre-emptive poisoning is not, and is published at its measured price:
+47,192 gas, $0.00094, measured 2026-09-09. It is not closeable against the frozen interface, and the
+two things that would close it — an envelope naming its own authorised sender, and a confirmation
+binding the creditor rather than only the invoice — are named as not built.
+
+Calling it mitigated would have cost nothing to write. The dossier's own rule is that an unrebutted
+defect is a defect at full price, and a defect dressed as closed is worse than one declared.
+
+--- reproducing it -------------------------------------------------------------
+
+    cd scripts/docs && bun test && bun run check.ts
+    node --experimental-strip-types scripts/docs/build-docs.mjs   # rewrites both documents
+    ./scripts/docs/build-diagram.sh                                # rewrites the landing's diagram

@@ -1,6 +1,6 @@
 # Evidence
 
-Ninety-seven files, measured rather than asserted. This page exists because a directory listing is
+Ninety-eight files, measured rather than asserted. This page exists because a directory listing is
 not a record: it tells a reader that work happened without telling them what any of it proves.
 
 Every claim below points at the file that carries it. Where a measurement is weaker than it looks,
@@ -64,6 +64,7 @@ including us — can write the record. These four carry it:
 | [`deploy/`](deploy) | DNS with TLS, the worker platform, variables, the deployment handoff, the deployed contracts, and verification. |
 | [`site/`](site), [`brand/`](brand) | The landing's own test output, Lighthouse, screenshots, and the brand handoff. |
 | [`storage/`](storage) | Storage layouts for the four contracts. |
+| [`repo/`](repo) | What the repository asserts about itself: the threat model and the related work, and the gate that stops either going stale. |
 
 Three files sit at the top level rather than in a surface: [`measured.json`](measured.json) is what
 the budget gate in CI compares against, [`test-count.json`](test-count.json) is the suite size the

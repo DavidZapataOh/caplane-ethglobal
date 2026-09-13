@@ -1,0 +1,33 @@
+# Threat model
+
+Six attack variants against the registry. No single mechanism closes more than one, which is
+the reason for listing them apart rather than as one claim about being secure.
+
+Five are closed and each names the line that closes it. One is priced and left open, because a
+mitigation that does not exist is not a mitigation, and an unrebutted defect costs less to
+declare than to be caught hiding.
+
+| Attack variant | Closure | Kind |
+|---|---|---|
+| **The original variant: a single operator wallet registers on a user's behalf.** | No operator wallet exists. `onReport` reverts unless the sender is the exact forwarder and the workflow name and owner both match. (`contracts/src/CaplaneRegistry.sol:57`) | cryptographic |
+| **Register someone else's receivable first, to block it — denial of service for the price of gas.** | **Open.** Measured 2026-09-09: 47,192 gas, $0.00094. Not closeable with the frozen interface — tying a lien to its disbursement would require the registry to know the pool, which is the governance this registry exists to avoid. What would close it, and is not built: an envelope that names its own authorised sender, and a debtor confirmation that binds the creditor rather than only the invoice. What survives regardless: the inbox keeps the submitter in contract state for ever, so an attempt stays provable after logs are pruned. (`contracts/src/CaplaneInbox.sol:39`) | open |
+| **Register something that matches k of the seven components without being the same right.** | A threshold calibrated against 903 pairs of real invoices, plus the debtor confirmation: a fabricated right is never confirmed by the party who would owe it. (`claim/match.ts:39`) | procedural |
+| **Show different lien states to different askers.** | There is no operator-served view to equivocate with. The state is a public `view`, read straight from a block explorer or the visitor’s own browser. (`contracts/src/CaplaneRegistry.sol:57`) | structural |
+| **Report as if from the enclave, without one.** | The forwarder relays only reports the DON signed, after verifying attestation. (`contracts/src/CaplaneRegistry.sol:57`) | cryptographic |
+| **Release someone else's lien.** | A release travels the same forwarder-only path as a record, and carries the repayment condition with it. (`contracts/src/CaplaneRegistry.sol:57`) | cryptographic |
+
+## On the open one
+
+Anyone can submit a claim over a receivable that is not theirs and have it refused — that is the
+registry working. What they can also do is submit one that is **accepted**, over a receivable
+someone else was about to finance, and block it. It costs a tenth of a cent.
+
+Two things would close it and neither is built. The sealed envelope would have to name the
+address allowed to submit it in a way a copier cannot reuse. And the confirmation a debtor signs
+would have to bind the creditor, not only the invoice — today a debtor can honestly confirm a
+real invoice that a stranger is financing.
+
+What holds regardless is the record: `CaplaneInbox` keeps the submitter of every submission in
+contract state, not in a log, so an attempt remains provable long after logs are pruned.
+
+<!-- Generated from scripts/docs/. Edit the data there, not this file. -->

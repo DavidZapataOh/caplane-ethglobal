@@ -92,6 +92,15 @@ debtor — the accounting ledger holds no chain address — so the whole anchor 
 at an address only the ledger knows. That service resolves the address itself and never accepts one
 from the caller. It is the weakest link in the chain and is declared as such rather than hidden.
 
+## Threat model and related work
+
+- [`THREATMODEL.md`](THREATMODEL.md) — six attack variants. Five are closed and each names the line
+  that closes it; one is priced and left open, because a mitigation that does not exist is not one.
+- [`RELATED-WORK.md`](RELATED-WORK.md) — three papers that describe this problem, and where this
+  design departs from each. One of the three it does not depart from at all, and says so.
+
+Both are generated from `scripts/docs/`. Editing them by hand fails CI.
+
 ## Toolchain
 
 Pinned so a clean machine reproduces this build:
