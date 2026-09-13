@@ -1,5 +1,11 @@
 {
   "name": "caplane-budgets",
   "private": true,
-  "scripts": { "test": "bun test" }
+  "scripts": {
+    "test": "bun test"
+  },
+  "devDependencies": {
+    "chrome-launcher": "1.2.1",
+    "lighthouse": "13.4.1"
+  }
 }

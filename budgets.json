@@ -80,18 +80,40 @@
     }
   },
   "web": {
-    "_registryDeltaGzipBytes": "What the public lookup route adds over the route that already existed, gzipped, measured from the prerendered HTML by scripts/budgets/first-load.mjs. The baseline is 173,508 B and is React and Next, not anything this route chose. The number that matters is the delta: the page reads the chain with no chain library, and the library it declined costs about 49 KB gzipped on its own.",
-    "registryDeltaGzipBytes": 8000,
-    "firstLoadJsBytes": null,
+    "firstLoadJsBytes": 190000,
     "lcpMs": null,
     "clsScore": null,
-    "investDeltaGzipBytes": 900000,
-    "_investDeltaGzipBytes": "The wallet SDK dominates: 815 KB gzip measured, and it is the cost of signing at all. Budgeted with room rather than at the line, because a Privy patch moving it 2% should not turn CI red on a number nobody chose."
+    "routes": {
+      "dark/invest": {
+        "firstLoadDeltaBytesGzip": 900000,
+        "against": "dark"
+      },
+      "dark/confirm": {
+        "firstLoadDeltaBytesGzip": 5000,
+        "against": "dark"
+      },
+      "paper/registry": {
+        "firstLoadDeltaBytesGzip": 8000,
+        "against": "paper"
+      }
+    },
+    "_routes": "Per route, against the shell it shares. The wallet SDK dominates the ones that sign \u2014 815 KB gzip measured on invest, and that is the cost of signing at all. Budgeted with room rather than at the line: a provider patch moving it two percent should not turn CI red against a number nobody chose.",
+    "vitals": {
+      "lcpMs": 3000,
+      "clsScore": 0.1,
+      "tbtMs": 200
+    },
+    "_vitals": "Lab numbers under Lighthouse default mobile throttling, which dominates LCP: the three surfaces measured 2467, 2465 and 2463 ms \u2014 within four milliseconds of each other, because what is being timed is the throttling profile more than the page. Budgeted at 3000 rather than at the standard's 2500 for that reason: a budget set on the measured line would flip red on runner variance and teach everyone to ignore it. CLS and TBT stay at the standard thresholds, because the measured 0 and 3.5-8 ms are nowhere near them and a regression there would be real.",
+    "_firstLoadJsBytes": "The same shell, measured at 173,904 B gzip. The two surfaces share a framework and a brand package, so they share a number."
   },
   "site": {
-    "firstLoadJsBytes": null,
-    "lcpMs": null,
-    "clsScore": null
+    "firstLoadJsBytes": 190000,
+    "_firstLoadJsBytes": "The shell React and Next put on every page, measured at 173,483 B gzip. Budgeted with room: this number moves when the framework moves, and a budget set at the measurement would turn a Next patch into a red build with nothing to fix.",
+    "vitals": {
+      "lcpMs": 3000,
+      "clsScore": 0.1,
+      "tbtMs": 200
+    }
   },
   "services": {
     "_p95Ms": "Client-observed round trip against the deployed service. It lands with the deploy: writing a number here without evidence/measured.json carrying it is now a violation, not a pass.",

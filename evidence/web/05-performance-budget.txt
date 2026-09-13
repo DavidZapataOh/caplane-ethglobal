@@ -1,0 +1,90 @@
+What the four surfaces serve, and what CI now refuses. Measured 2026-09-13.
+
+Every number here was produced by the same scripts CI runs, against a real production build served
+by `next start`, with a browser pinned by version — not by a tool that reports what a page ought to
+weigh.
+
+--- bytes, gzipped over the wire ------------------------------------------------
+
+  web  shell (dark)                    173,904     budget 190,000
+  site shell (dark)                    173,483     budget 190,000
+  web  paper/registry   delta            5,228     budget   8,000
+  web  dark/confirm     delta            2,880     budget   5,000
+  web  dark/invest      delta          815,054     budget 900,000
+
+The shells are React and Next and the brand package; the deltas are what each route adds on top.
+`dark/invest` is three orders of magnitude above its neighbours because it carries the wallet SDK,
+which is the cost of signing at all — and the reason the SDK is mounted on the segments that sign
+and never on the shared layout. The public registry, on the other side of that decision, adds five
+kilobytes.
+
+--- Core Web Vitals, under Lighthouse's default mobile throttling ---------------
+
+  surface                     LCP      CLS     TBT      budget
+  web  app.caplane.test/     2,467 ms    0     8 ms    3000 / 0.1 / 200
+  web  registry/registry     2,468 ms    0   3.5 ms
+  web  app/confirm           2,465 ms    0     8 ms
+  site localhost/            2,563 ms    0    59 ms    3000 / 0.1 / 200
+
+The three `web` surfaces land within four milliseconds of each other, which says more about the
+throttling profile than about the pages: what is being timed at that point is the simulated network,
+not the markup. That is why the LCP budget is 3,000 and not the standard's 2,500 — a budget set on
+the measured line flips red on runner variance and teaches everyone to ignore it. CLS and TBT keep
+the standard's thresholds, because the measured values are nowhere near them and a regression there
+would be a real one.
+
+`site` was measured separately and came in a hundred milliseconds slower. It is written here as
+measured rather than assumed equal to `web`: the two ship the same framework, and that is exactly
+the kind of resemblance that makes a copied number feel safe.
+
+--- the host is part of the measurement -----------------------------------------
+
+The mode is a property of the Host header — the proxy reads it and rewrites the path — so a page
+measured on `localhost` is a different page from the one a visitor gets. Chrome is pointed at the
+real host name and told where it lives:
+
+  node scripts/budgets/lighthouse.mjs http://registry.caplane.test:4100/registry \
+    "--host-resolver-rules=MAP registry.caplane.test:4100 127.0.0.1:4100"
+
+Verified both ways. With the flag the run reports metrics and the HTML comes back in paper mode.
+Without it:
+
+  Error: lighthouse could not measure the page: CHROME_INTERSTITIAL_ERROR
+
+--- the gap that measuring found ------------------------------------------------
+
+That failure is how a real defect surfaced. Before it was fixed, the same run without the flag
+printed:
+
+  {"url":"http://registry.caplane.test:4100/registry"}
+
+No metrics, no error, exit zero. Lighthouse answers a failed navigation with the audits present and
+their numbers absent, `JSON.stringify` drops undefined keys, and the result clears every budget by
+carrying nothing to compare. The measurer now refuses three ways: a run Lighthouse itself flags as
+failed, an audit that is missing, and an audit present with no number.
+
+--- and the gap the budget checker had ------------------------------------------
+
+Three times, in the same place. `site` was never walked at all — its three budgets sat at `null` and
+nothing read them. Then per-route budgets were walked only because the key was called `routes`. Then
+`vitals` — nested the same way, named differently — went straight past the "not a number, ignore it"
+filter with its budget decorative. The checker now walks nested objects generically, which is what
+stops the fourth occurrence.
+
+Each fix is held by a test that fails without it, and the gate is shown to discriminate rather than
+to pass:
+
+  web.routes.dark/invest.firstLoadDeltaBytesGzip 950000 exceeds the budget of 900000
+  web.vitals.lcpMs 3200 exceeds the budget of 3000
+
+--- where this runs -------------------------------------------------------------
+
+Each matrix branch measures its own surface and uploads the numbers; a job that waits for both
+downloads them, merges them into `evidence/measured.json`, and runs the check. Two branches on two
+runners cannot see each other's disk, so merging in either one would have compared against a file
+that was never written — a check that passes because half its inputs are missing.
+
+  cd web && npm run build && npx next start --port 4100
+  CHROME_PATH=… node scripts/budgets/lighthouse.mjs http://app.caplane.test:4100/ \
+    "--host-resolver-rules=MAP app.caplane.test:4100 127.0.0.1:4100"
+  bun run scripts/budgets/check.ts

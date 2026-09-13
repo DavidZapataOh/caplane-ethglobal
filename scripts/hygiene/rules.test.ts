@@ -11,6 +11,7 @@ import {
   noTemplateMockServer,
   noSprintReferences,
   servicesCannotReadTheLedgerInvoice,
+  noLoopbackUrls,
   noShadowUtilities,
   noPlanningVocabulary,
   noForbiddenCreIdentifiers,
@@ -705,6 +706,39 @@ test("a shadow utility in an object's className property is still a finding", ()
       snap({
         files: [
           { path: "web/components/button-variants.ts", content: "className: 'bg-text shadow-lg'" },
+        ],
+      }),
+    ),
+  ).toHaveLength(1);
+});
+
+test("a loopback address inside a browser host-resolver mapping is not a service call", () => {
+  // The rule exists to stop a service of ours being reached over loopback — a stand-in for the
+  // real thing. Pointing a host name at the app's own production build so a browser can measure
+  // it is the opposite: there is no second implementation, it is the same build that ships.
+  expect(
+    noLoopbackUrls(
+      snap({
+        files: [
+          {
+            path: ".github/workflows/ci.yml",
+            content: 'run: node lighthouse.mjs "--host-resolver-rules=MAP app.caplane.test:4100 127.0.0.1:4100"',
+          },
+        ],
+      }),
+    ),
+  ).toEqual([]);
+});
+
+test("loopback anywhere else in the same file is still a finding", () => {
+  expect(
+    noLoopbackUrls(
+      snap({
+        files: [
+          {
+            path: ".github/workflows/ci.yml",
+            content: 'run: node lighthouse.mjs "--host-resolver-rules=MAP a.test:4100 127.0.0.1:4100"\n  API_URL: http://localhost:8787',
+          },
         ],
       }),
     ),

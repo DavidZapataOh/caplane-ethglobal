@@ -58,13 +58,26 @@ export const noMockCallSites = (s: Snapshot): Finding[] =>
     })),
   );
 
+/**
+ * A browser's host-resolver mapping is not a service call.
+ *
+ * The rule exists to stop a service of ours being reached over loopback — a local stand-in for the
+ * real thing. Pointing a host name at the app's own production build so a browser can measure it
+ * is the opposite of that: there is no second implementation involved, it is the build that ships,
+ * and the mapping exists only because the page's mode is a property of its Host header. The
+ * exception is written narrowly, on the flag itself, so an ordinary loopback URL in the same file
+ * is still a finding.
+ */
+const RESOLVER_MAPPING = /--host-resolver-rules=[^"'\s]*(?:\s+[^"'\s]+)*/g;
+
 export const noLoopbackUrls = (s: Snapshot): Finding[] =>
   s.files
     .filter(isFirstPartySource)
+    .map((f) => ({ file: f, content: f.content.replace(RESOLVER_MAPPING, "") }))
     .filter((f) => LOOPBACK.test(f.content))
     .map((f) => ({
       rule: "no-loopback-urls",
-      where: f.path,
+      where: f.file.path,
       detail: f.content.match(LOOPBACK)![0],
     }));
 

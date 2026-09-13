@@ -167,12 +167,82 @@ jobs:
       - run: npm run build
         working-directory: ${{ matrix.dir }}
       # Measured here rather than in the budgets job: that one is hermetic and never builds
-      # Next, so a number it reported would be a number nothing could fail on. The baseline is
-      # React and Next; what this route is answerable for is the delta, and the chain library
-      # it declined would have cost about 49 KB gzipped on its own.
-      - if: matrix.dir == 'web'
+      # Next, so a number it reported would be a number nothing could fail on.
+      - name: Measure what this surface serves
         working-directory: ${{ matrix.dir }}
-        run: node ../scripts/budgets/first-load.mjs .next paper/registry --against paper --budget 8000
+        run: |
+          set -e
+          measure() { node ../scripts/budgets/first-load.mjs .next "$2" ${3:+--against "$3"} \
+            | node -e "let i='';process.stdin.on('data',d=>i+=d).on('end',()=>{const r=JSON.parse(i);console.log(JSON.stringify({[process.argv[1]]:r.deltaGzipBytes??r.gzipBytes}))})" "$1"; }
+          if [ "${{ matrix.dir }}" = "web" ]; then
+            { measure web.firstLoadJsBytes dark
+              measure 'web.routes.paper/registry.firstLoadDeltaBytesGzip' paper/registry paper
+              measure 'web.routes.dark/confirm.firstLoadDeltaBytesGzip' dark/confirm dark
+              measure 'web.routes.dark/invest.firstLoadDeltaBytesGzip' dark/invest dark
+            } > measured.jsonl
+          else
+            measure site.firstLoadJsBytes dark > measured.jsonl
+          fi
+          cat measured.jsonl
+      # Core Web Vitals need a browser, so they are measured where the build already is. Chrome is
+      # pinned by version and CHROME_PATH is exported from the install: without it chrome-launcher
+      # finds whatever the runner happens to have, and the number stops being comparable.
+      - name: Install the pinned browser
+        run: echo "CHROME_PATH=$(npx --yes @puppeteer/browsers install chrome@140.0.7339.80 --path ~/.cache/chrome-for-testing | awk '{print $2}')" >> "$GITHUB_ENV"
+      - name: Measure Core Web Vitals against the host proxy
+        working-directory: ${{ matrix.dir }}
+        run: |
+          set -e
+          npx next start --port 4100 &
+          npx wait-on tcp:4100 --timeout 60000
+          if [ "${{ matrix.dir }}" = "web" ]; then
+            # Through the host the proxy expects, mapped by Chrome rather than by /etc/hosts: the
+            # mode is a property of the Host header, and a page measured on localhost is a
+            # different page from the one a visitor gets.
+            node ../scripts/budgets/lighthouse.mjs http://app.caplane.test:4100/ \
+              "--host-resolver-rules=MAP app.caplane.test:4100 127.0.0.1:4100" \
+              | node -e "let i='';process.stdin.on('data',d=>i+=d).on('end',()=>{const r=JSON.parse(i);console.log(JSON.stringify({'web.vitals.lcpMs':Math.round(r.lcpMs),'web.vitals.clsScore':r.clsScore,'web.vitals.tbtMs':Math.round(r.tbtMs)}))})" >> measured.jsonl
+          else
+            node ../scripts/budgets/lighthouse.mjs http://site.caplane.test:4100/ \
+              "--host-resolver-rules=MAP site.caplane.test:4100 127.0.0.1:4100" \
+              | node -e "let i='';process.stdin.on('data',d=>i+=d).on('end',()=>{const r=JSON.parse(i);console.log(JSON.stringify({'site.vitals.lcpMs':Math.round(r.lcpMs),'site.vitals.clsScore':r.clsScore,'site.vitals.tbtMs':Math.round(r.tbtMs)}))})" >> measured.jsonl
+          fi
+          cat measured.jsonl
+      - uses: actions/upload-artifact@v4
+        with:
+          name: measured-${{ matrix.dir }}
+          path: ${{ matrix.dir }}/measured.jsonl
+
+  # Each matrix branch runs on its own runner with its own disk, so neither can see the other's
+  # numbers. Merging them needs a job that waits for both and downloads what they uploaded — the
+  # only shape GitHub offers for this, and the reason the budget check moved here from `hygiene`,
+  # which never built anything it could compare against.
+  budgets-gate:
+    runs-on: ubuntu-latest
+    needs: [web]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with: { bun-version: 1.2.21 }
+      - uses: actions/download-artifact@v4
+        with: { pattern: measured-*, path: measured }
+      - name: Fuse every surface's measurements into one file
+        run: |
+          set -e
+          node -e "
+            const fs = require('fs');
+            const merged = JSON.parse(fs.readFileSync('evidence/measured.json', 'utf8'));
+            for (const dir of fs.readdirSync('measured')) {
+              for (const line of fs.readFileSync('measured/' + dir + '/measured.jsonl', 'utf8').split('\n')) {
+                if (line.trim() !== '') Object.assign(merged, JSON.parse(line));
+              }
+            }
+            fs.writeFileSync('evidence/measured.json', JSON.stringify(merged, null, 2) + '\n');
+            console.log(merged);
+          "
+      - run: bun install --frozen-lockfile
+        working-directory: scripts/budgets
+      - run: bun run scripts/budgets/check.ts
 
   workflow:
     runs-on: ubuntu-latest

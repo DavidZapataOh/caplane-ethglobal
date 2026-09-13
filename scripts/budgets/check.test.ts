@@ -122,3 +122,65 @@ test("a route that grew past its budget is a violation", () => {
   );
   expect(found.some((line) => line.includes("51000 exceeds the budget of 8000"))).toBe(true);
 });
+
+// en scripts/budgets/check.test.ts, junto a los tests existentes de la rama web
+test("a site budget with no measurement behind it is a violation, same as web", () => {
+  const b = { web: {}, site: { firstLoadJsBytes: 100 }, services: {}, cre: {} };
+  const found = violations(b as any, limits, {});
+  expect(found).toContain("site.firstLoadJsBytes has no measurement behind it");
+});
+
+test("a site measurement over its budget is a violation", () => {
+  const b = { web: {}, site: { firstLoadJsBytes: 100 }, services: {}, cre: {} };
+  const found = violations(b as any, limits, { "site.firstLoadJsBytes": 150 });
+  expect(found).toContain("site.firstLoadJsBytes 150 exceeds the budget of 100");
+});
+
+test("a site measurement within its budget is not a violation", () => {
+  const b = { web: {}, site: { firstLoadJsBytes: 100 }, services: {}, cre: {} };
+  expect(violations(b as any, limits, { "site.firstLoadJsBytes": 90 })).toEqual([]);
+});
+
+// The nested shape the investor console already committed to for per-route deltas — a plain "typeof !== number"
+// guard would silently skip this object forever, the same class of gap as b.site.
+test("a route budget with no measurement behind it is a violation, named by its full path", () => {
+  const b = { web: { routes: { "dark/invest": { firstLoadDeltaBytesGzip: 9000, against: "dark" } } }, site: {}, services: {}, cre: {} };
+  const found = violations(b as any, limits, {});
+  expect(found).toContain("web.routes.dark/invest.firstLoadDeltaBytesGzip has no measurement behind it");
+});
+
+test("a route measurement over its own budget is a violation, independent of any other route", () => {
+  const b = {
+    web: { routes: {
+      "dark/invest": { firstLoadDeltaBytesGzip: 9000, against: "dark" },
+      "dark/confirm": { firstLoadDeltaBytesGzip: 3000, against: "dark" },
+    } },
+    site: {}, services: {}, cre: {},
+  };
+  const found = violations(b as any, limits, {
+    "web.routes.dark/invest.firstLoadDeltaBytesGzip": 9500,
+    "web.routes.dark/confirm.firstLoadDeltaBytesGzip": 2000,
+  });
+  expect(found).toEqual(["web.routes.dark/invest.firstLoadDeltaBytesGzip 9500 exceeds the budget of 9000"]);
+});
+
+// The gap this file already closed twice, found a third time: a nested object under a surface was
+// skipped by the "not a number, ignore it" filter, and `routes` was special-cased by name. Anything
+// else nested — `vitals`, or whatever comes next — stayed invisible and its budget decorative.
+// Walking nested objects generically is what stops the fourth occurrence.
+test("a nested budget is walked whatever it is called, not only when it is `routes`", () => {
+  const b = { web: { vitals: { lcpMs: 3000 } }, site: {}, services: {}, cre: {} };
+  expect(violations(b as any, limits, {})).toContain("web.vitals.lcpMs has no measurement behind it");
+});
+
+test("a nested measurement over its budget is a violation, named by its full path", () => {
+  const b = { web: { vitals: { lcpMs: 3000 } }, site: {}, services: {}, cre: {} };
+  expect(violations(b as any, limits, { "web.vitals.lcpMs": 3500 })).toContain(
+    "web.vitals.lcpMs 3500 exceeds the budget of 3000",
+  );
+});
+
+test("a nested measurement within its budget is clean", () => {
+  const b = { web: { vitals: { lcpMs: 3000, clsScore: 0.1 } }, site: {}, services: {}, cre: {} };
+  expect(violations(b as any, limits, { "web.vitals.lcpMs": 2467, "web.vitals.clsScore": 0 })).toEqual([]);
+});

@@ -34,6 +34,9 @@ const secondsOf = (value: string): number | undefined => {
 
 type Limits = typeof limits;
 
+/** Both surfaces carry the same shape, so both are walked by the same loop. */
+const SURFACES = ["web", "site"] as const;
+
 /**
  * Where each budget's limit lives, resolved out of the platform file rather than copied from it.
  * A budget with no entry here is a violation, not a pass: a check that ignores what it does not
@@ -91,18 +94,32 @@ export const violations = (
 ): string[] => {
   const found: string[] = [];
 
-  for (const [surface, entries] of Object.entries(b.web).sort()) {
-    if (surface.startsWith("_")) continue;
-    if (entries === null) continue;
-    const key = `web.${surface}`;
-    const seen = m[key];
-    if (typeof entries !== "number") continue;
-    if (seen === undefined) {
-      found.push(`${key} has no measurement behind it`);
-      continue;
+  // Every surface with this shape, not just `web`, and every nesting level under it.
+  //
+  // Two gaps were closed here in turn and a third appeared anyway: `site` was never walked, then
+  // `routes` was walked only because it was named, and then `vitals` — a nested object nobody had
+  // special-cased — went straight past the "not a number, ignore it" filter with its budget
+  // decorative. Walking nested objects generically is what stops the fourth one: a budget nothing
+  // compares reads as a gate and is not one.
+  const walk = (prefix: string, entries: Record<string, unknown>) => {
+    for (const [key, value] of Object.entries(entries).sort()) {
+      if (key.startsWith("_") || value === null) continue;
+      const path = `${prefix}.${key}`;
+      if (typeof value === "object") {
+        walk(path, value as Record<string, unknown>);
+        continue;
+      }
+      // A route budget carries `against` beside its number; only the numbers are budgets.
+      if (typeof value !== "number") continue;
+      const seen = m[path];
+      if (seen === undefined) {
+        found.push(`${path} has no measurement behind it`);
+        continue;
+      }
+      if (seen > value) found.push(`${path} ${seen} exceeds the budget of ${value}`);
     }
-    if (seen > entries) found.push(`${key} ${seen} exceeds the budget of ${entries}`);
-  }
+  };
+  for (const surface of SURFACES) walk(surface, b[surface] as Record<string, unknown>);
 
   for (const [service, entries] of Object.entries(b.services).sort()) {
     // Underscore-prefixed keys carry the reasoning inline, exactly as they do under `cre`. Iterated
