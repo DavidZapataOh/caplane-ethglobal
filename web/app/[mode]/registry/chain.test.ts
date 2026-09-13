@@ -134,15 +134,33 @@ test('no chain library is imported by the public registry route', () => {
   }
 })
 
-// And the package still declares what it declares on purpose: viem stays a devDependency, because
-// one test derives the selectors with it and no shipped module may.
-test('viem is a development dependency of web, never a runtime one', () => {
+/**
+ * viem is a runtime dependency, and saying otherwise cost a deployment.
+ *
+ * It was declared in `devDependencies` on the reasoning that only a test derived the selectors with
+ * it and no shipped module could. That stopped being true when the submit surface began signing:
+ * `submit.tsx` and `submit/verdict.ts` import it, and the same goes for `caplane-sdk` on the claims
+ * surface. A production install drops devDependencies, so the build resolved neither and every app
+ * route 404'd while this test stayed green — a declaration guarding nothing, about a fact that had
+ * changed underneath it.
+ *
+ * What protects the public registry page is not the manifest. It is the test above, which reads the
+ * route's own sources and refuses any chain library reaching them, and the first-load budget that
+ * measures the result. This asserts the declaration matches what the code does, in the direction
+ * that actually breaks: a runtime import demoted to dev builds locally and fails in production.
+ */
+test('what the app signs with is declared as a runtime dependency', () => {
   const manifest = JSON.parse(readFileSync(new URL('../../../package.json', import.meta.url), 'utf8')) as {
     dependencies: Record<string, string>
     devDependencies: Record<string, string>
   }
-  assert.equal(manifest.dependencies.viem, undefined)
-  assert.ok(manifest.devDependencies.viem !== undefined, 'the selector pin needs it, in dev')
+  for (const shipped of ['viem', 'caplane-sdk']) {
+    assert.ok(
+      manifest.dependencies[shipped] !== undefined,
+      `${shipped} is imported by a shipped module, so a production install has to bring it`,
+    )
+    assert.equal(manifest.devDependencies[shipped], undefined, `${shipped} must be declared once`)
+  }
 })
 
 // Reflected origins plus credentials is a combination these endpoints do not advertise, and the

@@ -36,8 +36,14 @@ export function Harness() {
       })
   }, [])
 
-  const bounced = rows.filter((row) => row.reason === 1).length
-  const other = rows.filter((row) => row.reason !== undefined && row.reason !== 1).length
+  // Only once the chain has actually answered. A count rendered while the read is failing is a
+  // zero a reader takes for a fact — and the fact it states, that the worker never bounced, is the
+  // opposite of the truth the page exists to show.
+  const counted = state === 'done'
+  const bounced = counted ? String(rows.filter((row) => row.reason === 1).length) : '—'
+  const other = counted
+    ? String(rows.filter((row) => row.reason !== undefined && row.reason !== 1).length)
+    : '—'
 
   return (
     <div className="mt-6 flex max-w-3xl flex-col gap-8">
@@ -49,8 +55,8 @@ export function Harness() {
 
       <dl className="border border-border">
         <DataRow label="submitter" value={SUBMITTER} />
-        <DataRow label="refused as already pledged" value={String(bounced)} />
-        <DataRow label="refused for another reason" value={String(other)} />
+        <DataRow label="refused as already pledged" value={bounced} />
+        <DataRow label="refused for another reason" value={other} />
       </dl>
 
       {state === 'reading' && (

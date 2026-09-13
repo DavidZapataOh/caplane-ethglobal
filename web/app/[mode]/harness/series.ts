@@ -68,16 +68,38 @@ export const joinSeries = (submissions: Submission[], refusals: Refusal[]): Row[
     .sort((a, b) => Number(b.submittedAt - a.submittedAt))
 }
 
-const logs = async (params: Record<string, unknown>): Promise<Array<Record<string, never>>> => {
-  const response = await fetch(ENDPOINT, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_getLogs', params: [params] }),
-  })
-  const body = (await response.json()) as { result?: unknown; error?: { message: string } }
-  if (body.error !== undefined) throw new Error(body.error.message)
-  return (body.result ?? []) as Array<Record<string, never>>
+const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+/**
+ * Paced and retried, because the endpoint rate-limits and two sweeps plus a height read are a burst
+ * by nature. Measured on this page: the first deployment answered `429` and the panel reported no
+ * attempts at all — a page that said "none" about a worker that had bounced ten times.
+ *
+ * The spacing and the backoff are the ones the public lookup already had to discover, reused rather
+ * than rediscovered. A rejection that never clears is raised, never turned into an empty result:
+ * an empty series reads as "the worker is not running", which is a different claim entirely.
+ */
+const call = async (method: string, params: unknown[]): Promise<unknown> => {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      const response = await fetch(ENDPOINT, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+      })
+      const body = (await response.json()) as { result?: unknown; error?: { message: string } }
+      if (body.error !== undefined) throw new Error(body.error.message)
+      if (!response.ok) throw new Error(`rpc ${method} http ${response.status}`)
+      return body.result
+    } catch (error) {
+      if (attempt === 5) throw error
+      await pause(600 * 2 ** attempt)
+    }
+  }
 }
+
+const logs = async (params: Record<string, unknown>): Promise<Array<Record<string, never>>> =>
+  ((await call('eth_getLogs', [params])) ?? []) as Array<Record<string, never>>
 
 const padded = (address: string) => `0x${address.slice(2).toLowerCase().padStart(64, '0')}`
 
@@ -91,31 +113,54 @@ const padded = (address: string) => `0x${address.slice(2).toLowerCase().padStart
  */
 export const WINDOW_BLOCKS = 167_000n
 
+/**
+ * The largest span the endpoint answers, measured rather than assumed: 167,000 and 50,000 are both
+ * refused with `-32012 requested range too large`, 20,000 is answered. A single window-wide query
+ * therefore fails every retry and leaves the panel reading for ever — which is how the first
+ * deployment of this page behaved.
+ */
+const PAGE = 20_000n
+
+type Log = { topics: string[]; data: string; blockNumber: string }
+
+const sweep = async (
+  address: string,
+  topics: Array<string | string[] | null>,
+  from: bigint,
+  to: bigint,
+): Promise<Log[]> => {
+  const found: Log[] = []
+  for (let at = from; at <= to; at += PAGE) {
+    const end = at + PAGE - 1n > to ? to : at + PAGE - 1n
+    found.push(
+      ...((await logs({
+        address,
+        topics,
+        fromBlock: `0x${at.toString(16)}`,
+        toBlock: `0x${end.toString(16)}`,
+      })) as unknown as Log[]),
+    )
+    // Spacing for the visitor as much as for this page: it competes with everything else asking
+    // the same public endpoint.
+    if (end < to) await pause(300)
+  }
+  return found
+}
+
 export const readSeries = async (submitter: string): Promise<Row[]> => {
-  const head = BigInt(
-    (await (
-      await fetch(ENDPOINT, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_blockNumber', params: [] }),
-      })
-    ).json().then((b: { result: string }) => b.result)) as string,
+  const head = BigInt((await call('eth_blockNumber', [])) as string)
+  const from = head > WINDOW_BLOCKS ? head - WINDOW_BLOCKS : 0n
+
+  const submitted = await sweep(INBOX, [TOPICS.claimSubmitted, null, padded(submitter)], from, head)
+
+  // Only from the first attempt found, not from the top of the window. The verdicts cannot precede
+  // the submissions they answer, so anything earlier is pages spent to read nothing.
+  const earliest = submitted.reduce(
+    (lowest, log) => (BigInt(log.blockNumber) < lowest ? BigInt(log.blockNumber) : lowest),
+    head,
   )
-  const from = `0x${(head > WINDOW_BLOCKS ? head - WINDOW_BLOCKS : 0n).toString(16)}`
-
-  const submitted = (await logs({
-    address: INBOX,
-    fromBlock: from,
-    toBlock: 'latest',
-    topics: [TOPICS.claimSubmitted, null, padded(submitter)],
-  })) as unknown as Array<{ topics: string[]; blockNumber: string }>
-
-  const refused = (await logs({
-    address: REGISTRY,
-    fromBlock: from,
-    toBlock: 'latest',
-    topics: [TOPICS.submissionRejected],
-  })) as unknown as Array<{ topics: string[]; data: string; blockNumber: string }>
+  await pause(300)
+  const refused = await sweep(REGISTRY, [TOPICS.submissionRejected], earliest, head)
 
   return joinSeries(
     submitted.map((log) => ({ submissionId: log.topics[1] as string, blockNumber: BigInt(log.blockNumber) })),
