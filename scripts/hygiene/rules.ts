@@ -381,12 +381,21 @@ export const secretNamesAreRegistered = (s: Snapshot): Finding[] => {
  * card. The seal is the subtle one: the same hex is correct as a fill and fails contrast as
  * text on dark, which is why two tokens exist for it.
  */
+/**
+ * The search half of a `sed` substitution describes what is being removed, not what is being set.
+ * The script that strips the renderer's round caps out of the generated diagram necessarily spells
+ * them out, and flagging it would make the fix indistinguishable from the defect. Written on the
+ * substitution itself, so the same string sitting loose in the same file is still a finding.
+ */
+const SED_SEARCH = /s\/[^/\n]*(?:stroke-line(?:cap|join)|border-radius|box-shadow)[^/\n]*\/[^/\n]*\//g;
+
 export const brandInvariants = (s: Snapshot): Finding[] => {
   const findings: Finding[] = [];
   const flag = (where: string, detail: string) =>
     findings.push({ rule: "brand-invariants", where, detail });
 
-  for (const f of s.files.filter(isScannable)) {
+  for (const raw of s.files.filter(isScannable)) {
+    const f = { ...raw, content: raw.content.replace(SED_SEARCH, "") };
     for (const [, value] of f.content.matchAll(/border-radius:\s*([^;}"']+)/gi)) {
       if (!/^0[a-z%]*$/i.test(value!.trim())) flag(f.path, `border-radius: ${value!.trim()} — the brand is zero radius`);
     }

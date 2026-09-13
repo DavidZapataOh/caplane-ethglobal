@@ -51,8 +51,10 @@ test("the file count the index states is the file count on disk", () => {
     "Ninety-eight": 98,
     "Ninety-nine": 99,
     "One hundred": 100,
+    "One hundred-one": 101,
+    "One hundred-two": 102,
   };
-  const stated = INDEX.match(/^([A-Z][a-z]+(?:-[a-z]+)?) files,/m)?.[1];
+  const stated = INDEX.match(/^([A-Z][a-z]+(?:[- ][a-z]+)?) files,/m)?.[1];
   expect(stated, "the index no longer opens with a file count").toBeDefined();
   expect(WORDS[stated!], `"${stated}" is not a number this test knows`).toBeDefined();
 

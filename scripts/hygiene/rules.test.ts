@@ -781,3 +781,19 @@ test("a loopback url in source is still a finding, and evidence json is still sc
     noSprintReferences(snap({ files: [{ path: "evidence/site/01-lighthouse.json", content: '{"a":"Sprint-04"}' }] })),
   ).toHaveLength(1);
 });
+
+// The script that removes the renderer's round caps has to name them to remove them. Flagging the
+// fix as the defect is how a rule teaches people to delete the fix.
+test("a sed expression that strips a round cap is not itself a round cap", () => {
+  const s = snap({
+    files: [{ path: "scripts/docs/build-diagram.sh", content: "sed -e 's/stroke-linecap:round/stroke-linecap:butt/g' in > out" }],
+  });
+  expect(brandInvariants(s).filter((f) => f.detail.includes("stroke-line"))).toEqual([]);
+});
+
+test("and the same string loose in the same file still is", () => {
+  const s = snap({
+    files: [{ path: "scripts/docs/build-diagram.sh", content: 'echo "stroke-linecap:round"' }],
+  });
+  expect(brandInvariants(s).filter((f) => f.detail.includes("stroke-line"))).toHaveLength(1);
+});
