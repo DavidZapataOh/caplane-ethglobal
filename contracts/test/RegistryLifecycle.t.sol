@@ -12,7 +12,9 @@ contract RegistryLifecycleTest is RegistryFixture {
     bytes32 seed
   ) internal pure returns (bytes32[] memory c) {
     c = new bytes32[](7);
-    for (uint256 i; i < 7; ++i) c[i] = keccak256(abi.encodePacked(seed, i));
+    for (uint256 i; i < 7; ++i) {
+      c[i] = keccak256(abi.encodePacked(seed, i));
+    }
   }
 
   /// @dev A paid invoice must be financeable again. The gate was `status != 0`, so a released lien
@@ -41,8 +43,7 @@ contract RegistryLifecycleTest is RegistryFixture {
     assertEq(registry.statusOf(LIEN_A), 3, "defaulted");
 
     bytes memory m = _metadata();
-    bytes memory report =
-      Reports.body(1, SELECTOR, _next(), LIEN_A, SUBMISSION_1, BORROWER, 250e6, 150, EXPIRES, c);
+    bytes memory report = Reports.body(1, SELECTOR, _next(), LIEN_A, SUBMISSION_1, BORROWER, 250e6, 150, EXPIRES, c);
     vm.expectRevert(abi.encodeWithSelector(ICaplaneRegistry.AlreadyEncumbered.selector, LIEN_A));
     _sendFrom(m, report);
   }
@@ -53,8 +54,7 @@ contract RegistryLifecycleTest is RegistryFixture {
     _send(Reports.body(1, SELECTOR, _next(), LIEN_A, SUBMISSION_1, BORROWER, 250e6, 150, EXPIRES, c));
 
     bytes memory m = _metadata();
-    bytes memory report =
-      Reports.body(1, SELECTOR, _next(), LIEN_A, SUBMISSION_1, BORROWER, 250e6, 150, EXPIRES, c);
+    bytes memory report = Reports.body(1, SELECTOR, _next(), LIEN_A, SUBMISSION_1, BORROWER, 250e6, 150, EXPIRES, c);
     vm.expectRevert(abi.encodeWithSelector(ICaplaneRegistry.AlreadyEncumbered.selector, LIEN_A));
     _sendFrom(m, report);
   }

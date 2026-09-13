@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import budgets from "../../budgets.json";
 import limits from "../../prod-limits.json";
-import { bytesOf, violations } from "./check";
+import { bytesOf, measured, violations } from "./check";
 
 // The platform writes "5kb" and the repository writes 5000. Their KByte is 1000, not 1024, and
 // that conversion is where the error hides: read as 1024 the report budget looks 120 bytes
@@ -12,6 +12,14 @@ test("platform sizes are decimal, not binary", () => {
   expect(bytesOf("265b")).toBe(265);
   expect(bytesOf("5120")).toBe(5120);
   expect(bytesOf("300s")).toBeUndefined();
+});
+
+// The loader resolved its path against the process's working directory and swallowed the miss, so
+// running the checker from anywhere but the repository root reported every measured budget as
+// unmeasured. This suite runs in its own directory, which is how it went unnoticed: the file it
+// could not find was the file it was asserting about.
+test("the measurements are found from any working directory", () => {
+  expect(Object.keys(measured())).not.toHaveLength(0);
 });
 
 // Two files that must agree, and nothing compared them. A budget can drift above a limit and the

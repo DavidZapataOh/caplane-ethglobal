@@ -68,10 +68,17 @@ const DERIVED: Record<string, (l: Limits) => number | undefined> = {
  * there would corrupt a verbatim copy of the platform's contract. So a services budget is tied to a
  * measurement instead, and a budget with no measurement behind it is a violation rather than a pass:
  * a number nothing compares reads as a gate and is not one.
+ *
+ * Resolved against this file, never against the process. A relative path reads it only when the
+ * checker happens to be run from the repository root, and the catch turns the miss into an empty
+ * set — so every measured budget reports as unmeasured while the checker looks like it is working.
+ * The suite that would have caught it runs in this directory.
  */
+const MEASURED = new URL("../../evidence/measured.json", import.meta.url);
+
 export const measured = (): Record<string, number> => {
   try {
-    return JSON.parse(readFileSync("evidence/measured.json", "utf8")) as Record<string, number>;
+    return JSON.parse(readFileSync(MEASURED, "utf8")) as Record<string, number>;
   } catch {
     return {};
   }

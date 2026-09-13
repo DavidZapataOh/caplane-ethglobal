@@ -176,6 +176,11 @@ jobs:
         with: { bun-version: 1.2.21 }
       - run: bun install --frozen-lockfile
         working-directory: caplane-workflow
+      # `claim` too: the typecheck reaches into it, and its imports resolve against its own
+      # node_modules, not this package's. Without it the check fails on a module that is
+      # declared and installed — one directory over, in a job that never installed it.
+      - run: bun install --frozen-lockfile
+        working-directory: claim
       - run: bun run typecheck
         working-directory: caplane-workflow
       - run: bun test
