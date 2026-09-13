@@ -12,25 +12,27 @@
   },
   "dependencies": {
     "@caplane/brand": "file:../brand",
+    "@noble/ciphers": "^2.4.0",
+    "@noble/curves": "^2.4.0",
+    "@noble/hashes": "^2.2.0",
     "@privy-io/chains": "0.6.0",
     "@privy-io/node": "^0.34.0",
     "@privy-io/react-auth": "3.42.0",
     "@stripe/stripe-js": "^9.16.0",
+    "caplane-sdk": "file:../sdk",
     "next": "16.3.4",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "viem": "^2.56.3"
   },
   "devDependencies": {
-    "@noble/curves": "^2.4.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "caplane-sdk": "file:../sdk",
     "eslint": "^9",
     "eslint-config-next": "16.3.4",
     "tailwindcss": "^4",
-    "typescript": "^5",
-    "viem": "^2.56.3"
+    "typescript": "^5"
   }
 }
