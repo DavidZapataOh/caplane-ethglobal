@@ -101,12 +101,38 @@ test('the input tells the two questions apart by length', () => {
 
 // The saving is the whole reason this module exists, and it is only real if the library stays out
 // of the bundle. It is a devDependency here because one test derives the selectors with it.
-test('no chain library is a runtime dependency of the browser bundle', () => {
+//
+// Asserted on this route's own imports, not on the package's dependency list. The list was the
+// original guard and it stopped meaning what it said the day a wallet SDK landed as a runtime
+// dependency of a different route segment: the package now depends on Privy, the registry does
+// not, and only one of those two facts is about this page. What protects this page is that
+// nothing here imports a chain library — which a careless import would break even while
+// package.json stayed untouched, and which the dependency list could never have caught.
+test('no chain library is imported by the public registry route', () => {
+  const here = new URL('.', import.meta.url)
+  const sources = readdirSync(here)
+    .filter((name) => /\.tsx?$/.test(name) && !name.endsWith('.test.ts'))
+    .map((name) => readFileSync(new URL(name, here), 'utf8'))
+  assert.ok(sources.length >= 4, `expected the route's modules, found ${sources.length}`)
+  for (const source of sources) {
+    for (const heavy of ['viem', 'ethers', 'web3', '@privy-io', 'caplane-sdk']) {
+      assert.doesNotMatch(
+        source,
+        new RegExp(`from '${heavy}`),
+        `${heavy} must not reach the public registry's bundle`,
+      )
+    }
+  }
+})
+
+// And the package still declares what it declares on purpose: viem stays a devDependency, because
+// one test derives the selectors with it and no shipped module may.
+test('viem is a development dependency of web, never a runtime one', () => {
   const manifest = JSON.parse(readFileSync(new URL('../../../package.json', import.meta.url), 'utf8')) as {
     dependencies: Record<string, string>
     devDependencies: Record<string, string>
   }
-  assert.deepEqual(Object.keys(manifest.dependencies).sort(), ['@caplane/brand', 'next', 'react', 'react-dom'])
+  assert.equal(manifest.dependencies.viem, undefined)
   assert.ok(manifest.devDependencies.viem !== undefined, 'the selector pin needs it, in dev')
 })
 

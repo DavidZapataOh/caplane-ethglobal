@@ -27,6 +27,14 @@ test('the root metadata routes are left alone', () => {
   }
 })
 
+test('API routes are left alone — they are endpoints, not pages with a mode', () => {
+  // A rewrite to a path that does not exist is a 404, not an error: `/api/organizations` arriving
+  // as `/dark/api/organizations` answers 404 with nothing in any log to say why.
+  for (const path of ['/api/organizations', '/api/organizations/anything']) {
+    assert.equal(matcher.test(path), false, `${path} must not be rewritten`)
+  }
+})
+
 test('the pages a visitor types still are', () => {
   for (const path of ['/', '/registry', '/confirm']) {
     assert.equal(matcher.test(path), true, `${path} must be rewritten`)

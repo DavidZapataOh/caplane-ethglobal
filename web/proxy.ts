@@ -9,12 +9,15 @@ import { modeFor } from './mode'
  * `/.well-known` must stay out: the certificate validation challenge travels through it, and
  * swallowing it means the domain resolves and never gets a certificate.
  *
+ * So must `/api/`: a route handler is an endpoint, not a page, and it has no mode. Prefixing one
+ * asks for `/dark/api/…`, which no route serves — a 404 with nothing in any log to explain it.
+ *
  * So must the metadata routes. They are emitted at the root of `app/`, outside `[mode]`, so each
  * exists at exactly one path — prepending a mode to `/icon.svg` asks for `/dark/icon.svg`, which no
  * route serves, and the favicon and the shared-link card 404 on a site whose pages all answer 200.
  */
 export const config = {
-	matcher: ['/((?!_next|\\.well-known|icon\\.svg|favicon\\.ico|opengraph-image|robots\\.txt|sitemap\\.xml).*)'],
+	matcher: ['/((?!api/|_next|\\.well-known|icon\\.svg|favicon\\.ico|opengraph-image|robots\\.txt|sitemap\\.xml).*)'],
 }
 
 /**
