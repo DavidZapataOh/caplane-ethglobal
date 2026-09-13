@@ -1,7 +1,7 @@
 {
   "cre": {
     "httpCallsPerExecution": 5,
-    "_httpBytes": "Decimal, not binary. The platform writes 10kb/100kb and its kb is 1000 — measured: a 1kb cap reports itself as 'the simulation limit of 1000 bytes'. These were 10240 and 102400, which sat ABOVE the real limits by 240 and 2400 bytes, and nothing compared the two files.",
+    "_httpBytes": "Decimal, not binary. The platform writes 10kb/100kb and its kb is 1000 \u2014 measured: a 1kb cap reports itself as 'the simulation limit of 1000 bytes'. These were 10240 and 102400, which sat ABOVE the real limits by 240 and 2400 bytes, and nothing compared the two files.",
     "httpRequestBytes": 10000,
     "httpResponseBytes": 100000,
     "chainReadCallsPerExecution": 15,
@@ -9,7 +9,11 @@
     "executionTimeoutSeconds": 300,
     "reportPayloadBytes": 5120,
     "_report": "5120 and 5000 are both real limits and both stay. What a report body is actually checked against is neither: 5011 is ChainWrite.EVM.ReportSizeLimit minus the forwarder's 109-byte header. 5000 is LogTrigger.EventSizeLimit, a different limit on a different object.",
-    "report": { "bodyBytes": 576, "rejectBodyBytes": 352, "bodyBudgetBytes": 5011 },
+    "report": {
+      "bodyBytes": 576,
+      "rejectBodyBytes": 352,
+      "bodyBudgetBytes": 5011
+    },
     "logTriggerEventBytes": 5000,
     "_triggerSubscriptions": "Two: the inbox and the escrow. The 10-events-per-6s rate limit is SHARED between them, so a second subscription divides that budget rather than adding to it.",
     "triggerSubscriptions": 2,
@@ -34,7 +38,7 @@
       "_comment": [
         "One POST carrying two eth_calls. The second reads an immutable whose value is known",
         "offline, so a response carrying it cannot have come from a wrong address, an empty",
-        "registry or a dead endpoint — the three failures that otherwise look like no collision.",
+        "registry or a dead endpoint \u2014 the three failures that otherwise look like no collision.",
         "The response does not grow with registry density: the posting lists are walked inside",
         "the view and never cross the wire."
       ],
@@ -61,12 +65,16 @@
     "gasSnapshotForkPath": "contracts/.gas-snapshot.fork",
     "maxGasDeltaPercent": 2,
     "receiptMeasured": {
-      "_CaplaneInbox.submit": "275 B is deliberate filler, sized for a gas receipt — not a sealed claim. The real one is below.",
-      "CaplaneInbox.submit": { "envelopeBytes": 275, "gas": 54144, "evidence": "evidence/contracts/01-inbox.txt" },
+      "_CaplaneInbox.submit": "275 B is deliberate filler, sized for a gas receipt \u2014 not a sealed claim. The real one is below.",
+      "CaplaneInbox.submit": {
+        "envelopeBytes": 275,
+        "gas": 54144,
+        "evidence": "evidence/contracts/01-inbox.txt"
+      },
       "CaplaneInbox.submit.sealedClaim": {
         "envelopeBytes": 836,
         "gas": 68037,
-        "_comment": "A claim with its debtor confirmation sealed in: 742 B plaintext + 20 submitter + 58 header + 16 tag. Serialized trigger Log is 1,159 B of 5,000 — 76.8% margin. Envelope cap is 4,096.",
+        "_comment": "A claim with its debtor confirmation sealed in: 742 B plaintext + 20 submitter + 58 header + 16 tag. Serialized trigger Log is 1,159 B of 5,000 \u2014 76.8% margin. Envelope cap is 4,096.",
         "evidence": "evidence/cre/11-debtor-confirmation.txt"
       }
     }
@@ -76,14 +84,30 @@
     "registryDeltaGzipBytes": 8000,
     "firstLoadJsBytes": null,
     "lcpMs": null,
+    "clsScore": null,
+    "investDeltaGzipBytes": 900000,
+    "_investDeltaGzipBytes": "The wallet SDK dominates: 815 KB gzip measured, and it is the cost of signing at all. Budgeted with room rather than at the line, because a Privy patch moving it 2% should not turn CI red on a number nobody chose."
+  },
+  "site": {
+    "firstLoadJsBytes": null,
+    "lcpMs": null,
     "clsScore": null
   },
-  "site": { "firstLoadJsBytes": null, "lcpMs": null, "clsScore": null },
   "services": {
     "_p95Ms": "Client-observed round trip against the deployed service. It lands with the deploy: writing a number here without evidence/measured.json carrying it is now a violation, not a pass.",
-    "api": { "serveMs": 5, "p95Ms": null },
+    "api": {
+      "serveMs": 5,
+      "p95Ms": null
+    },
     "_mcp": "serveMs is the server's own cost on a tool that touches nothing; readMs is a tool that reads the chain, and it is almost entirely two round trips to an endpoint whose own p95 is 190 ms. p95Ms is the client-observed round trip against the deployment and lands with it.",
-    "mcp": { "serveMs": 5, "readMs": 900, "p95Ms": null }
+    "mcp": {
+      "serveMs": 5,
+      "readMs": 900,
+      "p95Ms": null
+    }
   },
-  "ci": { "hermeticJobSeconds": 300, "cleanCloneJobSeconds": 600 }
+  "ci": {
+    "hermeticJobSeconds": 300,
+    "cleanCloneJobSeconds": 600
+  }
 }

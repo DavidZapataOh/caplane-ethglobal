@@ -1,0 +1,68 @@
+The investor console, against the deployed pool. Measured 2026-09-13 on Arc Testnet.
+
+Why this file exists: a console that only ever showed zeros would be indistinguishable from one
+that reads correctly, right up until the number it shows changes because something real happened.
+So what is recorded here is not a screen that rendered — it is a number that moved, and moved back.
+
+  pool          0x4df4c8d722b3a9ebd18b9094c883b5ff83565d7c
+  investor      0xb3f85869D8790F1DDC8981306b5bA1c9F76036cC
+  asset         0x3600000000000000000000000000000000000000   six decimals
+  share         cpUSDC                                        eighteen decimals
+
+--- the cycle, with real transactions -----------------------------------------
+
+  before        shares 6.000000000000000000 cpUSDC
+                pool holds 16.160000 USDC
+
+  approve       0.010000 USDC to the pool
+  deposit       0.010000 USDC
+
+  after         shares grew, pool holds grew — both asserted, not eyeballed
+  redeem        the shares the deposit minted, and only those
+
+  restored      shares 6.000000000000000000 cpUSDC    equal to before, asserted
+                pool holds 16.160001 USDC
+
+The last line is the honest remainder: a deposit-and-redeem round trip leaves one unit of the
+asset behind in the pool. That is the vault's rounding, which rounds in the vault's favour on both
+legs by design, and it is recorded rather than smoothed over — a test that asserted the pool
+returned to exactly 16.160000 would have been asserting something untrue about how the contract
+works.
+
+--- what the page shows, and why two numbers instead of one ---------------------
+
+  your shares        6.000000000000000000 cpUSDC
+  worth              6.060000 USDC
+  redeemable now     6.060000 USDC
+  pool holds        16.160001 USDC
+  out on advances    0.000000 USDC
+
+`worth` and `redeemable now` are equal today only because nothing is lent out. They are different
+questions and the page asks both: the pool caps a redemption at what it holds in cash, and once an
+advance is outstanding the second number is smaller than the first. Showing only the value would
+promise money the pool does not have that day.
+
+--- what is hand-encoded, and what checks it ------------------------------------
+
+No chain library reaches this route's bundle. The three calls are a four-byte selector plus
+fixed-width words, written out — and every selector is pinned by a test that derives it from the
+real signature with viem, which stays a development dependency:
+
+  deposit(uint256,address)              0x6e553f65
+  redeem(uint256,address,address)       0xba087652
+  approve(address,uint256)              0x095ea7b3
+  allowance(address,address)            0xdd62ed3e
+  balanceOf(address)                    0x70a08231
+  totalAssets()                         0x01e1d114
+  decimals()                            0x313ce567
+  maxRedeem(address)                    0xd905777e
+  outstandingPrincipal()                0x29b1829e
+
+The encodings are compared byte for byte against `encodeFunctionData` from the same library. A
+transcribed selector fails the same way a wrong one does — the call returns empty bytes, they
+decode to zero, and the page would report a position of nothing about a wallet that holds shares.
+
+--- reproduce it ----------------------------------------------------------------
+
+  cd web && npm test                    # the live cycle skips without INVESTOR_KEY
+  INVESTOR_KEY=… npm test               # and runs the real one with it
