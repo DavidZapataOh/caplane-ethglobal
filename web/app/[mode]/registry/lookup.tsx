@@ -1,6 +1,9 @@
 'use client'
 
 import { useState } from 'react'
+import { Alert } from '../../../components/alert'
+import { Badge } from '../../../components/badge'
+import { DataRow } from '../../../components/data-row'
 import { Icon } from '../../../components/icon'
 import { type Reading, classify, normalise, read } from './chain.ts'
 import { type Recorded, explain, liensOf } from './history.ts'
@@ -106,28 +109,25 @@ export function Lookup() {
         </p>
       )}
 
-      {/* `alert`, never `rejected`: that icon is bound to the registry status, and not reusing it is
-          what keeps the set meaningful. */}
       {state === 'error' && (
-        <p className="mt-4 flex items-center gap-2 text-seal-text">
-          <Icon name="alert" /> {detail}
-        </p>
+        <div className="mt-4">
+          <Alert variant="error">{detail}</Alert>
+        </div>
       )}
 
       {state === 'done' && answer?.kind === 'lien' && (
         <div className="mt-4 border border-border">
           <div className="flex items-center gap-3 border-b border-border bg-surface-2 p-3">
             {/* The seal appears only for an active lien. Nothing else in the brand may wear it. */}
-            {answer.reading.status === 1 ? (
-              <span className="flex items-center gap-2 bg-seal px-2 py-1 text-on-seal">
-                <Icon name="encumbered" /> ENCUMBERED
-              </span>
-            ) : (
-              <span className="flex items-center gap-2 text-text">
-                <Icon name={answer.reading.status === 0 ? 'unencumbered' : 'released'} />
-                {STATUS[answer.reading.status] ?? `status ${answer.reading.status}`}
-              </span>
-            )}
+            <Badge
+              variant={
+                answer.reading.status === 1 ? 'encumbered' : answer.reading.status === 0 ? 'free' : 'released'
+              }
+            >
+              {answer.reading.status === 1
+                ? 'ENCUMBERED'
+                : (STATUS[answer.reading.status] ?? `status ${answer.reading.status}`)}
+            </Badge>
             {answer.why !== undefined && (
               <span className="text-text-3">
                 {answer.why === 'unknown'
@@ -149,15 +149,14 @@ export function Lookup() {
               ['submission', answer.reading.lien.submissionId],
               ['read at block', BigInt(answer.reading.receipt.blockNumber).toString()],
             ].map(([label, value]) => (
-              <div key={label} className="flex items-start gap-4 p-3">
-                <dt className="w-36 shrink-0 text-text-3">{label}</dt>
-                <dd className="break-all text-text">{value}</dd>
-                {(label === 'lien id' || label === 'submission') && (
-                  <button type="button" onClick={() => copy(label as string, value as string)} className="text-text-3 hover:text-text" aria-label={`Copy the ${label}`}>
-                    <Icon name="copy" />
-                  </button>
-                )}
-              </div>
+              <DataRow
+                key={label}
+                label={label as string}
+                value={value as string}
+                {...(label === 'lien id' || label === 'submission'
+                  ? { onCopy: () => copy(label as string, value as string) }
+                  : {})}
+              />
             ))}
           </dl>
           <details className="border-t border-border p-3">
@@ -183,13 +182,12 @@ export function Lookup() {
           </p>
           <dl className="divide-y divide-border">
             {answer.found.map((lien) => (
-              <div key={lien.lienId} className="flex items-start gap-4 p-3">
-                <dt className="w-36 shrink-0 text-text-3">block {lien.blockNumber.toString()}</dt>
-                <dd className="break-all text-text">{lien.lienId}</dd>
-                <button type="button" onClick={() => copy(lien.lienId, lien.lienId)} className="text-text-3 hover:text-text" aria-label="Copy the lien id">
-                  <Icon name="copy" />
-                </button>
-              </div>
+              <DataRow
+                key={lien.lienId}
+                label={`block ${lien.blockNumber.toString()}`}
+                value={lien.lienId}
+                onCopy={() => copy(lien.lienId, lien.lienId)}
+              />
             ))}
           </dl>
           <p className="border-t border-border p-3 font-prose text-text-3">

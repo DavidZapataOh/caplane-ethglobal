@@ -1,0 +1,89 @@
+Rendered contrast — every pair the design system actually produces
+=================================================================
+
+The brand package already checks each text role against the ground, one token at a time. What it
+cannot check is which background a component crosses a token with. These are the pairs the shipped
+components declare and render — read out of the same objects the components consume at runtime, so
+a pair cannot be verified here and rendered differently in the browser.
+
+Thresholds are the standard's, not invented: 4.5:1 for text (WCAG 2.1 SC 1.4.3) and 3:1 for the
+focus indicator (SC 1.4.11, non-text contrast — a focus outline is not text, and the brand never
+set a threshold of its own for it).
+
+  mode   variant            foreground           background          ratio    needs
+  ----   -------            ----------           ----------          -----    -----
+  dark   badge.encumbered   --cp-on-seal         on --cp-seal          6.11:1   4.5
+  dark   badge.free         --cp-text-2          on --cp-surface-2     6.46:1   4.5
+  dark   badge.verified     --cp-verified-text   on --cp-ground        7.20:1   4.5
+  dark   badge.released     --cp-text-3          on --cp-ground        5.35:1   4.5
+  dark   button.primary     --cp-ground          on --cp-text         15.28:1   4.5
+  dark   button.secondary   --cp-text            on --cp-surface-2    13.70:1   4.5
+  dark   alert.error        --cp-text            on --cp-ground       15.28:1   4.5
+  dark   alert.blocked      --cp-text            on --cp-ground       15.28:1   4.5
+  dark   focus outline      --cp-text            on --cp-ground       15.28:1   3
+  paper  badge.encumbered   --cp-on-seal         on --cp-seal          6.11:1   4.5
+  paper  badge.free         --cp-text-2          on --cp-surface-2     5.06:1   4.5
+  paper  badge.verified     --cp-verified-text   on --cp-ground        5.51:1   4.5
+  paper  badge.released     --cp-text-3          on --cp-ground        4.56:1   4.5
+  paper  button.primary     --cp-ground          on --cp-text         15.28:1   4.5
+  paper  button.secondary   --cp-text            on --cp-surface-2    13.64:1   4.5
+  paper  alert.error        --cp-text            on --cp-ground       15.28:1   4.5
+  paper  alert.blocked      --cp-text            on --cp-ground       15.28:1   4.5
+  paper  focus outline      --cp-text            on --cp-ground       15.28:1   3
+
+Recomputed from @caplane/brand, never transcribed — the same contrast() the brand package already
+verifies against tokens.css, applied to combinations that package never saw.
+
+--- the two that were wrong before this ran ------------------------------------
+
+Two pairs were caught by this check and fixed before anything shipped, which is the whole reason
+the check walks the component's own map instead of the token list:
+
+  button.primary declared --cp-on-seal while its class list painted text-ground. The declared pair
+  resolved to #F2EFEA on #E6E3DF — two near-identical light tones, 1.12:1 in dark. Corrected to
+  --cp-ground, the colour the class actually paints: 15.28:1.
+
+  badge.free declared --cp-text-3, the same dim tone `released` uses. On the ground that clears the
+  bar with nothing to spare (4.56:1 on paper, above); on a filled --cp-surface-2 it falls to
+  4.07:1, under. The two variants differ in background, and the filled one spends the margin.
+  Corrected to --cp-text-2: 6.46:1 dark, 5.06:1 paper.
+
+Neither would have been visible in a screenshot review. Both produce a component that renders, looks
+plausible in one mode, and fails the standard in the other.
+
+--- the negative control -------------------------------------------------------
+
+A check that only ever passes proves nothing. The verifier is tested against a pair the brand
+explicitly forbids — the seal fill as text on dark — and must throw naming the variant and the mode:
+
+  renderedPairs({ mistake: { fg: '--cp-seal', bg: '--cp-ground' } }, 4.5)
+    -> throws: mistake (--cp-seal on --cp-ground) in dark: 2.79:1, needs 4.5:1
+
+The same pair passes on paper (5.47:1), which is why the check is per mode and not per token: one
+hex is forbidden as text on one ground and correct on the other, and the brand declares both.
+
+--- bundle cost, measured --------------------------------------------------------
+
+  paper/registry   delta 4799 B -> 5201 B gzip   (budget 8000)
+  dark/confirm     delta 2402 B -> 2865 B gzip   (no budget declared yet)
+
+The plan predicted this number would not move, on the reasoning that the components are the same
+Tailwind classes behind a function. Measured, it moves: +402 B on registry, +463 B on confirm. The
+prediction was wrong for a reason worth writing down rather than hiding — a shared component ships
+the union of its consumers' variants, not the subset one route uses. `lookup.tsx` renders three of
+four badge variants and one of two alert variants; it downloads all six. That, plus the module
+boundaries themselves, is what the deduplication costs.
+
+It is kept, not reverted: both routes stay well inside the 8000-byte budget (65% and 36% of it),
+and the same four components now serve two shipped pages instead of two hand-rolled copies that had
+already drifted — `lookup.tsx` and `sign.tsx` both painted their error state with the seal colour,
+which the brand reserves for an encumbered lien and nothing else. That defect is gone as a side
+effect of the migration, and cannot come back: the seal is unreachable from `Alert`, and a test
+asserts it.
+
+--- reproduce it ---------------------------------------------------------------
+
+  cd web && npm test                    # 35 tests, including the four contrast suites
+  npm run build
+  node ../scripts/budgets/first-load.mjs .next paper/registry --against paper --budget 8000
+  node ../scripts/budgets/first-load.mjs .next dark/confirm --against dark

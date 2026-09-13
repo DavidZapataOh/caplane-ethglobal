@@ -1,6 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { Alert } from '../../../components/alert'
+import { Button } from '../../../components/button'
+import { DataRow } from '../../../components/data-row'
 import { Icon } from '../../../components/icon'
 
 type Served = {
@@ -101,12 +104,10 @@ export function Sign() {
     )
   }
   if (state === 'error') {
-    // `alert`, never `rejected`: that icon is bound to the registry status and the discipline of
-    // not reusing it is what keeps the set meaningful.
     return (
-      <p className="mt-6 flex items-center gap-2 text-seal-text">
-        <Icon name="alert" /> {detail}
-      </p>
+      <div className="mt-6">
+        <Alert variant="error">{detail}</Alert>
+      </div>
     )
   }
   if (state === 'signed') {
@@ -121,19 +122,12 @@ export function Sign() {
     <div className="mt-6 border border-border">
       <dl className="divide-y divide-border">
         {served?.shown.map((field) => (
-          <div key={field} className="flex gap-6 p-3">
-            <dt className="w-48 text-text-3">{field}</dt>
-            <dd className="text-text">{served.message[field]}</dd>
-          </div>
+          <DataRow key={field} label={field} value={served.message[field] ?? ''} />
         ))}
       </dl>
-      <button
-        type="button"
-        onClick={sign}
-        className="w-full border-t border-border bg-surface-2 p-3 text-text hover:bg-surface"
-      >
+      <Button variant="primary" onClick={sign} className="w-full justify-center border-t border-border">
         Sign these terms
-      </button>
+      </Button>
     </div>
   )
 }

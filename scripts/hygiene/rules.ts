@@ -529,6 +529,47 @@ export const servicesCannotReadTheLedgerInvoice = (s: Snapshot): Finding[] =>
       detail: "a platform service may resolve a contact, never read an invoice",
     }));
 
+/**
+ * `brandInvariants` sees the literal CSS property `box-shadow:`, which never appears in a Tailwind
+ * component — the shadow comes from a utility class that Tailwind turns into `box-shadow` only in
+ * the generated CSS, outside the tree hygiene scans. Without this rule, a shadow utility in a
+ * `className` passes the gate green and draws the shadow the brand forbids: the separation is done
+ * with 1px hairlines.
+ *
+ * Only `className` values are scanned, not whole files. A first version read the file entire and
+ * flagged three of its own components — the English words in "the focus ring is", the CSS property
+ * `box-shadow` and the token `--cp-shadow`, all in comments explaining this very rule. A gate that
+ * cannot be described in a comment without failing is a gate nobody keeps. The cost of the
+ * narrower scan is that a class list assembled in a variable the rule cannot see would slip
+ * through; the surface where a Tailwind utility actually takes effect is a `className`, and that
+ * is what this reads.
+ *
+ * `outline-*` is deliberately out: it is the `outline` property, which takes no layout space and
+ * does not paint under the element. It is the only focus treatment the brand allows.
+ *
+ * Both prefixes also have a suffix-free form (`shadow`, `ring`) that Tailwind v4 generates just
+ * like the long ones, so each branch covers the bare word before the suffixed form.
+ */
+const SHADOW_UTILITY =
+  /\b(?:shadow(?![\w-])|shadow-(?!none\b)\S+|ring(?![\w-])|ring-(?!inset\b)[\w[\]/.-]+)/;
+
+/** `className="…"`, `className={'…'}`, `className={`…`}` and `className: '…'` all count. */
+const CLASS_NAME_VALUE = /className\s*[:=]\s*\{?\s*(?:"([^"]*)"|'([^']*)'|`([^`]*)`)/g;
+
+export const noShadowUtilities = (s: Snapshot): Finding[] =>
+  s.files
+    .filter((f) => f.path.startsWith("web/") && /\.tsx?$/.test(f.path))
+    .filter((f) =>
+      [...f.content.matchAll(CLASS_NAME_VALUE)].some((m) =>
+        SHADOW_UTILITY.test(m[1] ?? m[2] ?? m[3] ?? ""),
+      ),
+    )
+    .map((f) => ({
+      rule: "no-shadow-utilities",
+      where: f.path,
+      detail: "a Tailwind shadow/ring utility draws a shadow — the brand uses hairlines only",
+    }));
+
 export const ALL_RULES = [
   noMockDependencies,
   noMockCallSites,
@@ -549,4 +590,5 @@ export const ALL_RULES = [
   secretsAreReadOnce,
   noSecretThroughTheDoor,
   servicesCannotReadTheLedgerInvoice,
+  noShadowUtilities,
 ];

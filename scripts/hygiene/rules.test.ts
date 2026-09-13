@@ -11,6 +11,7 @@ import {
   noTemplateMockServer,
   noSprintReferences,
   servicesCannotReadTheLedgerInvoice,
+  noShadowUtilities,
   noPlanningVocabulary,
   noForbiddenCreIdentifiers,
   onlyApprovedTeeConstraint,
@@ -269,7 +270,7 @@ test("flags a workflow directory still named my-workflow", () => {
 });
 
 test("every rule is registered in ALL_RULES", () => {
-  expect(ALL_RULES).toHaveLength(19);
+  expect(ALL_RULES).toHaveLength(20);
 });
 
 test("does not flag the rule engine's own definitions and fixtures", () => {
@@ -611,4 +612,101 @@ test("the workflow may ask for the invoice scope", () => {
       snap({ files: [{ path: "caplane-workflow/verify.ts", content: "scope=accounting.invoices.read" }] }),
     ),
   ).toEqual([]);
+});
+
+test("a Tailwind shadow utility in a web component is a finding", () => {
+  const found = noShadowUtilities(
+    snap({ files: [{ path: "web/components/button.tsx", content: 'className="shadow-md rounded"' }] }),
+  );
+  expect(found).toHaveLength(1);
+  expect(found[0]!.detail).toContain("hairline");
+});
+
+test("a Tailwind ring utility in a web component is also a finding", () => {
+  expect(
+    noShadowUtilities(
+      snap({ files: [{ path: "web/app/[mode]/page.tsx", content: 'className="focus-visible:ring-2"' }] }),
+    ),
+  ).toHaveLength(1);
+});
+
+test("outline utilities are not shadows and are not flagged", () => {
+  expect(
+    noShadowUtilities(
+      snap({
+        files: [
+          {
+            path: "web/components/button.tsx",
+            content: 'className="focus-visible:outline-2 outline-text"',
+          },
+        ],
+      }),
+    ),
+  ).toEqual([]);
+});
+
+test("the bare 'shadow' and 'ring' utilities (no suffix) are also findings", () => {
+  // Tailwind v4 ships both with no suffix — `shadow` and `ring` alone are valid utility classes,
+  // not just `shadow-md`/`ring-2`. A regex anchored on the trailing hyphen misses exactly these.
+  expect(
+    noShadowUtilities(
+      snap({ files: [{ path: "web/components/button.tsx", content: 'className="flex shadow"' }] }),
+    ),
+  ).toHaveLength(1);
+  expect(
+    noShadowUtilities(
+      snap({ files: [{ path: "web/components/button.tsx", content: 'className="flex ring"' }] }),
+    ),
+  ).toHaveLength(1);
+});
+
+test("a component outside web/ is not scanned by this rule", () => {
+  expect(
+    noShadowUtilities(
+      snap({ files: [{ path: "services/mcp/src/server.ts", content: 'const x = "shadow-md"' }] }),
+    ),
+  ).toEqual([]);
+});
+
+test("prose about shadows is not a shadow — only a className value can be one", () => {
+  // The rule scanned whole files first, so every comment explaining the rule tripped it: the words
+  // "the focus ring is", the CSS property `box-shadow`, and the token `--cp-shadow` are all
+  // English or CSS, not Tailwind utilities. A gate that cannot be described in a comment without
+  // failing is a gate nobody can keep.
+  expect(
+    noShadowUtilities(
+      snap({
+        files: [
+          {
+            path: "web/components/button-variants.ts",
+            content:
+              "/** The focus ring is `outline`, never `ring-*`, which compiles to `box-shadow`. */\n" +
+              "const x = { className: 'focus-visible:outline-2' }",
+          },
+        ],
+      }),
+    ),
+  ).toEqual([]);
+});
+
+test("a --cp-shadow token reference is not a Tailwind utility", () => {
+  expect(
+    noShadowUtilities(
+      snap({
+        files: [{ path: "web/components/contrast.ts", content: "// dark declares `--cp-shadow`" }],
+      }),
+    ),
+  ).toEqual([]);
+});
+
+test("a shadow utility in an object's className property is still a finding", () => {
+  expect(
+    noShadowUtilities(
+      snap({
+        files: [
+          { path: "web/components/button-variants.ts", content: "className: 'bg-text shadow-lg'" },
+        ],
+      }),
+    ),
+  ).toHaveLength(1);
 });

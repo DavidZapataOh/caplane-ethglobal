@@ -4,6 +4,7 @@
     "app/**/*.test.ts",
     "app/**/*.test.tsx",
     "*.test.ts",
+    "components/**/*.test.ts",
     "next-env.d.ts"
   ],
   "exclude": [
