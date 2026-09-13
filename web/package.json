@@ -12,9 +12,7 @@
   },
   "dependencies": {
     "@caplane/brand": "file:../brand",
-    "@noble/ciphers": "^2.4.0",
     "@noble/curves": "^2.4.0",
-    "@noble/hashes": "^2.2.0",
     "@privy-io/chains": "0.6.0",
     "@privy-io/node": "^0.34.0",
     "@privy-io/react-auth": "3.42.0",
