@@ -1,0 +1,21 @@
+---
+title: Limitations
+---
+
+{/* generated from ../../../README.md#Limitations, do not edit */}
+
+Every project has these. Most do not write them down.
+
+| | |
+|---|---|
+| **Trust rests on the enclave** | Confidentiality is hardware attestation, not pure cryptography. If the TEE is broken, the plaintext is readable. We say so rather than claim a ZK property we do not have |
+| **Pre-emptive poisoning is open** | Anyone can pledge a receivable that is not theirs and block it, for $0.00094. Not closeable against the frozen interface. Priced and declared in [`THREATMODEL.md`](THREATMODEL.md) rather than called mitigated |
+| **Reformatting resistance is off-chain** | The ledger pins the invoice number, amount, currency and due date before the collision check sees them, so on chain only an exact match can be observed. The tolerance is real and measured — against the matcher the enclave itself runs — and it is stated where it lives |
+| **The confirmation channel is the weakest link** | The enclave cannot prove the key that signed belongs to the debtor. The anchor is that the link reached an address only the accounting ledger knows |
+| **One receivable** | The registry holds a single lien. It was recorded, released, and recorded again — everything demonstrated here happened to that one claim |
+
+The full six-variant threat model, with a code anchor for every closure, is in
+[`THREATMODEL.md`](THREATMODEL.md). Where this design departs from the three papers that describe
+the same problem is in [`RELATED-WORK.md`](RELATED-WORK.md).
+
+---

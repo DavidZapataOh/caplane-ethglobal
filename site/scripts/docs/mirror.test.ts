@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { mirror, mirrorSection } from './mirror.ts'
+import { extractSection, mirror, mirrorSection } from './mirror.ts'
 
 const HERE = import.meta.dirname
 const README = join(HERE, '../../../README.md')
@@ -47,7 +47,10 @@ test(
     assert.equal(result, 'written')
     const mirrored = readFileSync(join(HERE, '../../content/docs/limitations.mdx'), 'utf8')
     const body = mirrored.split('#Limitations, do not edit */}\n\n')[1]?.trimEnd()
-    const source = readFileSync(README, 'utf8').match(/^## Limitations\n([\s\S]*?)(?=\n## |$)/m)?.[1]?.trim()
+    // Through the exported extractor, not a second copy of the regex: the copy carried the same
+    // `m`-flag bug as the implementation, so it compared real content against an empty string and
+    // called the mismatch a failure of the mirror.
+    const source = extractSection(readFileSync(README, 'utf8'), 'Limitations')
     assert.equal(body, source === undefined ? source : toMdxComments(source))
   },
 )
@@ -68,4 +71,17 @@ test('mirrorSection reports skipped when the source exists but the section does 
     mirrorSection('../../../README.md', 'A Heading Nobody Wrote', '../../content/docs/does-not-exist.mdx', 'x'),
     'skipped',
   )
+})
+
+/**
+ * The regression that made this whole function a no-op: with the `m` flag, `$` anchors to the end
+ * of a line, so a multi-line section captured nothing and the mirrored page came out empty. It went
+ * unseen because a source without the section skips, and no source had one until now.
+ */
+test('a section spanning several lines is captured whole, not truncated at the first newline', () => {
+  const source = '# Title\n\n## Limitations\n\nFirst line.\n\n| a | b |\n|---|---|\n| c | d |\n\n## After\n\nnot this.\n'
+  const result = extractSection(source, 'Limitations') ?? ''
+  assert.match(result, /First line\./)
+  assert.match(result, /\| c \| d \|/)
+  assert.doesNotMatch(result, /not this/)
 })

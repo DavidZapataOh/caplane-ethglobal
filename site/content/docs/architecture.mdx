@@ -1,10 +1,85 @@
 ---
 title: Architecture
-description: How the registry, the inbox, the pool, and the CRE workflow fit together.
+description: What carries the guarantee, what carries none, and which half you can switch off.
 ---
 
-{/* TODO: replace this note with the real diagram once one exists, at site/public/architecture-diagram.svg */}
+Most of this system is disposable. The interesting question is not what the components are but
+which of them you would have to trust, and the answer is: four contracts and an enclave. Everything
+else can be switched off without changing what a lien says.
 
-The architecture diagram for this system is not yet published. This page is a placeholder for it —
-nothing here should be read as a description of how the on-chain contracts and the CRE workflow fit
-together until that diagram exists and this note is replaced.
+<div style={{ overflowX: 'auto', border: '1px solid var(--cp-border)', padding: '1rem' }}>
+  <img style={{ minWidth: '56rem', maxWidth: 'none' }} src="/architecture.svg" alt="A lender seals a claim in the browser and sends it to the inbox. A confidential workflow inside a TEE opens it, reads the accounting ledger and the sanctions list, checks the registry for a collision, and reports through the DON forwarder — the only caller the registry accepts. The indexer, MCP server, adversarial harness and web surfaces sit outside that path and carry no trust." />
+</div>
+
+## The path a claim takes
+
+1. **The lender fills in the invoice and asks the debtor to confirm.** The confirmation service
+   resolves the debtor's address from the accounting ledger itself, never from the caller, and mails
+   a one-time link.
+2. **The debtor signs an EIP-712 confirmation** of the exact figures. That signature travels back
+   inside the sealed envelope; it never rests on a server of ours.
+3. **The lender's browser seals the claim** to the enclave's public key and sends one transaction to
+   `CaplaneInbox`. Measured: 886 bytes of ciphertext, no plaintext field, 68,350 gas.
+4. **The inbox emits a log** and a Chainlink CRE confidential workflow wakes up inside a TEE. There
+   it decrypts the envelope, fetches the invoice from the accounting ledger and compares it exactly,
+   screens the counterparty, recovers the debtor's signature and checks it binds this claim, and
+   asks the registry whether six of seven components already match a live lien.
+5. **The DON reaches consensus and the forwarder writes the verdict.** `CaplaneRegistry` accepts a
+   write from nobody else. Either `LienRecorded` or `SubmissionRejected` with a reason code.
+
+Measured end to end: 28 blocks from submission to verdict, about fourteen seconds.
+
+## What carries the guarantee
+
+| | Why it cannot be removed |
+|---|---|
+| `CaplaneInbox` | The only entry point. No owner, no admin, no pause — so there is no privileged path around it |
+| The confidential workflow | Where the claim is decrypted and decided. The only place the plaintext exists |
+| KeystoneForwarder | The DON's consensus over an attested enclave, expressed as a caller |
+| `CaplaneRegistry` | `onReport` reverts unless the caller is that forwarder, under the right workflow name and owner. There is no operator key and no upgrade path |
+| `CaplanePool`, `CaplaneEscrow` | Where the money is. A disbursement and a settlement are chain state, not a promise |
+
+## What carries none
+
+The activity indexer, the MCP server, the adversarial harness and these web surfaces hold no
+authority and no state the registry needs. Stop all four and a lien reads exactly the same, because
+the [public lookup](https://registry.caplane.xyz) reads the chain from the visitor's own browser.
+
+This is demonstrated rather than asserted: the rehearsal stops `api.caplane.xyz` and queries the
+registry afterwards. You can check the property yourself without any of our software:
+
+```bash
+curl -s https://rpc.testnet.arc.io -H 'content-type: application/json' -d '{
+  "jsonrpc":"2.0","id":1,"method":"eth_call","params":[{
+    "to":"0xe7170ee0ce4cab4593970ef5c4ebf7d0d62ae19b",
+    "data":"0xc7df14e2ebd60de9b8c99e6bde3ce7ad1894177e706e75c0120c192da71400a378ae7e4c"
+  },"latest"]}'
+```
+
+`0x…01` is Active.
+
+## The one that sits between
+
+The confirmation service is neither. It is not a convenience — remove it and no debtor can confirm
+anything — and it is not trusted with the record either.
+
+The enclave cannot establish that the key which signed a confirmation belongs to the debtor: the
+accounting ledger holds no chain address, and the connection that reads it is read-only over
+contacts. So the entire anchor is that the one-time link arrived at an address only the ledger
+knows. That service resolves the address itself and refuses a request that offers one.
+
+It is the weakest link in the chain, and it is named here rather than left for a reader to find.
+
+## Two properties worth knowing before you build on this
+
+**A lien id is not derivable from the receivable.** The registry key is salted with a pepper that
+never leaves the enclave. Holding the invoice tells you nothing about whether it is pledged —
+measured, an unpeppered key was inverted by brute force in 71 ms against the real corpus, which is
+why the pepper exists. Query a lien id you were given, or enumerate by borrower address.
+
+**Reformatting is refused before the collision check, not by it.** The ledger pins the invoice
+number, the amount, the currency and the due date, and the enclave replaces the debtor, the issuer
+and the country with the book's own values. So on chain only an exact match can be observed. The
+index's tolerance for six of seven is real and measured against 903 pairs of real invoices — see
+[the threat model](/threat-model) — but it is a second line of defence, not the one a
+reformatted claim meets first.

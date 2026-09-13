@@ -1,4 +1,15 @@
 {
   "title": "Docs",
-  "pages": ["index", "quickstart", "sdk", "mcp", "api", "contracts", "architecture", "threat-model", "related-work"]
+  "pages": [
+    "index",
+    "quickstart",
+    "sdk",
+    "mcp",
+    "api",
+    "contracts",
+    "architecture",
+    "limitations",
+    "threat-model",
+    "related-work"
+  ]
 }

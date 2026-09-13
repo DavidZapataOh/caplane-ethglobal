@@ -32,8 +32,13 @@ export const mirror = (
 }
 
 /** The body of one `## <heading>` section, up to the next `## ` heading or the end of the file. */
-const extractSection = (source: string, heading: string): string | undefined =>
-  source.match(new RegExp(`^## ${heading}\\n([\\s\\S]*?)(?=\\n## |$)`, 'm'))?.[1]?.trim()
+/**
+ * No `m` flag, deliberately. With it, `$` anchors to the end of a LINE rather than the end of the
+ * file, so the lazy capture stopped at the first line break and this returned an empty section for
+ * every input — invisible until a source finally had the section, because an absent one skips.
+ */
+export const extractSection = (source: string, heading: string): string | undefined =>
+  source.match(new RegExp(`(?:^|\\n)## ${heading}\\n([\\s\\S]*?)(?=\\n## |$)`))?.[1]?.trim()
 
 /**
  * Same as `mirror`, but for a single section of a source file rather than the whole thing — the

@@ -19,7 +19,7 @@
   <a href="#architecture">Architecture</a> ·
   <a href="#deployed-on-arc-testnet">Contracts</a> ·
   <a href="#run-it-locally">Run locally</a> ·
-  <a href="#what-is-not-built">Limits</a>
+  <a href="#limitations">Limits</a>
 </p>
 
 ---
@@ -371,7 +371,7 @@ caplane/
 
 ---
 
-## What is not built
+## Limitations
 
 Every project has these. Most do not write them down.
 
