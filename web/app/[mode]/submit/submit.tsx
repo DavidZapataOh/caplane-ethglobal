@@ -1,7 +1,7 @@
 'use client'
 
 import { usePrivy, useWallets } from '@privy-io/react-auth'
-import { useState } from 'react'
+import { type ReactNode, useState } from 'react'
 import { type Hex, encodeFunctionData } from 'viem'
 import { Alert } from '../../../components/alert'
 import { Badge } from '../../../components/badge'
@@ -15,6 +15,45 @@ import { watchVerdict } from './verdict'
 import { ARC, API, INBOX, inboxAbi, submissionIdOf } from './inbox'
 
 type Stage = 'idle' | 'sealing' | 'sending' | 'watching' | 'recorded' | 'rejected' | 'pending' | 'error'
+
+/**
+ * One step of the three, with the only three states it can be in: waiting for you, done, or not
+ * your turn yet. A blocked step says why in its own body rather than leaving a disabled control to
+ * explain itself.
+ */
+const Step = ({
+  n,
+  title,
+  children,
+  done = false,
+  blocked = false,
+}: {
+  n: number
+  title: string
+  children: ReactNode
+  done?: boolean
+  blocked?: boolean
+}) => (
+  <div className="flex gap-4">
+    <span
+      className={`mt-0.5 flex size-6 shrink-0 items-center justify-center border font-display text-sm ${
+        done
+          ? 'border-verified text-verified-text'
+          : blocked
+            ? 'border-border text-text-3'
+            : 'border-border-strong text-text'
+      }`}
+    >
+      {done ? <Icon name="verified" className="size-3.5" /> : n}
+    </span>
+    <div className="flex flex-col gap-1.5">
+      <h2 className={`font-display text-base font-medium ${blocked ? 'text-text-3' : 'text-text'}`}>
+        {title}
+      </h2>
+      <p className="max-w-prose font-prose text-sm leading-[1.6] text-text-2">{children}</p>
+    </div>
+  </div>
+)
 
 /**
  * Seals in the browser, signs with the visitor's Privy wallet, and broadcasts the signed
@@ -36,11 +75,28 @@ export function Submit() {
   const [detail, setDetail] = useState('')
   const [transaction, setTransaction] = useState('')
   const [envelopeBytes, setEnvelopeBytes] = useState(0)
-  const [expiresAtBlock, setExpiresAtBlock] = useState('')
+  // A block far enough ahead that nobody has to reason about it. It bounds how long the customer's
+  // signature stays usable, and asking a person to name a block height is asking them to guess.
+  const [expiresAtBlock, setExpiresAtBlock] = useState('99000000')
+  const [showAdvanced, setShowAdvanced] = useState(false)
 
   // Whether the claim carries enough to derive an identity at all. The identity itself is built
   // where the debtor is chosen: two of its components are the ledger's, not this form's.
   const complete = invoiceNumber !== '' && amountMinor !== '' && dueDate !== ''
+  const confirmed = receipt !== ''
+
+  /**
+   * What the minor units mean, echoed back. The field asks for 27500000 and a person is holding an
+   * invoice that says 275,000.00 — measured on a real person, that is where they stop and ask.
+   */
+  const amountShown = (() => {
+    if (!/^\d+$/.test(amountMinor)) return undefined
+    const digits = currency.toUpperCase() === 'JPY' ? 0 : 2
+    const padded = amountMinor.padStart(digits + 1, '0')
+    const whole = padded.slice(0, padded.length - digits) || '0'
+    const fraction = digits === 0 ? '' : `.${padded.slice(padded.length - digits)}`
+    return `${Number(whole).toLocaleString('en-US')}${fraction} ${currency.toUpperCase()}`
+  })()
 
   const wallet = wallets[0]
 
@@ -135,70 +191,163 @@ export function Submit() {
   }
 
   if (!authenticated) {
+    // Signed out, the page used to be one button and nothing else — no way to know what you were
+    // agreeing to start, or what you would need to hand over, before committing to a wallet.
     return (
-      <div className="mt-6">
-        <Button variant="primary" onClick={login}>
-          <Icon name="wallet" /> Sign in to submit
-        </Button>
+      <div className="mt-10 flex max-w-2xl flex-col gap-8">
+        <div className="flex flex-col gap-5 border border-border p-6">
+          <h2 className="font-display text-base font-medium text-text">What you will need</h2>
+          <ul className="flex flex-col gap-3 font-prose text-sm leading-[1.6] text-text-2">
+            <li className="flex gap-3">
+              <Icon name="contract" className="mt-0.5 size-4 shrink-0 text-text-3" />
+              The invoice, as it appears in your accounting system: its number, amount, currency and
+              due date.
+            </li>
+            <li className="flex gap-3">
+              <Icon name="debtor" className="mt-0.5 size-4 shrink-0 text-text-3" />
+              Your customer, reachable at the email your ledger holds for them. They confirm the
+              figures; you cannot pledge on their behalf.
+            </li>
+            <li className="flex gap-3">
+              <Icon name="wallet" className="mt-0.5 size-4 shrink-0 text-text-3" />
+              A wallet, to sign the one transaction that carries it.
+            </li>
+          </ul>
+          <p className="font-prose text-xs leading-[1.6] text-text-3">
+            You can fill in the invoice and come back — nothing is sent until your customer signs.
+          </p>
+        </div>
+        <div>
+          <Button variant="primary" onClick={login}>
+            <Icon name="wallet" /> Sign in to start
+          </Button>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="mt-6 flex max-w-xl flex-col gap-4">
-      <FindDebtor
-        creditor={wallet?.address ?? ''}
-        invoiceNumber={invoiceNumber}
-        currency={currency}
-        amountMinor={amountMinor}
-        dueDate={dueDate}
-        expiresAtBlock={expiresAtBlock}
-        onReceipt={setReceipt}
-        ready={complete}
-      />
-      <Field
-        label="Confirmation receipt"
-        value={receipt}
-        onChange={(event) => setReceipt(event.target.value)}
-        hint="Filled in when the debtor is asked; paste one to resume a claim from another session."
-      />
-      <Field
-        label="Invoice number"
-        value={invoiceNumber}
-        onChange={(event) => setInvoiceNumber(event.target.value)}
-        placeholder="ORC1043"
-      />
-      <Field
-        label="Amount, in minor units"
-        value={amountMinor}
-        onChange={(event) => setAmountMinor(event.target.value)}
-        placeholder="27500000"
-      />
-      <Field label="Currency" value={currency} onChange={(event) => setCurrency(event.target.value)} />
-      <Field
-        label="Due date"
-        value={dueDate}
-        onChange={(event) => setDueDate(event.target.value)}
-        placeholder="2027-01-30"
-      />
-      <Field
-        label="Confirmation expires at block"
-        value={expiresAtBlock}
-        onChange={(event) => setExpiresAtBlock(event.target.value)}
-        placeholder="70000000"
-      />
-      <div>
-        <Button variant="primary" onClick={() => void submit()} disabled={stage === 'sealing' || stage === 'sending' || stage === 'watching'}>
-          <Icon name={stage === 'idle' || stage === 'error' ? 'encrypted' : 'loading'} />
-          {stage === 'sealing'
-            ? 'Sealing'
-            : stage === 'sending'
-              ? 'Submitting'
-              : stage === 'watching'
-                ? 'Waiting for the enclave'
-                : 'Seal and submit'}
-        </Button>
-      </div>
+    <div className="mt-8 flex max-w-2xl flex-col gap-10">
+      {/* The order is the order the work happens in. It used to open with the debtor search, which
+          cannot be used until the invoice below is filled — so the first thing the page did was
+          offer a control and then refuse it. */}
+      <section className="flex flex-col gap-4">
+        <Step n={1} title="The invoice you want to finance" done={complete}>
+          Copy it from your accounting system. These four fields are what your customer will be
+          asked to confirm, so they have to match the invoice exactly.
+        </Step>
+        <Field
+          label="Invoice number"
+          value={invoiceNumber}
+          onChange={(event) => setInvoiceNumber(event.target.value)}
+          placeholder="ORC1043"
+          hint="Exactly as it appears in your ledger."
+        />
+        <Field
+          label="Amount"
+          value={amountMinor}
+          onChange={(event) => setAmountMinor(event.target.value)}
+          placeholder="27500000"
+          hint={
+            amountShown === undefined
+              ? 'In minor units — cents, not dollars. 275,000.00 is written 27500000.'
+              : `That is ${amountShown}.`
+          }
+        />
+        <Field
+          label="Currency"
+          value={currency}
+          onChange={(event) => setCurrency(event.target.value)}
+          hint="Three letters, as the invoice states it."
+        />
+        <Field
+          label="Due date"
+          value={dueDate}
+          onChange={(event) => setDueDate(event.target.value)}
+          placeholder="2026-12-31"
+          hint="Year first."
+        />
+      </section>
+
+      <section className="flex flex-col gap-4">
+        <Step n={2} title="Ask your customer to confirm" done={confirmed} blocked={!complete}>
+          {complete
+            ? 'Search your ledger for them. We email the address your ledger holds — never one typed here — and they sign the figures above. Nothing is sent until they do.'
+            : 'Fill in the invoice first. What your customer signs is derived from it, so asking now would have them agree to a blank claim.'}
+        </Step>
+        <FindDebtor
+          creditor={wallet?.address ?? ''}
+          invoiceNumber={invoiceNumber}
+          currency={currency}
+          amountMinor={amountMinor}
+          dueDate={dueDate}
+          expiresAtBlock={expiresAtBlock}
+          onReceipt={setReceipt}
+          ready={complete}
+        />
+        {confirmed && (
+          <dl className="border border-border">
+            <DataRow label="confirmation" value={receipt} />
+          </dl>
+        )}
+        <div>
+          <button
+            type="button"
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            className="font-prose text-sm text-text-3 underline underline-offset-4 hover:text-text-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text"
+          >
+            {showAdvanced ? 'Hide' : 'Resuming from another session, or changing the expiry?'}
+          </button>
+        </div>
+        {showAdvanced && (
+          <div className="flex flex-col gap-4 border-l border-border pl-4">
+            <Field
+              label="Confirmation receipt"
+              value={receipt}
+              onChange={(event) => setReceipt(event.target.value)}
+              hint="Filled in for you when your customer is asked. Paste one to pick up where you left off."
+            />
+            <Field
+              label="Confirmation expires at block"
+              value={expiresAtBlock}
+              onChange={(event) => setExpiresAtBlock(event.target.value)}
+              hint="How long your customer's signature stays usable. The default is far enough ahead that it will not expire on you."
+            />
+          </div>
+        )}
+      </section>
+
+      <section className="flex flex-col gap-4">
+        <Step n={3} title="Seal it and send it" blocked={!complete || !confirmed}>
+          {!complete
+            ? 'The invoice is not filled in yet.'
+            : !confirmed
+              ? 'Waiting on your customer. This turns on the moment they sign.'
+              : 'Your browser encrypts the invoice so only the enclave can read it, then sends one transaction. You will see the verdict here in about fifteen seconds.'}
+        </Step>
+        <div>
+          <Button
+            variant="primary"
+            onClick={() => void submit()}
+            disabled={
+              !complete ||
+              !confirmed ||
+              stage === 'sealing' ||
+              stage === 'sending' ||
+              stage === 'watching'
+            }
+          >
+            <Icon name={stage === 'idle' || stage === 'error' ? 'encrypted' : 'loading'} />
+            {stage === 'sealing'
+              ? 'Encrypting'
+              : stage === 'sending'
+                ? 'Sending'
+                : stage === 'watching'
+                  ? 'Waiting for the enclave'
+                  : 'Seal and submit'}
+          </Button>
+        </div>
+      </section>
 
       {envelopeBytes > 0 && (
         <dl className="border border-border">
