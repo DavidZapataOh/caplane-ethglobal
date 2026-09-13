@@ -2,7 +2,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { keccak256, toHex, verifyTypedData } from 'viem'
 import book from '../abi/deployments.arc-testnet.json' with { type: 'json' }
 import { CONFIRMATION_TYPES, SHOWN, confirmationDomain } from './confirmation.js'
-import { contactEmailOf } from './ledger.js'
+import { contactEmailOf, searchContacts } from './ledger.js'
 import { type LinkPayload, markUsed, mint, open, receiptOf } from './link.js'
 import { type SendOutcome, idempotencyKeyFor, send } from './notify.js'
 
@@ -179,6 +179,20 @@ export const routeConfirm = async (
       return true
     }
     reply(response, 405, { error: 'method not allowed' }, cors)
+    return true
+  }
+
+  if (url.startsWith('/contacts') && request.method === 'GET') {
+    const query = new URL(request.url ?? '', 'http://local').searchParams.get('q') ?? ''
+    if (query.trim().length < 3) {
+      reply(response, 400, { error: 'a search needs at least three characters' }, cors)
+      return true
+    }
+    try {
+      reply(response, 200, { contacts: await searchContacts(query) }, cors)
+    } catch (error) {
+      reply(response, 502, { error: (error as Error).message }, cors)
+    }
     return true
   }
 

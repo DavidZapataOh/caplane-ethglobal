@@ -148,6 +148,12 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: ${{ matrix.dir }}/package-lock.json
+      # Two runtimes for `web`, not one. The submission page seals with `claim/`, whose modules
+      # import each other without file extensions — which a bundler and bun both resolve and plain
+      # `node` does not. That test proves the browser's envelope opens with the enclave's own
+      # decoder, so running it under the runtime that can load the decoder is the point.
+      - uses: oven-sh/setup-bun@v2
+        with: { bun-version: 1.2.21 }
       - run: npm ci
         working-directory: ${{ matrix.dir }}
       - run: npm run lint

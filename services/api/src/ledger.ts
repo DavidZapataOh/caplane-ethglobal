@@ -56,3 +56,42 @@ export const contactEmailOf = async (contactId: string): Promise<string | undefi
   const email = body.Contacts?.[0]?.EmailAddress
   return email === undefined || email === '' ? undefined : email
 }
+
+/**
+ * Contacts matching a name, for a business that knows who its debtor is but not the identifier the
+ * ledger files them under. Nobody memorises that GUID, and the confirmation channel requires one.
+ *
+ * The same scope `contactEmailOf` already uses: `accounting.contacts.read` covers the collection
+ * endpoint and its filter as well as the single-contact one, so a search asks for nothing new. The
+ * three-character floor is not politeness — a one-character query against a real ledger returns a
+ * page of everybody, which is both useless to the caller and a wide scan on someone else's API.
+ */
+export const searchContacts = async (
+  query: string,
+): Promise<Array<{ id: string; name: string }>> => {
+  if (query.trim().length < 3) throw new Error('search query must be at least three characters')
+  const { token, tenant } = await tokenFor()
+  // The quote is stripped rather than escaped: the filter is a provider-side expression language,
+  // and a value that closes its own string is the only way a name reaches it as syntax.
+  const filter = `Name.Contains("${query.replaceAll('"', '')}")`
+  const response = await fetch(
+    `https://api.xero.com/api.xro/2.0/Contacts?where=${encodeURIComponent(filter)}`,
+    {
+      headers: {
+        authorization: `Bearer ${token}`,
+        'xero-tenant-id': tenant,
+        accept: 'application/json',
+      },
+    },
+  )
+  if (!response.ok) throw new Error(`ledger search ${response.status}`)
+  const body = (await response.json()) as {
+    Contacts?: Array<{ ContactID?: string; Name?: string }>
+  }
+  return (body.Contacts ?? [])
+    .filter(
+      (contact): contact is { ContactID: string; Name: string } =>
+        contact.ContactID !== undefined && contact.Name !== undefined,
+    )
+    .map((contact) => ({ id: contact.ContactID, name: contact.Name }))
+}

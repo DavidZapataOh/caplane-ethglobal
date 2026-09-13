@@ -195,3 +195,26 @@ test('the routes the activity gate forbids are still absent', async (t) => {
     assert.equal((await fetch(`${api.url}${path}`)).status, 404, path)
   }
 })
+
+// The business knows its debtor's name, never the identifier the ledger files them under — and the
+// confirmation route requires that identifier. This is the only way to get from one to the other.
+test('GET /contacts searches by name and returns nothing an invoice route needs', async (t) => {
+  const api = await listen(t)
+  const response = await fetch(`${api.url}/contacts?q=Bayside`)
+  assert.equal(response.status, 200)
+  const body = (await response.json()) as { contacts: Array<Record<string, unknown>> }
+  assert.ok(Array.isArray(body.contacts))
+  assert.ok(body.contacts.length >= 1, 'the ledger matched nothing for a name it holds')
+  // Exactly two fields. A contact carries an address, a tax number and a bank account, and none of
+  // those is this route's business — a search that returned the whole record would hand a browser
+  // more of the ledger than the channel ever needs.
+  for (const contact of body.contacts) {
+    assert.deepEqual(Object.keys(contact).sort(), ['id', 'name'])
+  }
+})
+
+test('a search too short to be useful is refused, not forwarded to the ledger', async (t) => {
+  const api = await listen(t)
+  assert.equal((await fetch(`${api.url}/contacts?q=ab`)).status, 400)
+  assert.equal((await fetch(`${api.url}/contacts`)).status, 400)
+})
