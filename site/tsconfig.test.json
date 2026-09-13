@@ -1,0 +1,8 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "allowImportingTsExtensions": true
+  },
+  "include": ["lib/**/*.test.ts", "next-env.d.ts"],
+  "exclude": ["node_modules"]
+}
