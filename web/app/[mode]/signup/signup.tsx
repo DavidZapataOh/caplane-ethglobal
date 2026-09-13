@@ -10,7 +10,7 @@ import { Icon } from '../../../components/icon'
 import { Treasury } from './treasury'
 import { validOrgName } from './treasury-support.ts'
 
-type Organization = { id: string; walletId: string; walletAddress: string }
+type Organization = { id: string; walletAddress: string; binding: string }
 
 /**
  * Signing up a business. The person authenticates with Privy; the organization, its wallet and its
@@ -84,7 +84,7 @@ export function Signup() {
             <DataRow label="wallet" value={organization.walletAddress} />
           </dl>
         </div>
-        <Treasury walletId={organization.walletId} from={organization.walletAddress} />
+        <Treasury binding={organization.binding} from={organization.walletAddress} />
       </div>
     )
   }

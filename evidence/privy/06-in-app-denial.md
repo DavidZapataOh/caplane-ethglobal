@@ -6,6 +6,15 @@ transfer in the interface rather than in a terminal.
 
 Measured live on 2026-09-13 against `api.privy.io`, with the organization torn down afterwards.
 
+⚠️ **The two route calls below were recorded before the routes required a session.** They are
+reproduced verbatim because they are what was run, not what would be run today: both now answer
+`401` without an `Authorization: Bearer <Privy access token>` header, and the transfer route no
+longer accepts a wallet id from the caller at all — it reads one out of a token minted at sign-up
+and bound to the signed-in user. Re-running them needs a browser login, which belongs to the
+rehearsal. What the routes prove about the **policy** is unchanged, and the section below it —
+signing straight against the Privy SDK, with no route in the path — reproduces today exactly as
+written.
+
 ## The organization the route creates
 
 `POST /api/organizations` with `{"name":"caplane-demo-verify-route"}` answered `200`:
@@ -43,6 +52,9 @@ changes; it is never a wallet owner.
 
 ## The same pair through the route the page calls
 
+Recorded before the session requirement landed; today each of these carries a bearer token and the
+wallet is named by the sign-up binding rather than by `walletId`:
+
     POST /api/organizations/transfer   valueWei 1000000000000000    -> 200, signed transaction, 242 chars
     POST /api/organizations/transfer   valueWei 10000000000000000   -> 400
       {"status":400,"error":{"error":"RPC request denied due to policy violation",
@@ -70,6 +82,25 @@ on the deny side. A pair written `lt` and `gt` would leave the threshold matchin
 wallet, refusing a blocked recipient, captured with headers. This file proves the product: an
 organization a person created through the interface, with a policy it received at sign-up, refusing
 an amount in the surface a judge can open.
+
+## What the routes refuse, verified after the session requirement
+
+    POST /api/organizations            no Authorization header        401
+    POST /api/organizations/transfer   no Authorization header        401
+    POST /api/organizations/transfer   Authorization: Bearer <forged> 401
+
+Authenticating is not authorising, and the second was the one that mattered: a signed-in visitor
+could still name another organization's wallet id and have the app secret sign for it, capped only
+by that organization's own threshold. Privy's organization resource carries no membership — id,
+name and key quorum, nothing else — so the server has nobody to ask whether a caller owns a wallet.
+The wallet id therefore stopped being caller input: it travels inside a token this server mints at
+sign-up, and the transfer route reads it from there. Naming someone else's wallet is not a request
+that can be made.
+
+The 403 path — a valid session presenting a binding minted for a different user — is covered by
+unit tests over the token (including a body swapped under a kept signature, and a token signed with
+another key) plus the route's own comparison. Exercising it end to end needs two real browser
+sessions, which belongs to the rehearsal.
 
 ## Teardown
 

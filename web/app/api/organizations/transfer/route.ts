@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { isPolicyViolation } from '../policy'
-import { authenticatedUserId, privyClient } from '../privy'
+import { openBinding } from '../binding'
+import { authenticatedUserId, privyClient, required } from '../privy'
 
 /**
  * A treasury transfer: signed by the organization's wallet, then broadcast by us.
@@ -42,19 +43,28 @@ const rpc = async (method: string, params: unknown[]): Promise<string> => {
 
 export async function POST(request: Request) {
   const privy = privyClient()
-  if ((await authenticatedUserId(privy, request)) === undefined) {
+  const userId = await authenticatedUserId(privy, request)
+  if (userId === undefined) {
     return NextResponse.json({ error: { code: 'unauthenticated' } }, { status: 401 })
   }
 
-  const { walletId, from, to, valueWei } = (await request.json()) as {
-    walletId?: string
+  const { binding, from, to, valueWei } = (await request.json()) as {
+    binding?: string
     from?: string
     to?: string
     valueWei?: string
   }
-  if (walletId === undefined || from === undefined || to === undefined || valueWei === undefined) {
+  if (binding === undefined || from === undefined || to === undefined || valueWei === undefined) {
     return NextResponse.json({ error: { code: 'malformed_request' } }, { status: 400 })
   }
+
+  // The wallet comes out of the token, never out of the body, and only for the user it was minted
+  // for. Verifying the access token says someone is signed in; this says which wallet is theirs.
+  const opened = openBinding(binding, required('ORG_BINDING_KEY'))
+  if (opened === undefined || opened.userId !== userId) {
+    return NextResponse.json({ error: { code: 'not_your_wallet' } }, { status: 403 })
+  }
+  const walletId = opened.walletId
 
   // The wallet's own count, never a literal: a fixed nonce signs fine and is rejected on
   // broadcast the second time the same wallet sends anything.

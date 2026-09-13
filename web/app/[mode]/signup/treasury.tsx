@@ -14,7 +14,7 @@ import { outcomeOf, weiOf } from './treasury-support.ts'
  * is the point of the whole flow, and the reason the amount field starts empty rather than
  * pre-filled with a number that would prove nothing either way.
  */
-export function Treasury({ walletId, from }: { walletId: string; from: string }) {
+export function Treasury({ binding, from }: { binding: string; from: string }) {
   const { getAccessToken } = usePrivy()
   const [to, setTo] = useState('0x000000000000000000000000000000000000dEaD')
   const [amount, setAmount] = useState('')
@@ -30,7 +30,7 @@ export function Treasury({ walletId, from }: { walletId: string; from: string })
           'content-type': 'application/json',
           authorization: `Bearer ${await getAccessToken()}`,
         },
-        body: JSON.stringify({ walletId, from, to, valueWei: weiOf(amount).toString() }),
+        body: JSON.stringify({ binding, from, to, valueWei: weiOf(amount).toString() }),
       })
       const outcome = outcomeOf(await response.json())
       setDetail(outcome.detail)

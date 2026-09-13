@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
+import { bindWallet } from './binding'
 import { THRESHOLD_WEI } from './policy'
-import { authenticatedUserId, privyClient } from './privy'
+import { authenticatedUserId, privyClient, required } from './privy'
 import { buildSignupPolicyRules } from './rules'
 
 /**
@@ -37,7 +38,8 @@ const authorizationKey = async (): Promise<string> => {
 
 export async function POST(request: Request) {
   const privy = privyClient()
-  if ((await authenticatedUserId(privy, request)) === undefined) {
+  const userId = await authenticatedUserId(privy, request)
+  if (userId === undefined) {
     return NextResponse.json({ error: 'Sign in to create an organization.' }, { status: 401 })
   }
 
@@ -73,7 +75,10 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     id: organization.id,
-    walletId: wallet.id,
     walletAddress: wallet.address,
+    // Not the wallet id: what goes back is a token binding this user to it. The transfer route
+    // reads the id out of the token, so naming someone else's wallet is not a request anyone can
+    // make.
+    binding: bindWallet({ userId, walletId: wallet.id }, required('ORG_BINDING_KEY')),
   })
 }
