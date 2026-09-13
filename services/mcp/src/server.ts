@@ -51,6 +51,28 @@ export const createMcp = () =>
       response.writeHead(200, { 'content-type': 'text/plain' })
       return response.end('ok')
     }
+    // Still a 404 at the root — the status is what distinguishes this responder from a platform
+    // placeholder — but with a body for the person who typed the host into a browser and would
+    // otherwise read two words and conclude the service is down.
+    if (url === '/') {
+      response.writeHead(404, { 'content-type': 'text/plain' })
+      return response.end(
+        [
+          'Caplane MCP',
+          '',
+          'This host speaks the Model Context Protocol, not HTML. There is no page here, and that',
+          'is not a fault: POST JSON-RPC to /mcp and a client will be answered.',
+          '',
+          '  endpoint   POST /mcp',
+          '  health     GET  /health',
+          '  docs       https://docs.caplane.xyz/mcp',
+          '',
+          'It reads the lien registry on Arc Testnet and nothing else. It holds no key, takes no',
+          'credential, and cannot write.',
+          '',
+        ].join('\n'),
+      )
+    }
     if (url !== ENDPOINT) {
       response.writeHead(404, { 'content-type': 'text/plain' })
       return response.end('not found')

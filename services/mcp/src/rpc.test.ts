@@ -9,16 +9,23 @@ import { RPC_URL, readLien, requests } from './rpc.js'
 const RECORDED = '0xebd60de9b8c99e6bde3ce7ad1894177e706e75c0120c192da71400a378ae7e4c' as const
 const REFUSED = '0x9c22eff8f4efee07013d86feaf5f1a559053004f1f61915873690d57e5a08b29' as const
 
-// The measured trap of every surface built on this registry: the only lien on chain is released, so
-// isEncumbered answers false for it AND for an id nobody ever wrote. A server that answered "not
-// encumbered" to everything would be indistinguishable through that field alone.
+/**
+ * What the surface has to tell apart, read from the chain rather than asserted about it.
+ *
+ * Written against whatever the registry holds rather than against a state someone measured once:
+ * this lien has been active, then released, then active again, and a test pinned to one of those
+ * reads as a decoding fault the next time a claim is pledged. The borrower is not pinned either —
+ * it is whoever last pledged. The two figures that are pinned are policy, published in
+ * configuration and stable across submissions.
+ */
 test('a recorded lien and a refused submission differ where it matters', async () => {
   const recorded = await readLien(RECORDED)
   const refused = await readLien(REFUSED)
-  assert.equal(recorded.encumbered, refused.encumbered) // both false today, and that is the point
-  assert.equal(recorded.status, LienStatus.Released)
+  assert.notEqual(recorded.status, LienStatus.None, 'the registry has never heard of this id')
   assert.equal(refused.status, LienStatus.None)
-  assert.equal(recorded.lien.borrower, '0x86Ec9f04485Db066CF155353f15eef356Ae90253')
+  assert.equal(recorded.encumbered, recorded.status === LienStatus.Active)
+  assert.equal(refused.encumbered, false)
+  assert.notEqual(recorded.lien.borrower, '0x0000000000000000000000000000000000000000')
   assert.equal(recorded.lien.advanceUsdc6, 8_000_000n)
   assert.equal(recorded.lien.rateBps, 200)
   assert.equal(refused.lien.borrower, '0x0000000000000000000000000000000000000000')

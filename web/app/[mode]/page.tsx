@@ -29,11 +29,19 @@ const SURFACES = [
   },
   {
     href: '/harness',
+    // Last of an odd five: spanning both columns closes the grid instead of leaving a hole.
+    wide: true,
     icon: 'rejected',
     title: 'The adversarial harness',
     body: 'A worker trying to pledge the same receivable a second time, continuously, refused every time.',
   },
-] as const
+] as const satisfies ReadonlyArray<{
+  href: string
+  icon: string
+  title: string
+  body: string
+  wide?: boolean
+}>
 
 /**
  * The root of both hosts, and they want different things from it.
@@ -49,30 +57,36 @@ export default async function Page({ params }: PageProps<'/[mode]'>) {
   if (mode === 'paper') redirect('/registry')
 
   return (
-    <main className="flex-1 p-8 font-data text-text-2">
-      <h1 className="font-display text-2xl text-text">Caplane</h1>
-      <p className="mt-2 flex items-center gap-2 text-seal-text">
-        <Icon name="encumbered" />
-        An encrypted lien registry writable only from inside a TEE.
+    <main className="flex-1 py-16">
+      <p className="font-display text-[10px] font-medium tracking-[0.22em] text-text-3 uppercase">
+        Arc Testnet
+      </p>
+      <h1 className="mt-5 max-w-[20ch] font-display text-4xl leading-[1.15] font-medium tracking-[-0.03em] text-balance text-text sm:text-5xl">
+        An encrypted lien registry, writable only from inside a TEE.
+      </h1>
+      <p className="mt-6 max-w-2xl font-prose text-lg leading-[1.6] text-pretty text-text-2">
+        Five surfaces, one registry. Only the first needs nothing from you.
       </p>
 
-      <dl className="mt-8 flex max-w-3xl flex-col divide-y divide-border border border-border">
+      <dl className="mt-12 grid gap-px border border-border bg-border sm:grid-cols-2">
         {SURFACES.map((surface) => (
           <Link
             key={surface.href}
             href={surface.href}
-            className="flex flex-col gap-1 p-4 hover:bg-surface focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-text"
+            className={`flex flex-col gap-2 bg-surface p-6 hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-text${
+              'wide' in surface && surface.wide ? ' sm:col-span-2' : ''
+            }`}
           >
-            <dt className="flex items-center gap-2 font-display text-text">
-              <Icon name={surface.icon} />
+            <dt className="flex items-center gap-2.5 font-display text-base font-medium text-text">
+              <Icon name={surface.icon} className="size-4 shrink-0 text-text-3" />
               {surface.title}
             </dt>
-            <dd className="max-w-prose font-prose text-text-2">{surface.body}</dd>
+            <dd className="font-prose text-sm leading-[1.6] text-text-2">{surface.body}</dd>
           </Link>
         ))}
       </dl>
 
-      <p className="mt-8 max-w-prose font-prose text-text-3">
+      <p className="mt-10 max-w-2xl font-prose text-sm leading-[1.65] text-text-3">
         Only the lookup needs nothing from you. The others sign with a wallet, and the registry does
         not care which one — it accepts a write from the network&apos;s forwarder and from no one
         else, including us.

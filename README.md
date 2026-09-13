@@ -56,7 +56,9 @@ Everything below is live on Arc Testnet right now.
 | [registry.caplane.xyz](https://registry.caplane.xyz) | **Public lookup.** No account, no key. Reads the chain from your own browser |
 | [app.caplane.xyz](https://app.caplane.xyz) | Sign up, pledge a receivable, see your claims, fund the pool |
 | [app.caplane.xyz/harness](https://app.caplane.xyz/harness) | **The adversarial worker**, live: the same pledged receivable attempted again and again, refused every time |
+| [docs.caplane.xyz](https://docs.caplane.xyz) | **The documentation**: quickstart, SDK reference, MCP, the API, the contracts, the architecture and the declared limits |
 | [api.caplane.xyz/health](https://api.caplane.xyz/health) | The indexer and the confirmation channel |
+| [mcp.caplane.xyz/mcp](https://mcp.caplane.xyz/health) | **An MCP server**: ask an agent about a lien, over the Model Context Protocol. `/health` answers for humans; `/mcp` speaks the protocol and answers `405` to a browser, which is correct |
 
 Read a real lien without trusting anything of ours:
 
@@ -156,7 +158,7 @@ over stays inside.
 | Working backend | [`api.caplane.xyz`](https://api.caplane.xyz/health) — chain indexer and the debtor confirmation channel |
 | Architecture diagram | [Below](#architecture), and on the landing page |
 | Deployed on Arc | Four contracts, verified, [addresses below](#deployed-on-arc-testnet) |
-| Detailed documentation | This file, [`THREATMODEL.md`](THREATMODEL.md), [`RELATED-WORK.md`](RELATED-WORK.md), [`evidence/`](evidence/) |
+| Detailed documentation | [docs.caplane.xyz](https://docs.caplane.xyz), this file, [`THREATMODEL.md`](THREATMODEL.md), [`RELATED-WORK.md`](RELATED-WORK.md), [`evidence/`](evidence/) |
 
 **On "deployed or deployment-ready on Arc mainnet".** Arc Public Mainnet launches on
 **16 September 2026** — three days after this submission closes. Today Arc is in private mainnet
@@ -364,7 +366,7 @@ caplane/
 ├── sdk/                @caplane/sdk — read the registry from anywhere
 ├── web/                The app: sign up, pledge, claims, invest, public lookup, harness panel
 ├── site/               The landing page
-├── services/           api (indexer + debtor confirmation), mcp, adversarial harness
+├── services/           api (indexer + debtor confirmation), mcp (Model Context Protocol server), adversarial harness
 ├── scripts/            The repository's gates: hygiene, budgets, generated docs
 └── evidence/           98 reproducible artifacts, indexed
 ```

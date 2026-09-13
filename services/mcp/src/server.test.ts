@@ -51,7 +51,8 @@ test('the official client connects, discovers and calls', async (t) => {
   const called = (await client.callTool({ name: 'get_lien', arguments: { lienId: RECORDED } })) as {
     content: Array<{ text: string }>
   }
-  assert.equal((JSON.parse(called.content[0]!.text) as { status: string }).status, 'released')
+  // Whatever the registry holds today: what matters is that the id is known at all.
+  assert.notEqual((JSON.parse(called.content[0]!.text) as { status: string }).status, 'none')
 })
 
 // The instructions are how an agent learns the boundary from the protocol rather than from a README
@@ -148,4 +149,21 @@ test('the health contract survives', async (t) => {
   const missing = await fetch(`${api.url}/nothing`)
   assert.equal(missing.status, 404)
   assert.equal(await missing.text(), 'not found')
+})
+
+/**
+ * The root still answers 404 — that status is what tells a client this responder is ours and not a
+ * platform placeholder — but the body is for the person who typed the host into a browser and
+ * would otherwise read "not found" as "this service is down".
+ */
+test('the root explains itself without pretending to be a page', async (t) => {
+  const api = await listen(t)
+  const root = await fetch(`${api.url}/`)
+  assert.equal(root.status, 404)
+  const body = await root.text()
+  assert.match(body, /Model Context Protocol/)
+  assert.match(body, /POST/)
+  assert.match(body, /\/mcp/)
+  // And an unknown path is still terse: only the root is worth explaining.
+  assert.equal(await (await fetch(`${api.url}/nothing`)).text(), 'not found')
 })
