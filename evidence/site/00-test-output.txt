@@ -1,6 +1,6 @@
-ℹ pass 15
+ℹ pass 19
 ℹ fail 0
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 152.38525
+ℹ duration_ms 322.3775

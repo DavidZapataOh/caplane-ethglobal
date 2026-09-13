@@ -11,7 +11,13 @@ import {
   assertEvidenceReal,
   commandFor,
   REGISTRY_ADDRESS,
+  isPlaceholder,
 } from './landing-data.ts'
+
+test('isPlaceholder flags a REPLACE_ href and nothing else', () => {
+  assert.equal(isPlaceholder('https://REPLACE_WITH_REAL_ID'), true)
+  assert.equal(isPlaceholder('https://registry.caplane.xyz'), false)
+})
 
 const validFixture = DELIVERABLES.map((d) => ({ ...d, href: d.href.includes('REPLACE_') ? '/placeholder' : d.href }))
 

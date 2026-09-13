@@ -5,7 +5,7 @@ export type Deliverable = {
   readonly category: 'bounty' | 'thesis' | 'differentiator'
 }
 
-// The 12 deliverables PROYECTO.md §20.3 defines as done-when for Sprint 06.
+// Everything a reviewer should be able to reach from the landing.
 export const DELIVERABLES: readonly Deliverable[] = [
   { id: 1, label: 'Landing', href: '/', category: 'bounty' },
   { id: 2, label: 'App', href: 'https://app.caplane.xyz', category: 'bounty' },
@@ -19,13 +19,13 @@ export const DELIVERABLES: readonly Deliverable[] = [
   {
     id: 10,
     label: 'Evidence',
-    href: 'https://github.com/REPLACE_ORG/caplane/tree/main/evidence',
+    href: 'https://github.com/DavidZapataOh/caplane-ethglobal/tree/main/evidence',
     category: 'differentiator',
   },
   {
     id: 11,
     label: 'Threat model',
-    href: 'https://github.com/REPLACE_ORG/caplane/blob/main/THREATMODEL.md',
+    href: 'https://github.com/DavidZapataOh/caplane-ethglobal/blob/main/THREATMODEL.md',
     category: 'differentiator',
   },
   { id: 12, label: 'Adversarial harness', href: 'https://REPLACE_WITH_HARNESS_PANEL_URL', category: 'differentiator' },
@@ -61,7 +61,7 @@ export type EvidenceEntry = {
 
 const REGISTRY_ADDRESS = '0xe7170ee0ce4cab4593970ef5c4ebf7d0d62ae19b'
 
-// Every number here is cited in CAPLANE-COMPLETO.md — none is estimated.
+// Every number here is measured and has a receipt in evidence/ — none is estimated.
 export const EVIDENCE: readonly EvidenceEntry[] = [
   {
     id: 'contracts',
@@ -74,7 +74,7 @@ export const EVIDENCE: readonly EvidenceEntry[] = [
     id: 'tests',
     headline: '295 tests, 100% branch coverage',
     detail: '138 contract tests plus 157 unit tests, every branch of all four contracts covered.',
-    proofHref: 'https://github.com/REPLACE_ORG/caplane/tree/main/evidence/test-count.json',
+    proofHref: 'https://github.com/DavidZapataOh/caplane-ethglobal/tree/main/evidence/test-count.json',
   },
   {
     id: 'cycle',
@@ -88,7 +88,7 @@ export const EVIDENCE: readonly EvidenceEntry[] = [
     headline: 'Fuzzy match, measured: 0.111%',
     detail:
       "Across 43 real invoices from Xero's Demo Company (903 pairs), the false-match rate at the shipped threshold is 0.111% (95% CI upper bound 0.524%).",
-    proofHref: 'https://github.com/REPLACE_ORG/caplane/tree/main/evidence/claim/09-rates.txt',
+    proofHref: 'https://github.com/DavidZapataOh/caplane-ethglobal/tree/main/evidence/claim/09-rates.txt',
   },
 ] as const
 
@@ -122,3 +122,7 @@ export function commandFor(audience: Audience, registryAddress: string): string 
       ].join('\n')
   }
 }
+
+export const REPO_URL = 'https://github.com/DavidZapataOh/caplane-ethglobal'
+
+export const isPlaceholder = (href: string): boolean => href.includes('REPLACE_')

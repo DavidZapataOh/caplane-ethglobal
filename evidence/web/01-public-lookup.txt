@@ -143,3 +143,15 @@ the exclusions again fails the test by name:
 The test anchors the pattern before applying it. Unanchored it is worthless: `/_next/...` slips
 past the lookahead at the second slash and every path matches, so the suite would pass on a
 matcher that excludes nothing at all.
+
+--- what changed on 2026-09-13 ------------------------------------------------
+
+The lien above is active again. The same receivable was pledged a second time through the browser
+submission flow, and because the key is derived from the claim's own components it is the same
+lienId: 0xebd60de9… now reads status 1, borrower 0x68905da7…, expiring 2027-01-30.
+
+That makes the trap described above no longer reproducible from live state — `isEncumbered` now
+discriminates, because the lien is active rather than released. The hazard it names is a property of
+the contract and has not gone anywhere: `isEncumbered` is `status == Active`, so a settled lien and
+an id nobody ever wrote still answer alike. The page shows the word, not the boolean, for that
+reason and not for this one measurement.

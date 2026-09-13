@@ -8,16 +8,20 @@ import { REGISTRY, SELECTORS, classify, read } from './chain.ts'
 const RECORDED = '0xebd60de9b8c99e6bde3ce7ad1894177e706e75c0120c192da71400a378ae7e4c'
 const REFUSED = '0x9c22eff8f4efee07013d86feaf5f1a559053004f1f61915873690d57e5a08b29'
 
-// The measured trap. The registry holds exactly one lien in its whole life and it is released, so
-// isEncumbered is false for it AND for an id nobody ever wrote. A page built on that boolean
-// answers the same thing to everything, and a judge sees an answer rather than a status byte.
+// What the page has to tell apart, read from the chain rather than asserted about it. The status
+// byte is the discriminator and the boolean is not: `isEncumbered` is `status == Active`, so a
+// released lien and an id nobody ever wrote both answer false, and a page built on it would say the
+// same thing to a claim that was settled and to one that never existed.
+//
+// The borrower is not pinned. It is whoever last pledged this receivable, so a demo that pledges it
+// again would fail a test about decoding for a reason that has nothing to do with decoding. The two
+// figures that are pinned are policy, published in configuration and stable across submissions.
 test('a recorded id and a refused one differ where it matters', async () => {
   const recorded = await read(RECORDED)
   const refused = await read(REFUSED)
-  assert.equal(recorded.encumbered, refused.encumbered) // both false today, and that is the point
-  assert.equal(recorded.status, 2)
+  assert.notEqual(recorded.status, 0, 'the registry has never heard of the id this test reads')
   assert.equal(refused.status, 0)
-  assert.equal(recorded.lien.borrower, '0x86ec9f04485db066cf155353f15eef356ae90253')
+  assert.notEqual(recorded.lien.borrower, '0x0000000000000000000000000000000000000000')
   assert.equal(recorded.lien.advanceUsdc6, 8_000_000n)
   assert.equal(recorded.lien.rateBps, 200)
   assert.equal(refused.lien.borrower, '0x0000000000000000000000000000000000000000')
@@ -53,9 +57,14 @@ test('the hand-written selectors are the real ones', () => {
 
 // Encumbered is status 1 and nothing else. A reader doing `status != 0` would call a released lien
 // and a defaulted one encumbered, and both are terminal.
+// Written against whatever the chain holds rather than against a state someone measured once: this
+// lien has been active, then released, then active again, and a test pinned to one of those reads
+// as a decoder fault the next time the demo runs.
 test('encumbered is active and nothing else', async () => {
-  assert.equal((await read(RECORDED)).encumbered, false)
-  assert.equal((await read(RECORDED)).status, 2)
+  for (const id of [RECORDED, REFUSED]) {
+    const { encumbered, status } = await read(id)
+    assert.equal(encumbered, status === 1, `encumbered disagreed with the status byte for ${id}`)
+  }
 })
 
 // Without this the page is worth exactly as much as our word for it, and the explorer is not a

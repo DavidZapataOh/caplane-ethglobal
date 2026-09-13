@@ -2,7 +2,13 @@ import { NextResponse, type NextRequest } from 'next/server'
 
 // `/.well-known` must stay out: the certificate validation challenge travels through it, and
 // swallowing it means the domain resolves and never gets a certificate.
-export const config = { matcher: ['/((?!_next|\\.well-known).*)'] }
+//
+// So must the metadata routes. They are emitted at the root of `app/`, outside `[mode]`, so each
+// exists at exactly one path — prepending a mode to `/icon.png` asks for `/dark/icon.png`, which no
+// route serves, and the favicon and the shared-link card 404 on a site whose pages all answer 200.
+export const config = {
+  matcher: ['/((?!_next|\\.well-known|icon\\.png|apple-icon\\.png|favicon\\.ico|opengraph-image|robots\\.txt|sitemap\\.xml).*)'],
+}
 
 /**
  * The mode is a property of the host, so it is resolved here and rewritten into the path.

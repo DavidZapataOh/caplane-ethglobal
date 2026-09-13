@@ -13,11 +13,11 @@ import { modeFor } from './mode'
  * asks for `/dark/api/…`, which no route serves — a 404 with nothing in any log to explain it.
  *
  * So must the metadata routes. They are emitted at the root of `app/`, outside `[mode]`, so each
- * exists at exactly one path — prepending a mode to `/icon.svg` asks for `/dark/icon.svg`, which no
+ * exists at exactly one path — prepending a mode to `/icon.png` asks for `/dark/icon.png`, which no
  * route serves, and the favicon and the shared-link card 404 on a site whose pages all answer 200.
  */
 export const config = {
-	matcher: ['/((?!api/|_next|\\.well-known|icon\\.svg|favicon\\.ico|opengraph-image|robots\\.txt|sitemap\\.xml).*)'],
+	matcher: ['/((?!api/|_next|\\.well-known|icon\\.png|apple-icon\\.png|favicon\\.ico|opengraph-image|robots\\.txt|sitemap\\.xml).*)'],
 }
 
 /**
