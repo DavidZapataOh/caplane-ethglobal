@@ -32,3 +32,17 @@ export const inboxAbi = [
 
 /** The confirmation service. Holds the debtor's signature and nothing of the claim itself. */
 export const API = process.env.NEXT_PUBLIC_API_URL ?? 'https://api.caplane.xyz'
+
+export const REGISTRY = deployments.registry as Hex
+
+/** Arc's own endpoint, which needs no credential — the same one the public registry reads from. */
+export const rpc = async (method: string, params: unknown[]): Promise<unknown> => {
+  const response = await fetch(process.env.NEXT_PUBLIC_ARC_RPC_URL ?? 'https://rpc.testnet.arc.io', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+  })
+  const body = (await response.json()) as { result?: unknown; error?: { message: string } }
+  if (body.error !== undefined) throw new Error(body.error.message)
+  return body.result
+}

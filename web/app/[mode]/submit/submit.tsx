@@ -4,18 +4,20 @@ import { usePrivy, useWallets } from '@privy-io/react-auth'
 import { useState } from 'react'
 import { type Hex, encodeFunctionData } from 'viem'
 import { Alert } from '../../../components/alert'
+import { Badge } from '../../../components/badge'
 import { Button } from '../../../components/button'
 import { DataRow } from '../../../components/data-row'
 import { Field } from '../../../components/field'
 import { Icon } from '../../../components/icon'
 import { FindDebtor } from './find-debtor'
 import { buildEnvelope } from './seal'
+import { watchVerdict } from './verdict'
 import { ARC, API, INBOX, inboxAbi, submissionIdOf } from './inbox'
 import { ClaimType } from '../../../../claim/abi/frozen'
 import { claimIdOf } from '../../../../claim/commit'
 import { toComponents } from '../../../../claim/index'
 
-type Stage = 'idle' | 'sealing' | 'sending' | 'sent' | 'error'
+type Stage = 'idle' | 'sealing' | 'sending' | 'watching' | 'recorded' | 'rejected' | 'pending' | 'error'
 
 /**
  * Seals in the browser, signs with the visitor's Privy wallet, and broadcasts the signed
@@ -35,6 +37,7 @@ export function Submit() {
   const [dueDate, setDueDate] = useState('')
   const [stage, setStage] = useState<Stage>('idle')
   const [detail, setDetail] = useState('')
+  const [transaction, setTransaction] = useState('')
   const [envelopeBytes, setEnvelopeBytes] = useState(0)
   const [expiresAtBlock, setExpiresAtBlock] = useState('')
 
@@ -115,8 +118,25 @@ export function Submit() {
         method: 'eth_sendTransaction',
         params: [{ from: wallet.address, to: INBOX, data, chainId: ARC.chainIdHex }],
       })) as string
-      setDetail(hash)
-      setStage('sent')
+      setTransaction(hash)
+
+      // The transaction landing is not the answer. The enclave decides afterwards, and the two
+      // outcomes it can reach are different things to tell a business — so the page waits for one
+      // of them and says `pending` if neither arrives, rather than calling a receipt a lien.
+      setStage('watching')
+      const verdict = await watchVerdict(
+        submissionIdOf(wallet.address as Hex, ciphertext),
+        wallet.address as Hex,
+      )
+      if (verdict.kind === 'rejected') {
+        setDetail(verdict.reason)
+        setStage('rejected')
+      } else if (verdict.kind === 'recorded') {
+        setDetail(verdict.lienId)
+        setStage('recorded')
+      } else {
+        setStage('pending')
+      }
     } catch (error) {
       setDetail((error as Error).message)
       setStage('error')
@@ -185,9 +205,15 @@ export function Submit() {
         placeholder="70000000"
       />
       <div>
-        <Button variant="primary" onClick={() => void submit()} disabled={stage === 'sealing' || stage === 'sending'}>
+        <Button variant="primary" onClick={() => void submit()} disabled={stage === 'sealing' || stage === 'sending' || stage === 'watching'}>
           <Icon name={stage === 'idle' || stage === 'error' ? 'encrypted' : 'loading'} />
-          {stage === 'sealing' ? 'Sealing' : stage === 'sending' ? 'Submitting' : 'Seal and submit'}
+          {stage === 'sealing'
+            ? 'Sealing'
+            : stage === 'sending'
+              ? 'Submitting'
+              : stage === 'watching'
+                ? 'Waiting for the enclave'
+                : 'Seal and submit'}
         </Button>
       </div>
 
@@ -198,18 +224,35 @@ export function Submit() {
         </dl>
       )}
 
-      {stage === 'sent' && (
-        <p className="flex items-center gap-2 text-verified-text">
-          <Icon name="verified" />
+      {transaction !== '' && (
+        <p className="flex items-center gap-2 text-text-3">
           <a
-            href={`https://testnet.arcscan.app/tx/${detail}`}
+            href={`https://testnet.arcscan.app/tx/${transaction}`}
             target="_blank"
             rel="noreferrer"
             className="underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text"
           >
-            Submitted — {detail}
+            Submitted — {transaction}
           </a>
         </p>
+      )}
+
+      {stage === 'recorded' && (
+        <div className="flex flex-col gap-2">
+          <Badge variant="encumbered">Recorded</Badge>
+          <dl className="border border-border">
+            <DataRow label="lien" value={detail} />
+          </dl>
+        </div>
+      )}
+      {/* A refusal by the enclave is a risk verdict, not a policy block — `blocked` means one
+          specific thing in this system and this is not it. */}
+      {stage === 'rejected' && <Alert variant="error">Rejected — {detail}</Alert>}
+      {stage === 'pending' && (
+        <Alert variant="error">
+          The transaction landed and the enclave has not answered yet. Nothing is recorded until it
+          does.
+        </Alert>
       )}
       {stage === 'error' && <Alert variant="error">{detail}</Alert>}
     </div>
