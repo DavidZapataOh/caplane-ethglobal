@@ -1,0 +1,112 @@
+---
+title: SDK
+description: caplane-sdk — a thin, quorum-checked read client over the Caplane registry on Arc Testnet.
+---
+
+`caplane-sdk` is the TypeScript client `mcp.caplane.xyz` is built on. It wraps
+[viem](https://viem.sh) and adds nothing that changes chain state — every export here is a read.
+`registry.caplane.xyz` decodes the same reads by hand instead of importing this package, to avoid
+shipping viem to a page that never signs anything — but it verifies that hand-rolled decode against
+this package in its own test suite, field for field, against the live chain (see the
+[Lien](./sdk/lien) reference).
+
+```sh
+npm install caplane-sdk
+```
+
+Every function below takes a `CaplaneClient`, created once per caller with `createCaplaneClient`.
+
+## Reference
+
+### `createCaplaneClient`
+
+```ts
+function createCaplaneClient(options?: {
+  rpcUrls?: readonly string[]
+  registry?: `0x${string}`
+  quorum?: boolean
+}): CaplaneClient
+```
+
+Builds a reader over one or more RPC endpoints. With no arguments it points at the two default Arc
+Testnet endpoints and compares their answers (`quorum: true` whenever more than one endpoint is
+configured) — a caller running their own node should pass it and set `quorum: false`, since a lone
+endpoint has nothing to agree with.
+
+```ts
+import { createCaplaneClient } from 'caplane-sdk'
+
+const client = createCaplaneClient()
+const code = await client.registryCode()
+```
+
+Used in production by the MCP server's `registry_identity` tool (`services/mcp/src/tools.ts`), and
+by the claims page (`web/app/[mode]/claims/claims.tsx`) to read a wallet's own submission history.
+
+### `CaplaneClient`
+
+```ts
+type CaplaneClient = {
+  endpoints: readonly string[]
+  registry: `0x${string}`
+  read: PublicClient
+  agree: <T>(ask: (client: PublicClient) => Promise<T>) => Promise<T>
+  registryCode: () => Promise<`0x${string}`>
+  workflowName: () => Promise<`0x${string}`>
+}
+```
+
+What `createCaplaneClient` returns. `agree` is what every other read in this package calls instead
+of `read` directly — it asks every configured endpoint and throws if they disagree, so a single
+hostile endpoint cannot answer a question alone. `registryCode` and `workflowName` are an identity
+check: an address alone does not prove which contract is deployed there.
+
+### `arcTestnet`
+
+```ts
+const arcTestnet: Chain // viem Chain, id 5042002
+```
+
+The viem chain definition Caplane runs on — native currency is USDC at six decimals, not ether at
+eighteen. Pass it to any viem client that needs to talk to Arc directly; `createCaplaneClient`
+already uses it internally.
+
+### `deployments`
+
+```ts
+const deployments: {
+  registry: `0x${string}`
+  inbox: `0x${string}`
+  pool: `0x${string}`
+  escrow: `0x${string}`
+  forwarder: `0x${string}`
+  chainSelector: bigint
+  workflowOwner: `0x${string}`
+  workflowName: `0x${string}`
+  blockNumber: bigint
+}
+```
+
+The address book for the current deployment, read from the package's vendored copy rather than
+retyped by each caller. `chainSelector` is a `bigint` because it exceeds
+`Number.MAX_SAFE_INTEGER`. Consumed directly by the MCP server (`services/mcp/src/rpc.ts` and `tools.ts`) to build ABI calls
+without hardcoding an address.
+
+### `Deployments`
+
+```ts
+type Deployments = {
+  registry: `0x${string}`
+  inbox: `0x${string}`
+  pool: `0x${string}`
+  escrow: `0x${string}`
+  forwarder: `0x${string}`
+  chainSelector: bigint
+  workflowOwner: `0x${string}`
+  workflowName: `0x${string}`
+  blockNumber: bigint
+}
+```
+
+The type of `deployments`, exported so a caller can type their own function parameters against it
+without retyping the shape.

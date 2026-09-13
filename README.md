@@ -129,11 +129,17 @@ Measured end to end: **68,350 gas** to submit, **28 blocks** to a verdict, about
 | Significant, not decorative | The enclave **is** the product. Nothing else may write the registry | [`evidence/cre/18-full-cycle.txt`](evidence/cre/18-full-cycle.txt) |
 | Demonstrated execution | Deployed and executed, not only simulated. Workflow ID `006818407c…` | [`evidence/cre/04-deploy.txt`](evidence/cre/04-deploy.txt) |
 
+**We ran the published must-pass list against ourselves, point by point:**
+[`evidence/repo/02-sponsor-rubric.md`](evidence/repo/02-sponsor-rubric.md). Sixteen points, each
+claiming exactly one kind of proof — a gate that would catch a regression, a measurement on disk, or
+an argument. Five of them are decidable by reading the workflow source, so a CI job decides them
+rather than taking our word: `scripts/rubric/check.ts`.
+
 The simulation banner echoes the **resolved** TEE constraint — AWS Nitro, `us-west-2` — so the
 constraint literal parsed rather than being accepted as text, and production limits were enforced
 instead of the simulator&apos;s permissive defaults.
 
-We also ran the rubric against ourselves: the determinism audit is in
+The determinism audit is in
 [`evidence/cre/14-determinism-audit.txt`](evidence/cre/14-determinism-audit.txt). No `Date.now()`,
 no `Math.random()`, no unsorted map iteration, no `ConfidentialHTTPClient` inside a TEE handler, and
 we do **not** claim the workflow binary is confidential — the DON sees it; only the data it computes

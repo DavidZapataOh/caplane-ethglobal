@@ -36,6 +36,11 @@ jobs:
       - run: bun test
         working-directory: scripts/docs
       - run: bun run scripts/docs/check.ts
+      # The published must-pass list, run against the source rather than against our memory of it.
+      # Five of the sixteen points are decidable by reading the workflow, so they are decided here.
+      - run: bun test
+        working-directory: scripts/rubric
+      - run: bun run scripts/rubric/check.ts
 
   contracts:
     runs-on: ubuntu-latest

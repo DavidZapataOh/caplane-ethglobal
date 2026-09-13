@@ -1,0 +1,34 @@
+/* A second, self-sufficient Tailwind entry (its own `@import "tailwindcss"`) — Turbopack processes
+   each CSS import site independently, so `fumadocs-ui/css/preset.css` only resolves its own
+   utility classes (`sm:ms-4`, `rounded-md`, etc.) when it is chained from a file that starts the
+   Tailwind pipeline itself. Verified: importing `preset.css` directly from a page file, without
+   this, threw "Cannot apply unknown utility class `sm:ms-4`" — nesting it inside `app/globals.css`
+   was the only reason it compiled before.
+
+   Imported only from the two modules that render Fumadocs (this file, and the `[...slug]`
+   catch-all) — not from `app/globals.css`, so it is no longer permanently fused into the base
+   stylesheet every route (including `dark`) always loads. It never applies visually to `dark`
+   (every rule here is scoped to `[data-docs-root]`, an attribute `dark`'s JSX never renders —
+   verified against the compiled output and against `dark.html`).
+
+   What this split does NOT achieve, verified rather than assumed: `dark` and `paper` are two
+   static outputs of the same `/[mode]` route (`app/[mode]/page.tsx`), and Next.js's build manifest
+   attaches every CSS chunk reachable from a route's module graph to *every* static param of that
+   route, not per param — confirmed by testing both a static top-level import here and a genuinely
+   dynamic `import()` gated behind `mode === 'paper'`; both produced the identical set of two
+   `<link>` tags on `dark.html`. Splitting this out of `globals.css` still narrows the blast radius
+   (this chunk is no longer merged with base/brand CSS, so unrelated pages and future non-`[mode]`
+   routes never pull it in, and its cache invalidation is independent of the base stylesheet's), but
+   the byte transfer to `dark.html` specifically is a Next.js per-route manifest limitation, not
+   something reachable from inside this file structure without moving `dark`/`paper` off a shared
+   dynamic segment — out of scope here (the file that owns the shared `[mode]` layout owns that
+   change).
+
+   It does not need `@caplane/brand/tokens.css` or the brand's `@theme inline` block again:
+   `docs-theme.css` only reads `var(--color-*)` custom properties, which `app/globals.css` already
+   puts on `:root` in the same document — CSS custom properties cascade at the browser, independent
+   of which stylesheet declared them. */
+@import "tailwindcss";
+@import "fumadocs-ui/css/lib/default-colors.css";
+@import "fumadocs-ui/css/preset.css";
+@import "../../lib/docs-theme.css";

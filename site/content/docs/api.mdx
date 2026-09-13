@@ -1,0 +1,48 @@
+---
+title: API
+description: A convenience view of the registry, derived from the chain and never a source of truth.
+---
+
+`GET /health` and `GET /activity` on `api.caplane.xyz` are the two routes built for an external
+integrator. The same process also answers `/confirmations/*`, `/contacts` and `/receipts/*`, but
+those belong to the debtor confirmation flow and are out of scope for this guide.
+
+## `GET /health`
+
+Returns `200 ok`, plain text. Every other path — the routes below excepted — answers `404 not
+found`; that 404 is what distinguishes this responder from a platform placeholder rather than an
+outage.
+
+## `GET /activity`
+
+Returns the indexer's snapshot as JSON — a convenience layer over the same event log the chain
+already holds, never a source of truth for it:
+
+```json
+{
+  "source": "chain",
+  "chainId": 5042002,
+  "addresses": ["0x...registry", "0x...inbox", "0x...pool", "0x...escrow"],
+  "deployedAt": "61681981",
+  "indexedThrough": "62000000",
+  "head": "62000010",
+  "lagBlocks": 10,
+  "stale": false,
+  "truncated": false,
+  "events": [
+    { "name": "LienRecorded", "address": "0x...", "blockNumber": "61999000", "logIndex": 3, "transactionHash": "0x...", "fields": { "lienId": "0x...", "borrower": "0x...", "expiresAt": "..." } }
+  ]
+}
+```
+
+`source: "chain"` travels in the body on purpose: the chain id, the four contract addresses and the
+height this was built at come with every answer, so the same result can be reproduced from a node
+directly instead of trusting this service. `lagBlocks` and `stale` say how far behind head the
+indexer currently is; `truncated` means the feed was capped at its retention limit and older events
+fell off the front.
+
+There is deliberately no route here that answers whether a right is taken. The threat model closes
+registrar equivocation on the ground that no such view is served by an operator, and a lookup here
+would reopen exactly that. That question belongs to the chain: ask
+[`is_encumbered`](./mcp#is_encumbered) over MCP, which answers with a receipt that replays against
+any node, or read [`isEncumbered`](./sdk/lien#isencumbered) directly with `caplane-sdk`.

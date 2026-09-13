@@ -1,0 +1,17 @@
+$ node --test --experimental-strip-types scripts/docs/coverage.test.ts
+✔ every real sdk export has a reference section (2.659209ms)
+✔ no section documents an export that does not exist (0.393458ms)
+✔ every sdk doc page uses the real package name, never the scoped guess (0.354ms)
+✔ every real mcp tool has a section in the guide (1.234833ms)
+✔ no mcp guide section documents a tool that does not exist (0.189958ms)
+✔ the mcp guide never references the scoped package name (0.099958ms)
+✔ the api guide never frames /activity as a lien check (0.392625ms)
+✔ the api guide never references the scoped package name (0.101833ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 125.971709

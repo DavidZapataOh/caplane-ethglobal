@@ -1,0 +1,25 @@
+---
+title: Quickstart
+description: Ask what a borrower has already pledged, against the real chain, in four lines.
+---
+
+```sh
+npm install caplane-sdk
+```
+
+This is the one question any third party can ask unaided: what has a given borrower already
+pledged, and until when. It does not need a lien id — a lien id cannot be derived from a
+receivable, it only comes from the enclave when a claim is recorded, so it is not something a
+quickstart can hand you. See the [Lien](./sdk/lien) reference if you already have one.
+
+```ts
+import { createCaplaneClient, liensOf } from 'caplane-sdk'
+
+const client = createCaplaneClient()
+const liens = await liensOf(client, borrower)
+```
+
+Replace `borrower` with any Arc Testnet address. `liens` is a `RecordedLien[]` — empty if that
+address has never had a lien recorded, one entry per lien otherwise, each carrying its `lienId`
+and `expiresAt`. Full field list, pagination, and retry behaviour are in the
+[History](./sdk/history) reference.

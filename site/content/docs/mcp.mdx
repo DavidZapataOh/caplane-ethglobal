@@ -1,0 +1,83 @@
+---
+title: MCP
+description: Read-only MCP tools over the Caplane lien registry on Arc Testnet, with a receipt on every answer.
+---
+
+This server gives an agent read-only access to the Caplane lien registry on Arc Testnet. Every
+answer carries a receipt — endpoint, block height, call data and raw result — so it can be replayed
+against any node without trusting this server.
+
+A lien id cannot be derived from a receivable: the registry key is salted with a secret that never
+leaves the enclave. Ask about a lien id you were given, or enumerate by borrower address with
+[`liens_of_borrower`](#liens_of_borrower). Encumbered means status is exactly `active`; a released
+lien and an id that was never written both answer `false`, so read the status alongside the boolean
+rather than trusting it alone.
+
+## Connecting
+
+The server speaks MCP over Streamable HTTP at `https://mcp.caplane.xyz/mcp` — `POST` only. It is
+stateless by construction: no session id is issued and nothing is kept between requests, so a
+restart costs a client nothing. `GET /health` answers `200 ok`; a browser `Origin` outside
+`*.caplane.xyz` and loopback is refused with `403`.
+
+## Reference
+
+### `get_lien`
+
+Every recorded term of one lien: who borrowed, how much in USDC base units, at what rate in basis
+points, when it was recorded and when it expires. Carries a receipt that replays the reads against
+any node.
+
+Input: `lienId` — the 32-byte lien id, as 0x-prefixed hex.
+
+Reads the same three calls as [`lienOf`](./sdk/lien#lienof), batched into one request pinned to one
+block height (`services/mcp/src/rpc.ts`), and returns the decoded lien plus `status` (the named
+string, not the raw byte), `encumbered`, and the `receipt`.
+
+### `is_encumbered`
+
+Whether a lien is currently active. Released and defaulted are terminal and free the receivable, so
+this answers `false` for them and for an id that was never written — read the status it returns
+alongside the boolean rather than trusting it alone.
+
+Input: `lienId` — the 32-byte lien id, as 0x-prefixed hex.
+
+Returns `{ lienId, encumbered, status, note, receipt }`. See [`isEncumbered`](./sdk/lien#isencumbered)
+for the same distinction spelled out against the SDK.
+
+### `liens_of_borrower`
+
+Every lien ever recorded for one borrower address, from the registry deployment block. This is the
+only question answerable without having been handed a lien id: it says how much a counterparty has
+already pledged and until when.
+
+Input: `borrower` — the 20-byte borrower address, as 0x-prefixed hex. `fromBlock` — optional decimal
+block height to start from; defaults to the deployment block.
+
+Returns `{ borrower, fromBlock, endpoint, note, liens }`, where `liens` is the same shape
+[`liensOf`](./sdk/history) resolves to. The `note` flags that this is assembled from `LienRecorded`
+logs against one endpoint, so an endpoint that omitted an event would show less pledged than there
+actually is.
+
+### `registry_identity`
+
+The chain, the registry address, the hash of its deployed code, and the workflow name it has frozen
+as an immutable — so a caller can check it is reading the real registry rather than taking this
+server's word for the address.
+
+No input.
+
+Returns `{ chainId, registry, codeHash, codeBytes, workflowName, workflowOwner,
+matchesFrozenIdentity }`. `matchesFrozenIdentity` compares the live `workflowName` against the
+[`deployments`](./sdk#deployments) constant this server was built with — `false` means the deployed
+workflow has moved and the address book is stale.
+
+### `explain_rejection`
+
+What a `SubmissionRejected` reason code means. Reads nothing: the codes are fixed in the frozen
+interface, and the registry emits a bare `uint8` with no enum behind it.
+
+Input: `code` — the `reasonCode` from a `SubmissionRejected` event.
+
+Returns `{ code, reason }`. The full table of codes is the SDK's
+[`RejectReason`](./sdk/lien#rejectreason) reference.

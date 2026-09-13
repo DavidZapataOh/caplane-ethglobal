@@ -1,5 +1,6 @@
 import path from 'node:path'
 import type { NextConfig } from 'next'
+import { createMDX } from 'fumadocs-mdx/next'
 
 // The root has to contain both the app and the linked brand package. Pointing it at the app
 // directory looks tidier and breaks the build: Turbopack refuses to resolve `../brand`,
@@ -13,4 +14,6 @@ const nextConfig: NextConfig = {
   outputFileTracingRoot: repositoryRoot,
 }
 
-export default nextConfig
+const withMDX = createMDX()
+
+export default withMDX(nextConfig)

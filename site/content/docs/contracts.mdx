@@ -1,0 +1,36 @@
+---
+title: Contracts
+description: The four contracts deployed on Arc Testnet, and where their ABI lives.
+---
+
+## Deployed on Arc Testnet
+
+Chain id `5042002`. Addresses below are read directly from
+`contracts/abi/deployments.arc-testnet.json` — the deploy script's own output, never retyped by
+hand.
+
+| Contract | Source | Address |
+|---|---|---|
+| `CaplaneRegistry` | `contracts/src/CaplaneRegistry.sol` | `0xe7170ee0ce4cab4593970ef5c4ebf7d0d62ae19b` |
+| `CaplaneInbox` | `contracts/src/CaplaneInbox.sol` | `0xc5218fd1b6eb7c91f905871301bf8620bc8baf91` |
+| `CaplanePool` | `contracts/src/CaplanePool.sol` | `0x4df4c8d722b3a9ebd18b9094c883b5ff83565d7c` |
+| `CaplaneEscrow` | `contracts/src/CaplaneEscrow.sol` | `0x2bc74ceb10287890fb9be43667a55b73e080db1f` |
+
+All four are verified on the Arc Testnet explorer — full source, not partial — so each one's read
+and write tabs work directly:
+[`CaplaneRegistry`](https://testnet.arcscan.app/address/0xe7170ee0ce4cab4593970ef5c4ebf7d0d62ae19b),
+[`CaplaneInbox`](https://testnet.arcscan.app/address/0xc5218fd1b6eb7c91f905871301bf8620bc8baf91),
+[`CaplanePool`](https://testnet.arcscan.app/address/0x4df4c8d722b3a9ebd18b9094c883b5ff83565d7c),
+[`CaplaneEscrow`](https://testnet.arcscan.app/address/0x2bc74ceb10287890fb9be43667a55b73e080db1f).
+
+## ABI
+
+`contracts/abi/frozen.ts` is the frozen source: the `Lien` struct, the `LienStatus` and
+`RejectReason` enums, and the deployment shape itself, hand-mirrored from the Solidity interfaces
+with zero runtime dependencies so the same file vendors unchanged into the CRE workflow's WASM
+build. `caplane-sdk` re-exports these same types from that file rather than restating them — see
+the [SDK reference](./sdk/lien) for how they're used.
+
+The generated JSON ABI lives alongside it in `contracts/abi/index.ts`, currently covering the
+Registry and Inbox interfaces (`registryAbi`, `inboxAbi`). Neither file is reproduced on this page;
+both are generated or hand-frozen from `contracts/src`, not from these docs.

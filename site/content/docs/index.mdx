@@ -1,0 +1,20 @@
+---
+title: Caplane
+description: An encrypted lien registry writable only from inside a TEE.
+---
+
+Caplane is an on-chain registry of liens against invoices. A lien is written once, from inside a
+Trusted Execution Environment, and stays readable by anyone from that point on — there is no
+separate write path that skips the enclave.
+
+This site documents the surfaces that already exist:
+
+- [`registry.caplane.xyz`](https://registry.caplane.xyz) — the public lookup, queryable by
+  borrower address.
+- [`mcp.caplane.xyz`](https://mcp.caplane.xyz) — an MCP server exposing the same registry to
+  agents.
+- [`caplane-sdk`](https://www.npmjs.com/package/caplane-sdk) — the TypeScript client both of the
+  above are built on.
+
+It covers invoices only; a second instrument type is still in progress and is not documented here
+until it ships.

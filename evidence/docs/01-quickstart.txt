@@ -1,0 +1,10 @@
+$ node --test --experimental-strip-types scripts/docs/quickstart-example.test.ts
+✔ the quickstart example runs and matches the sdk, against the real chain (53217.198709ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 53625.421417

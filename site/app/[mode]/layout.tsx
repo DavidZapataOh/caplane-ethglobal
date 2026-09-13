@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { RootProvider } from 'fumadocs-ui/provider/next'
 import { data, display, prose } from '../fonts'
 import '../globals.css'
 
@@ -18,7 +19,14 @@ export default async function RootLayout({ children, params }: LayoutProps<'/[mo
       data-mode={mode}
       className={`${display.variable} ${prose.variable} ${data.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {/* Theme disabled: the mode is a fixed property of the host (see `proxy.ts`), never a
+            client-side toggle — `next-themes` must not add its own class or storage read. Only
+            the doc pages render Fumadocs components, but the search dialog they open needs this
+            context wherever it mounts, so the provider wraps both trees; it renders no visible
+            markup of its own. */}
+        <RootProvider theme={{ enabled: false }}>{children}</RootProvider>
+      </body>
     </html>
   )
 }

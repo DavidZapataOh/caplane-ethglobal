@@ -1,0 +1,97 @@
+---
+title: Inbox
+description: Track a submission from the moment it is sealed to whatever the enclave decides.
+---
+
+A submission and a lien are different things: a submission is what a caller sent to the inbox, a
+lien is what the enclave decided to record because of it. These reads follow one submission
+through to whichever it became.
+
+## Reference
+
+### `submitterOf`
+
+```ts
+function submitterOf(client: CaplaneClient, submissionId: `0x${string}`): Promise<`0x${string}`>
+```
+
+Who sent a submission, read through the quorum like every point read in this package — an endpoint
+free to lie about this is an endpoint free to hand one organization another's submission history.
+
+```ts
+import { submitterOf, type CaplaneClient } from 'caplane-sdk'
+
+const sender = await submitterOf(client, submissionId)
+```
+
+Used in production by the claims page's ownership guard
+(`web/app/[mode]/claims/guard.ts`), which refuses to show a submission whose recorded sender does
+not match the connected wallet.
+
+### `submissionsOf`
+
+```ts
+function submissionsOf(
+  client: CaplaneClient,
+  submitter: `0x${string}`,
+  options?: { fromBlock?: bigint },
+): Promise<Submission[]>
+```
+
+Every submission an address has made, paginated exactly as `liensOf` paginates by borrower (see
+the [History](./history) reference).
+
+Used in production by the claims page (`web/app/[mode]/claims/claims.tsx`) to list a connected
+wallet's own submissions before resolving each one with `outcomeOf`.
+
+### `outcomeOf`
+
+```ts
+function outcomeOf(
+  client: CaplaneClient,
+  submissionId: `0x${string}`,
+  submitter: `0x${string}`,
+  options?: { fromBlock?: bigint },
+): Promise<Outcome>
+```
+
+What became of a submission: refused, recorded as a lien, or not yet answered. A refusal is found
+directly from a `SubmissionRejected` event; a recorded lien is found by sweeping the submitter's
+own liens (via `liensOf`) and matching each one's stored `submissionId` — the two are keyed
+differently because the on-chain events are. Never returns "not found": the workflow may simply not
+have answered yet, and this never invents a verdict the chain has not given.
+
+```ts
+import { createCaplaneClient, outcomeOf, submissionsOf } from 'caplane-sdk'
+
+const client = createCaplaneClient()
+const mine = await submissionsOf(client, submitter)
+const outcome = await outcomeOf(client, mine[0].submissionId, submitter, {
+  fromBlock: mine[0].blockNumber,
+})
+```
+
+Used in production by the claims page (`web/app/[mode]/claims/claims.tsx`) to resolve every one of
+a wallet's own submissions after `submissionsOf` lists them.
+
+### `Outcome`
+
+```ts
+type Outcome =
+  | { status: 'pending' }
+  | { status: 'rejected'; reason: (typeof RejectReason)[keyof typeof RejectReason] }
+  | { status: 'active' | 'released' | 'defaulted'; lien: Lien }
+```
+
+What `outcomeOf` resolves to. A rejected outcome carries the reason code from the
+[Lien](./lien) reference's `RejectReason`; a recorded outcome carries the full `Lien`. A rejection
+never carries a lien: what a refused financier cannot learn about the claim that beat them is
+absent from the event itself, not removed by this type.
+
+### `Submission`
+
+```ts
+type Submission = { submissionId: `0x${string}`; blockNumber: bigint }
+```
+
+One element of what `submissionsOf` resolves to.

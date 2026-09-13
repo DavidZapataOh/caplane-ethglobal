@@ -1,0 +1,101 @@
+---
+title: Lien
+description: Point reads against one lien — status, terms, and the encumbered check.
+---
+
+Everything here answers a question about a lien id you already have. A lien id cannot be derived
+from a receivable; it comes from the enclave when a claim is recorded.
+
+## Reference
+
+### `lienOf`
+
+```ts
+function lienOf(client: CaplaneClient, lienId: `0x${string}`): Promise<Lien>
+```
+
+Every recorded term: who borrowed, how much, at what rate, when it was recorded, when it expires.
+
+```ts
+import { createCaplaneClient, lienOf } from 'caplane-sdk'
+
+const client = createCaplaneClient()
+const lien = await lienOf(client, lienId)
+```
+
+### `statusOf`
+
+```ts
+function statusOf(client: CaplaneClient, lienId: `0x${string}`): Promise<number>
+```
+
+The raw status byte: `0` none, `1` active, `2` released, `3` defaulted. See `LienStatus` below for
+the named constants.
+
+### `isEncumbered`
+
+```ts
+function isEncumbered(client: CaplaneClient, lienId: `0x${string}`): Promise<boolean>
+```
+
+Whether a lien is encumbered — status exactly `Active`. Released, defaulted, and an id that was
+never written all answer `false`; read `statusOf` alongside this if the distinction matters, since
+`false` alone cannot tell those three apart.
+
+`isEncumbered`, `statusOf`, and `lienOf` are the three calls the public registry lookup makes for
+one lien id. That page decodes the raw ABI bytes itself instead of importing this package, to avoid
+shipping viem's ~49 KB to a page that never signs anything — but its test suite
+(`web/app/[mode]/registry/chain.test.ts`) imports `createCaplaneClient`, `lienOf`, and `statusOf`
+from `caplane-sdk` and asserts the hand-rolled decode matches this package's, field for field,
+against the live chain. This package is the correctness oracle for that page, even where the page
+itself does not import it.
+
+### `LienStatus`
+
+```ts
+const LienStatus: { None: 0; Active: 1; Released: 2; Defaulted: 3 }
+```
+
+Named constants for the byte `statusOf` and `lienOf(...).status` return. Used in production by the
+MCP server (`services/mcp/src/tools.ts`) to turn a status byte into the name a tool result reports.
+
+### `RejectReason`
+
+```ts
+const RejectReason: {
+  Unset: 0
+  AlreadyEncumbered: 1
+  DebtorUnconfirmed: 2
+  ComplianceHit: 3
+  SourceUnverified: 4
+  BelowThreshold: 5
+  UnauthorizedSubmitter: 6
+  MalformedClaim: 7
+  VerificationUnavailable: 8
+  MalformedEnvelope: 9
+}
+```
+
+Named constants for the `reasonCode` a `SubmissionRejected` event carries — see the
+[Inbox](./inbox) reference for reading one. The registry emits a bare `uint8` with no enum behind
+it, so this table is the only place the codes are named. Used in production by the MCP server's
+`explain_rejection` tool (`services/mcp/src/tools.ts`) and by the claims page's rejection copy
+(`web/app/[mode]/claims/rejection-copy.ts`).
+
+### `Lien`
+
+```ts
+type Lien = {
+  borrower: `0x${string}`
+  rateBps: number
+  createdAt: bigint
+  advanceUsdc6: bigint
+  expiresAt: bigint
+  status: number
+  submissionId: `0x${string}`
+}
+```
+
+What `lienOf` resolves to. `advanceUsdc6` is USDC base units (six decimals), never native gas wei;
+`rateBps` is basis points flat over the term, not annualised; `createdAt` and `expiresAt` are Unix
+seconds. Consumed in production by the MCP server (`services/mcp/src/rpc.ts`).

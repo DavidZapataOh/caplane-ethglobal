@@ -1,0 +1,114 @@
+/* Scoped to `[data-docs-root]`, never to `:root` or `.dark` — the dark branch, which the landing
+   plan owns, renders no Fumadocs component and must never see these overrides. Fumadocs-ui 16 exposes its palette as
+   `--color-fd-*` Tailwind v4 theme tokens (verified in fumadocs-ui/css/lib/default-colors.css),
+   not the bare `--fd-*` custom properties an older version used — this file targets the real
+   tokens, not the brief's example names. There is no single `--fd-radius` switch in this version;
+   corner radius and shadow come from Tailwind's own scale (`rounded-md`, `shadow-lg`, etc.), so the
+   brand's "zero radius, zero shadow" rule is enforced by zeroing that scale within this scope,
+   which is the mechanism Fumadocs-ui's classes actually read from. */
+[data-docs-root] {
+  --color-fd-background: var(--color-ground);
+  --color-fd-foreground: var(--color-text);
+  --color-fd-muted: var(--color-surface-2);
+  --color-fd-muted-foreground: var(--color-text-2);
+  --color-fd-popover: var(--color-surface);
+  --color-fd-popover-foreground: var(--color-text);
+  --color-fd-card: var(--color-surface);
+  --color-fd-card-foreground: var(--color-text);
+  --color-fd-border: var(--color-border);
+  --color-fd-primary: var(--color-seal-text);
+  --color-fd-primary-foreground: var(--color-on-seal);
+  --color-fd-secondary: var(--color-surface-2);
+  --color-fd-secondary-foreground: var(--color-text);
+  --color-fd-accent: var(--color-surface-2);
+  --color-fd-accent-foreground: var(--color-text);
+  --color-fd-ring: var(--color-border-strong);
+  --color-fd-overlay: color-mix(in oklab, var(--color-text) 20%, transparent);
+
+  /* Tailwind's radius utilities (`rounded-md`, etc.) read `var(--radius-md)` at the point of use, so
+     overriding the scale here reaches every one of them. Scoping it to `[data-docs-root]` (rather
+     than the global `@theme`) keeps it off the dark placeholder the landing plan owns. */
+  --radius-xs: 0px;
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+  --radius-2xl: 0px;
+  --radius-3xl: 0px;
+  --radius-4xl: 0px;
+  --radius: 0px;
+
+  font-family: var(--font-prose);
+}
+
+/* `rounded-full` is a fixed Tailwind literal (`border-radius: 3.40282e38px`), not driven by the
+   `--radius-*` scale above — used by a handful of circular affordances (e.g. the reading-progress
+   dot). Verified in the compiled output rather than assumed. */
+[data-docs-root] .rounded-full {
+  border-radius: 0;
+}
+
+/* Unlike radius, Tailwind's `shadow-*` utilities bake the box-shadow geometry in as a literal at
+   build time (only `--tw-shadow-color` stays a runtime variable) — verified in the compiled CSS.
+   Overriding `--shadow-*` theme tokens has no effect on them, so the utility classes themselves
+   are neutralized here instead. This file is imported unlayered (plain `@import`, no `@layer`),
+   which already outranks Tailwind's own `@layer utilities` regardless of selector specificity. */
+[data-docs-root] .shadow-2xs,
+[data-docs-root] .shadow-xs,
+[data-docs-root] .shadow-sm,
+[data-docs-root] .shadow,
+[data-docs-root] .shadow-md,
+[data-docs-root] .shadow-lg,
+[data-docs-root] .shadow-xl,
+[data-docs-root] .shadow-2xl,
+[data-docs-root] .inset-shadow-2xs,
+[data-docs-root] .inset-shadow-xs,
+[data-docs-root] .inset-shadow-sm,
+[data-docs-root] .inset-ring,
+[data-docs-root] .drop-shadow-xs,
+[data-docs-root] .drop-shadow-sm,
+[data-docs-root] .drop-shadow-md,
+[data-docs-root] .drop-shadow-lg,
+[data-docs-root] .drop-shadow-xl,
+[data-docs-root] .drop-shadow-2xl {
+  box-shadow: none;
+  filter: none;
+}
+
+[data-docs-root] pre,
+[data-docs-root] code {
+  font-family: var(--font-data);
+}
+
+/* The typography plugin bakes literal radii and a shadow into `.prose code`/`.prose kbd`, the
+   scrollbar thumb ships its own literal radius, and `.fd-step:before`'s numbered bullet is a
+   fixed-literal pill (the same `rounded-full` value zeroed above, just inlined by Fumadocs rather
+   than read from the utility class) — none of them read the `--radius-*`/`shadow-*` scale, so
+   zeroing that scale above does not reach them. Verified against the compiled chunk. */
+[data-docs-root] :where(code, kbd, pre),
+[data-docs-root] .fd-step:before {
+  border-radius: 0;
+}
+
+[data-docs-root] :where(kbd) {
+  box-shadow: none;
+}
+
+[data-docs-root] .fd-scroll-container::-webkit-scrollbar-thumb {
+  border-radius: 0;
+}
+
+/* `max-lg:shadow-lg` on the mobile sidebar is the one `shadow-*` variant the plain-class list
+   above does not name. */
+[data-docs-root] .max-lg\:shadow-lg {
+  box-shadow: none;
+}
+
+[data-docs-root] h1,
+[data-docs-root] h2,
+[data-docs-root] h3,
+[data-docs-root] h4,
+[data-docs-root] h5,
+[data-docs-root] h6 {
+  font-family: var(--font-display);
+}
