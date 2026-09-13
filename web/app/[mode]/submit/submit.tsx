@@ -13,9 +13,6 @@ import { FindDebtor } from './find-debtor'
 import { buildEnvelope } from './seal'
 import { watchVerdict } from './verdict'
 import { ARC, API, INBOX, inboxAbi, submissionIdOf } from './inbox'
-import { ClaimType } from '../../../../claim/abi/frozen'
-import { claimIdOf } from '../../../../claim/commit'
-import { toComponents } from '../../../../claim/index'
 
 type Stage = 'idle' | 'sealing' | 'sending' | 'watching' | 'recorded' | 'rejected' | 'pending' | 'error'
 
@@ -41,23 +38,9 @@ export function Submit() {
   const [envelopeBytes, setEnvelopeBytes] = useState(0)
   const [expiresAtBlock, setExpiresAtBlock] = useState('')
 
-  // The identity the debtor signs over: derived from the claim's own fields, without a pepper,
-  // so the debtor and anyone else can recompute it. The peppered one lives only in the enclave.
-  const claimId =
-    invoiceNumber === '' || amountMinor === '' || dueDate === ''
-      ? ''
-      : claimIdOf(
-          ClaimType.Invoice,
-          toComponents(ClaimType.Invoice, {
-            debtorTaxId: 'unknown',
-            invoiceNumber,
-            amountMinor,
-            currency,
-            dueDate,
-            issuerTaxId: 'unknown',
-            country: 'AU',
-          }),
-        )
+  // Whether the claim carries enough to derive an identity at all. The identity itself is built
+  // where the debtor is chosen: two of its components are the ledger's, not this form's.
+  const complete = invoiceNumber !== '' && amountMinor !== '' && dueDate !== ''
 
   const wallet = wallets[0]
 
@@ -164,7 +147,6 @@ export function Submit() {
   return (
     <div className="mt-6 flex max-w-xl flex-col gap-4">
       <FindDebtor
-        claimId={claimId}
         creditor={wallet?.address ?? ''}
         invoiceNumber={invoiceNumber}
         currency={currency}
@@ -172,6 +154,7 @@ export function Submit() {
         dueDate={dueDate}
         expiresAtBlock={expiresAtBlock}
         onReceipt={setReceipt}
+        ready={complete}
       />
       <Field
         label="Confirmation receipt"

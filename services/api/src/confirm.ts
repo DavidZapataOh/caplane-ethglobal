@@ -2,7 +2,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { keccak256, toHex, verifyTypedData } from 'viem'
 import book from '../abi/deployments.arc-testnet.json' with { type: 'json' }
 import { CONFIRMATION_TYPES, SHOWN, confirmationDomain } from './confirmation.js'
-import { contactEmailOf, searchContacts } from './ledger.js'
+import { contactEmailOf, ledgerIdentity, searchContacts } from './ledger.js'
 import { type LinkPayload, markUsed, mint, open, receiptOf } from './link.js'
 import { type SendOutcome, idempotencyKeyFor, send } from './notify.js'
 
@@ -152,6 +152,18 @@ export const routeConfirm = async (
         reply(response, 400, { error: 'debtor and signature are required' }, cors)
         return true
       }
+      // Before the signature is even checked: a creditor confirming their own claim is refused by
+      // the enclave as an unconfirmed debtor, which is the same code a debtor who never answered
+      // produces. Telling them here is the only place the difference is still visible.
+      if (debtor.toLowerCase() === payload.creditor.toLowerCase()) {
+        reply(
+          response,
+          422,
+          { error: 'the creditor named on this claim cannot confirm it; sign from the debtor\u2019s own account' },
+          cors,
+        )
+        return true
+      }
       const message = messageOf(payload, debtor as `0x${string}`)
       const valid = await verifyTypedData({
         address: debtor as `0x${string}`,
@@ -189,7 +201,10 @@ export const routeConfirm = async (
       return true
     }
     try {
-      reply(response, 200, { contacts: await searchContacts(query) }, cors)
+      // The identity travels beside the contacts, never inside one: a contact is what the ledger
+      // holds about a counterparty, and the tenant is not.
+      const [contacts, ledger] = await Promise.all([searchContacts(query), ledgerIdentity()])
+      reply(response, 200, { contacts, ledger }, cors)
     } catch (error) {
       reply(response, 502, { error: (error as Error).message }, cors)
     }

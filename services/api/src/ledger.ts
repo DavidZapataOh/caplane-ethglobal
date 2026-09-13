@@ -95,3 +95,30 @@ export const searchContacts = async (
     )
     .map((contact) => ({ id: contact.ContactID, name: contact.Name }))
 }
+
+/**
+ * The jurisdiction the enclave substitutes into a claim before hashing it.
+ *
+ * It is a property of the organisation, not of a claim, and the contacts scope cannot read the
+ * organisation — so it is configured here and asserted against the enclave's own configuration in
+ * the tests. Disagreement would refuse every confirmation as unsigned and say nothing about why.
+ */
+export const ledgerCountry = (): string => process.env.LEDGER_COUNTRY ?? 'AU'
+
+let identity: { tenantId: string; country: string } | undefined
+
+/**
+ * The two components of a claim the enclave takes from the ledger rather than from the submitter.
+ *
+ * The browser needs them to derive the identity it asks the debtor to sign; without them it
+ * derives one the enclave cannot arrive at. Held after the first resolution because the tenant is
+ * a property of the credential, not of a request, and re-minting a token per search would spend
+ * the provider's quota to learn a constant.
+ */
+export const ledgerIdentity = async (): Promise<{ tenantId: string; country: string }> => {
+  if (identity === undefined) {
+    const { tenant } = await tokenFor()
+    identity = { tenantId: tenant, country: ledgerCountry() }
+  }
+  return identity
+}

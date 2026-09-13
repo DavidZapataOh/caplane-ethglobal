@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
-    "test": "node --test --test-concurrency=1 --experimental-strip-types \"app/**/*.test.ts\" \"components/**/*.test.ts\" \"*.test.ts\" && bun test ./app/[mode]/submit/seal.bun-test.ts"
+    "test": "node --test --test-concurrency=1 --experimental-strip-types \"app/**/*.test.ts\" \"components/**/*.test.ts\" \"*.test.ts\" && bun test ./app/[mode]/submit/seal.bun-test.ts ./app/[mode]/submit/claim-id.bun-test.ts ./app/[mode]/submit/binds.bun-test.ts"
   },
   "dependencies": {
     "@caplane/brand": "file:../brand",

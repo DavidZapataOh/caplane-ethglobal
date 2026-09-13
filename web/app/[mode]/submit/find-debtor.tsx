@@ -5,6 +5,7 @@ import { Alert } from '../../../components/alert'
 import { Button } from '../../../components/button'
 import { Field } from '../../../components/field'
 import { Icon } from '../../../components/icon'
+import { type LedgerIdentity, confirmationClaimId } from './claim-id'
 import { API } from './inbox'
 
 type Contact = { id: string; name: string }
@@ -18,7 +19,6 @@ type Contact = { id: string; name: string }
  * on, and refuses the request outright if the caller offers one.
  */
 export function FindDebtor({
-  claimId,
   creditor,
   invoiceNumber,
   currency,
@@ -26,8 +26,8 @@ export function FindDebtor({
   dueDate,
   expiresAtBlock,
   onReceipt,
+  ready,
 }: {
-  claimId: string
   creditor: string
   invoiceNumber: string
   currency: string
@@ -35,9 +35,12 @@ export function FindDebtor({
   dueDate: string
   expiresAtBlock: string
   onReceipt: (receipt: string) => void
+  /** False until the claim's own fields are filled — see below. */
+  ready: boolean
 }) {
   const [query, setQuery] = useState('')
   const [found, setFound] = useState<Contact[]>([])
+  const [ledger, setLedger] = useState<LedgerIdentity | undefined>()
   const [state, setState] = useState<'idle' | 'searching' | 'asking' | 'asked' | 'error'>('idle')
   const [detail, setDetail] = useState('')
 
@@ -45,9 +48,14 @@ export function FindDebtor({
     setState('searching')
     try {
       const response = await fetch(`${API}/contacts?q=${encodeURIComponent(query)}`)
-      const body = (await response.json()) as { contacts?: Contact[]; error?: string }
+      const body = (await response.json()) as {
+        contacts?: Contact[]
+        ledger?: LedgerIdentity
+        error?: string
+      }
       if (!response.ok) throw new Error(body.error ?? 'The ledger did not answer.')
       setFound(body.contacts ?? [])
+      setLedger(body.ledger)
       setState('idle')
     } catch (error) {
       setDetail((error as Error).message)
@@ -56,6 +64,11 @@ export function FindDebtor({
   }
 
   const ask = async (contact: Contact) => {
+    if (ledger === undefined) {
+      setDetail('The ledger did not say which organisation it answered for.')
+      setState('error')
+      return
+    }
     setState('asking')
     try {
       const response = await fetch(`${API}/confirmations`, {
@@ -63,7 +76,14 @@ export function FindDebtor({
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           contactId: contact.id,
-          claimId,
+          // Built here, not in the form: the enclave replaces the debtor and the issuer with the
+          // ledger's own values before it recomputes this, so an identity derived from anything
+          // else is one it can never reach — and the claim is refused as unconfirmed.
+          claimId: confirmationClaimId(
+            { invoiceNumber, currency, amountMinor, dueDate },
+            contact.name,
+            ledger,
+          ),
           creditor,
           invoiceNumber,
           currency,
@@ -108,13 +128,26 @@ export function FindDebtor({
             <div key={contact.id} className="flex items-center gap-4 p-3">
               <dt className="flex-1 text-text">{contact.name}</dt>
               <dd>
-                <Button onClick={() => void ask(contact)} disabled={state === 'asking'}>
+                {/* The confirmation the debtor signs carries the claim's identity, derived from
+                    the invoice fields below. Asking before they are filled would have them sign
+                    over an empty one, and the seal would not match what they agreed to — a
+                    failure that only surfaces at the end, with no way back. */}
+                <Button
+                  onClick={() => void ask(contact)}
+                  disabled={state === 'asking' || !ready}
+                >
                   <Icon name="debtor" /> Ask them to confirm
                 </Button>
               </dd>
             </div>
           ))}
         </dl>
+      )}
+
+      {!ready && found.length > 0 && (
+        <p className="font-prose text-text-3">
+          Fill in the invoice below first — what the debtor signs is derived from it.
+        </p>
       )}
 
       {state === 'asked' && (

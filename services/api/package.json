@@ -7,7 +7,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "npm run build && node --test --test-concurrency=1 dist/src/*.test.js",
+    "test": "npm run build && node --env-file-if-exists=../../.env --test --test-concurrency=1 dist/src/*.test.js",
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/src/main.js"
   },

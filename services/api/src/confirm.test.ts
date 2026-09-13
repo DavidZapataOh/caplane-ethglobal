@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
 import { test } from 'node:test'
 import { privateKeyToAccount } from 'viem/accounts'
 import { CONFIRMATION_TYPES } from './confirmation.js'
 import { createIndex } from './index-state.js'
+import { ledgerCountry, tokenFor as ledgerConnection } from './ledger.js'
 import { type LinkPayload, mint, receiptOf } from './link.js'
 import { createApi } from './server.js'
 
@@ -217,4 +219,74 @@ test('a search too short to be useful is refused, not forwarded to the ledger', 
   const api = await listen(t)
   assert.equal((await fetch(`${api.url}/contacts?q=ab`)).status, 400)
   assert.equal((await fetch(`${api.url}/contacts`)).status, 400)
+})
+
+/**
+ * The browser derives the identity the debtor signs, and two of its components are the ledger's,
+ * not the browser's: the tenant the service reads through and the country configured beside it.
+ * Serving them here is what lets that derivation land on the same value the enclave recomputes.
+ *
+ * Asserted against a live ledger connection, not a constant: a served tenant that is merely well-formed
+ * would satisfy a shape check while pointing at the wrong organisation.
+ */
+test('GET /contacts serves the ledger identity the confirmation binds to', async (t) => {
+  const api = await listen(t)
+  const response = await fetch(`${api.url}/contacts?q=Bayside`)
+  assert.equal(response.status, 200)
+  const body = (await response.json()) as {
+    ledger: { tenantId: string; country: string }
+  }
+  const { tenant } = await ledgerConnection()
+  assert.equal(body.ledger.tenantId, tenant)
+  assert.equal(body.ledger.country, ledgerCountry())
+})
+
+/**
+ * The country is configuration on both sides of a boundary the enclave will not negotiate: it
+ * substitutes its own before hashing, so a service that served a different one would produce
+ * confirmations refused as unconfirmed, with nothing anywhere saying why. The workflow's config is
+ * absent on a machine that never deploys it, and the check is skipped there rather than faked.
+ */
+test('the country served matches the one the enclave substitutes', async (t) => {
+  const path = new URL('../../../../caplane-workflow/config.production.json', import.meta.url)
+  let configured: string
+  try {
+    configured = (JSON.parse(await readFile(path, 'utf8')) as { ledgerCountry: string }).ledgerCountry
+  } catch {
+    t.skip('the workflow configuration is not present on this machine')
+    return
+  }
+  assert.equal(ledgerCountry(), configured)
+})
+
+/**
+ * A creditor confirming their own claim is the one refusal the enclave publishes as
+ * `DebtorUnconfirmed`, and the channel used to let it through: the signature was valid, the link
+ * was spent, and the refusal arrived minutes later on chain as a code that reads as a debtor who
+ * never answered. Refused here, before the link is burned, so the debtor can still sign it from an
+ * account that is not the creditor's.
+ */
+test('a creditor cannot confirm their own claim, and the link survives the attempt', async (t) => {
+  const api = await listen(t)
+  // Far enough from the offsets above that a second of drift between tests cannot mint the same
+  // link twice, which reads as an already-spent link rather than as the refusal under test.
+  const token = tokenFor(Math.floor(Date.now() / 1000) - 600)
+  const itself = await signWith(api.url, token, process.env.BORROWER_KEY as `0x${string}`)
+  assert.equal(
+    itself.debtor.address.toLowerCase(),
+    REQUEST.creditor.toLowerCase(),
+    'the premise of this test is that the two addresses are the same',
+  )
+  const refused = await post(`${api.url}/confirmations/${token}`, {
+    debtor: itself.debtor.address,
+    signature: itself.signature,
+  })
+  assert.equal(refused.status, 422)
+
+  const real = await signWith(api.url, token, process.env.DEBTOR_KEY as `0x${string}`)
+  const accepted = await post(`${api.url}/confirmations/${token}`, {
+    debtor: real.debtor.address,
+    signature: real.signature,
+  })
+  assert.equal(accepted.status, 200, 'the refusal burned a link the debtor could still use')
 })

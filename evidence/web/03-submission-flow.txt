@@ -1,0 +1,51 @@
+The submission cycle, driven from a browser against the deployed registry. Measured 2026-09-13.
+
+A page that showed "submitted" would look identical whether the enclave ever answered or not, and a
+sealed envelope proves nothing about confidentiality unless the same search that fails against the
+chain succeeds against the plaintext. Both controls are below.
+
+--- the cycle -----------------------------------------------------------------
+
+    invoice        ORC1043, 275,000.00 AUD, due 2026-12-31, owed by a contact the ledger holds
+    submitted      0x9d052f40a16ee671e4e095d14266bdeeba8b0b892c1e9825d2b347944895110b
+                   status 1, block 61888812, 69,097 gas, to the inbox
+    verdict        LienRecorded @ 61888838 — 26 blocks, about 13 seconds
+                   tx 0xaa2bc2e46491d917c1b5d8c2305939ffa31e804d3ad3575fbb07b76dfcb9f9fa
+    lienId         0xebd60de9b8c99e6bde3ce7ad1894177e706e75c0120c192da71400a378ae7e4c
+    borrower       0x68905da737e5a11e3a93ab6cec2ea8b145fce961
+    expiresAt      2027-01-30 (the due date plus the configured grace)
+
+Nothing of ours is in that path after the browser broadcasts. The enclave fetched the invoice from
+the accounting ledger itself, screened the counterparty, recovered the debtor's signature and read
+the collision index — and published one word.
+
+--- one encrypted envelope, and the control that makes "absent" mean something --
+
+    envelope       886 bytes of ciphertext; the event carries 960 bytes of ABI-encoded data
+    plaintext      792 bytes, recovered by opening the on-chain bytes with the enclave key
+
+    field          in the plaintext      on chain
+    ORC1043        PRESENT               absent
+    27500000       PRESENT               absent
+    AUD            PRESENT               absent
+    2026-12-31     PRESENT               absent
+
+The right-hand column is the claim; the left-hand column is what keeps it from being vacuous. The
+same byte search, over the same four needles, finds every one of them inside the opened envelope.
+A search that could not find a field it was looking at would have reported "absent" for both.
+
+--- three refusals on the way here --------------------------------------------
+
+The cycle was refused twice before it was recorded, both times as reason 2, DebtorUnconfirmed —
+which is one code covering ten conditions, so the chain names the claim and never the condition.
+Opening the envelope and running the enclave's own check condition by condition is what told them
+apart:
+
+    0xfe04b521…  claimId mismatch. The page derived the identity the debtor signs from its own
+                 fields, and the enclave substitutes the ledger's name for the counterparty and the
+                 tenant it read through before it recomputes. No submission could ever have matched.
+    0x879837c9…  claimId matched; the debtor was the submitter. A creditor cannot confirm their own
+                 claim, and the channel used to accept the signature and spend the one-time link
+                 before the chain refused it minutes later.
+
+Both are closed, each with a test that fails if the old behaviour returns.

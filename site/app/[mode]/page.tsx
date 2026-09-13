@@ -3,7 +3,7 @@ import { Landing } from '../../components/landing'
 export default async function Page({ params }: PageProps<'/[mode]'>) {
   const { mode } = await params
   if (mode === 'paper') {
-    // Sprint-06/02 replaces this with the documentation site.
+    // A placeholder until the documentation site lands here.
     return (
       <main className="flex-1 p-8 font-data text-text-2">
         <h1 className="font-display text-text text-2xl">Caplane docs</h1>
